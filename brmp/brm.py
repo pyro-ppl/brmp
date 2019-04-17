@@ -126,8 +126,12 @@ def std_normal(shape):
     assert type(shape) == list
     return 'Normal(torch.zeros({}), torch.ones({})).to_event({})'.format(shape, shape, len(shape))
 
-def sample(name, distribution):
-    return '{} = pyro.sample("{}", dist.{})'.format(name, name, distribution)
+def sample(name, distribution, obs=None):
+    args = ['"{}"'.format(name),
+            'dist.{}'.format(distribution)]
+    if obs:
+        args.append('obs={}'.format(obs))
+    return '{} = pyro.sample({})'.format(name, ', '.join(args))
 
 def indent(line):
     return '    {}'.format(line)
@@ -265,15 +269,15 @@ def genmodel(formula, metadata):
     # from the data.
     body.append(sample('sigma', half_cauchy(scale=3., shape=[1])))
 
-    # TODO: Add the observation.
     # TODO: Add plate?
-    body.append(sample('y', 'Normal(mu, sigma.expand(N)).to_event(1)'))
+    body.append(sample('y', 'Normal(mu, sigma.expand(N)).to_event(1)', 'y_obs'))
 
     body.append('return dict(b=b, sigma=sigma, y=y)')
 
     params = (['X'] +
               ['Z_{}'.format(i+1) for i in range(num_groups)] +
-              ['J_{}'.format(i+1) for i in range(num_groups)])
+              ['J_{}'.format(i+1) for i in range(num_groups)] +
+              ['y_obs=None'])
     return '\n'.join(method('model', params, body))
 
 def eval_model(model_code):
@@ -300,6 +304,7 @@ def dummydata(formula, metadata, N):
         data['Z_{}'.format(i+1)] = torch.rand(N, M_i)
         # Maps (indices of) data points to (indices of) levels.
         data['J_{}'.format(i+1)] = torch.randint(0, num_levels, size=[N])
+    data['y_obs'] = torch.rand(N)
     return data
 
 def main():
