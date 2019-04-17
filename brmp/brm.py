@@ -196,7 +196,11 @@ def gengroup(i, group, metadata):
     # Prior over coefficient scales.
     code.append(sample('sd_{}'.format(i), half_cauchy(scale=3.0, shape=[M])))
 
-    # Prior over a matrix of unscaled/uncorrelated coefficients.
+    # Prior over a matrix of unscaled/uncorrelated coefficients. This
+    # is similar to the brms generated Stan code. An alternative would
+    # be to pass `torch.mm(torch.diag(sd_{}), L_{})` as the
+    # `scale_tril` argument of a `MultivariateNormal`. Is there any
+    # significant different between these two approaches?
     code.append(sample('z_{}'.format(i), std_normal([M, N])))
 
     # Compute the final (scaled, correlated) coefficients.
