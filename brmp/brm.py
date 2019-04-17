@@ -307,6 +307,26 @@ def dummydata(formula, metadata, N):
     data['y_obs'] = torch.rand(N)
     return data
 
+def print_marginals(mcmc_run):
+    # Looking at only the first trace is OK here because the models
+    # described by lme4 have static structure.
+    trace = mcmc_run.exec_traces[0]
+
+    # Is there a more Pyronic (not poking in trace internals) way to
+    # achieve this? Or is it safer the have `genmodel` return a list
+    # of sample sites used by the models it generates?
+    sample_sites = [k for k in trace.nodes.keys()
+                    if trace.nodes[k]['type'] == 'sample' and not k == 'y']
+    marginal = mcmc_run.marginal(sample_sites)
+    for name in sample_sites:
+        print('==================================================')
+        print(name)
+        print('-- mean ------------------------------------------')
+        print(marginal.empirical[name].mean)
+        print('-- stddev ----------------------------------------')
+        print(marginal.empirical[name].stddev)
+
+
 def main():
     formula = Formula('y', ['x'], [Group(['x2'], 'x1'), Group(['x3'], 'x2')])
     metadata = [Factor('x1', 3), Factor('x2', 4)]
@@ -317,8 +337,11 @@ def main():
 
     model = eval_model(code)
     data = dummydata(formula, metadata, N=5)
-    #print([(k,v.shape) for (k,v) in data.items()])
-    print(model(**data))
+
+    from pyro.infer.mcmc import MCMC, NUTS
+    nuts_kernel = NUTS(model, jit_compile=False, adapt_step_size=True)
+    mcmc_run = MCMC(nuts_kernel, num_samples=10, warmup_steps=10).run(**data)
+    print_marginals(mcmc_run)
 
 if __name__ == '__main__':
     main()
