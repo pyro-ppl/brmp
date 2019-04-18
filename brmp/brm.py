@@ -52,6 +52,10 @@ other assumptions
 
 from collections import namedtuple
 
+import torch
+import numpy as np
+import pandas as pd
+
 # TODO: Add a parser.
 # TODO: Make into classes. Add validation. Add repr.
 Formula = namedtuple('Formula',
@@ -331,21 +335,64 @@ def print_marginals(mcmc_run):
         print(marginal.empirical[name].stddev)
 
 
+# Extract metadata (as expected by `genmodel`) from a pandas
+# dataframe.
+def dfmetadata(df):
+    return [Factor(c, len(df[c].dtype.categories))
+            for c in df
+            if type(df[c].dtype) == pd.CategoricalDtype]
+
+def codenumeric(dfcol):
+    return [dfcol]
+
+def codefactor(dfcol):
+    factors = dfcol.cat.categories
+    num_levels = len(factors)
+    return [dfcol == factors[i] for i in range(1, num_levels)]
+
+def join(lists):
+    return sum(lists, [])
+
+# brms keeps track of the meaning of each column, and uses that when
+# e.g. presenting summaries. Collect that information here?
+
+# TODO: Complain when we don't know how to handle df. e.g A column is
+# neither numeric nor categorical.
+def designmatrix(terms, df):
+    assert type(terms) == list
+    def code(dfcol):
+        return (codefactor
+                if type(dfcol.dtype) == pd.CategoricalDtype
+                else codenumeric)(dfcol)
+    bias_col = torch.ones(len(df))
+    coded_cols = join([code(df[col]) for col in terms])
+    X_T = torch.stack([bias_col] +
+                      [torch.tensor(col.to_numpy().astype('float32')) for col in coded_cols])
+    return X_T.transpose(0, 1)
+
 def main():
-    formula = Formula('y', ['x'], [Group(['x2'], 'x1'), Group(['x3'], 'x2')])
-    metadata = [Factor('x1', 3), Factor('x2', 4)]
+    # formula = Formula('y', ['x'], [Group(['x2'], 'x1'), Group(['x3'], 'x2')])
+    # metadata = [Factor('x1', 3), Factor('x2', 4)]
 
-    code = genmodel(formula, metadata)
-    print(code)
-    print()
+    # code = genmodel(formula, metadata)
+    # print(code)
+    # print()
 
-    model = eval_model(code)
-    data = dummydata(formula, metadata, N=5)
+    # model = eval_model(code)
+    # data = dummydata(formula, metadata, N=5)
 
-    from pyro.infer.mcmc import MCMC, NUTS
-    nuts_kernel = NUTS(model, jit_compile=False, adapt_step_size=True)
-    mcmc_run = MCMC(nuts_kernel, num_samples=10, warmup_steps=10).run(**data)
-    print_marginals(mcmc_run)
+    # from pyro.infer.mcmc import MCMC, NUTS
+    # nuts_kernel = NUTS(model, jit_compile=False, adapt_step_size=True)
+    # mcmc_run = MCMC(nuts_kernel, num_samples=10, warmup_steps=10).run(**data)
+    # print_marginals(mcmc_run)
+
+    df = pd.DataFrame({'y': [1,1,1,1,1,1],
+                       'x1': pd.Categorical(list('ABCDAB')),
+                       'x2': pd.Categorical(list('XYXYXY')),
+                       'x3': [1,1,2,2,3,4]})
+    print(df)
+    print(designmatrix(['x1', 'x2', 'x3'], df))
+
 
 if __name__ == '__main__':
     main()
