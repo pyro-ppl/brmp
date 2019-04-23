@@ -377,6 +377,32 @@ def designmatrix(terms, df):
                       [torch.tensor(col.to_numpy().astype('float32')) for col in coded_cols])
     return X_T.transpose(0, 1)
 
+
+def lookupvector(column, df):
+    assert type(column) == str
+    assert type(df) == pd.DataFrame
+    assert column in df
+    assert is_categorical_dtype(df[column])
+    return torch.from_numpy(df[column].cat.codes.to_numpy(np.int64))
+
+def responsevector(column, df):
+    assert type(column) == str
+    assert type(df) == pd.DataFrame
+    assert column in df
+    assert is_numeric_dtype(df[column])
+    return torch.from_numpy(df[column].to_numpy(np.float32))
+
+def makedata(formula, df):
+    assert type(formula) == Formula
+    assert type(df) == pd.DataFrame
+    data = {}
+    data['X'] = designmatrix(formula.pterms, df)
+    data['y_obs'] = responsevector(formula.response, df)
+    for i, group in enumerate(formula.groups):
+        data['Z_{}'.format(i+1)] = designmatrix(group.gterms, df)
+        data['J_{}'.format(i+1)] = lookupvector(group.column, df)
+    return data
+
 def main():
     # formula = Formula('y', ['x'], [Group(['x2'], 'x1'), Group(['x3'], 'x2')])
     # metadata = [Factor('x1', 3), Factor('x2', 4)]
