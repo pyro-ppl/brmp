@@ -378,7 +378,10 @@ def designmatrix(terms, df):
     bias_col = torch.ones(len(df))
     coded_cols = join([code(df[col]) for col in terms])
     X_T = torch.stack([bias_col] +
-                      [torch.tensor(col.to_numpy().astype('float32')) for col in coded_cols])
+                      # TODO: It's possible to do torch.tensor(col)
+                      # here. What does that do? Is it preferable to
+                      # this?
+                      [torch.from_numpy(col.to_numpy(np.float32)) for col in coded_cols])
     return X_T.transpose(0, 1)
 
 
