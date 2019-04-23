@@ -279,8 +279,8 @@ def genmodel(formula, metadata):
     # from the data.
     body.append(sample('sigma', half_cauchy(scale=3., shape=[1])))
 
-    # TODO: Add plate?
-    body.append(sample('y', 'Normal(mu, sigma.expand(N)).to_event(1)', 'y_obs'))
+    body.append('with pyro.plate("obs", N):')
+    body.append(indent(sample('y', 'Normal(mu, sigma.expand(N))', 'y_obs')))
 
     body.append('return dict(b=b, sigma=sigma, y=y)')
 
@@ -326,7 +326,7 @@ def print_marginals(mcmc_run):
     # achieve this? Or is it safer the have `genmodel` return a list
     # of sample sites used by the models it generates?
     sample_sites = [k for k in trace.nodes.keys()
-                    if trace.nodes[k]['type'] == 'sample' and not k == 'y']
+                    if trace.nodes[k]['type'] == 'sample' and not k in ['obs', 'y']]
     marginal = mcmc_run.marginal(sample_sites)
     for name in sample_sites:
         print('==================================================')
