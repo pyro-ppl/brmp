@@ -344,6 +344,10 @@ def dfmetadata(df):
             for c in df
             if type(df[c].dtype) == pd.CategoricalDtype]
 
+def makecode(formula, df):
+    return genmodel(formula, dfmetadata(df))
+
+
 def codenumeric(dfcol):
     return [dfcol]
 
@@ -403,29 +407,17 @@ def makedata(formula, df):
         data['J_{}'.format(i+1)] = lookupvector(group.column, df)
     return data
 
+def brm(formula, df):
+    code = genmodel(formula, dfmetadata(df))
+    model = eval_model(code)
+    data = makedata(formula, df)
+
+    from pyro.infer.mcmc import MCMC, NUTS
+    nuts_kernel = NUTS(model, jit_compile=False, adapt_step_size=True)
+    return MCMC(nuts_kernel, num_samples=500, warmup_steps=100).run(**data)
+
 def main():
-    # formula = Formula('y', ['x'], [Group(['x2'], 'x1'), Group(['x3'], 'x2')])
-    # metadata = [Factor('x1', 3), Factor('x2', 4)]
-
-    # code = genmodel(formula, metadata)
-    # print(code)
-    # print()
-
-    # model = eval_model(code)
-    # data = dummydata(formula, metadata, N=5)
-
-    # from pyro.infer.mcmc import MCMC, NUTS
-    # nuts_kernel = NUTS(model, jit_compile=False, adapt_step_size=True)
-    # mcmc_run = MCMC(nuts_kernel, num_samples=10, warmup_steps=10).run(**data)
-    # print_marginals(mcmc_run)
-
-    df = pd.DataFrame({'y': [1,1,1,1,1,1],
-                       'x1': pd.Categorical(list('ABCDAB')),
-                       'x2': pd.Categorical(list('XYXYXY')),
-                       'x3': [1,1,2,2,3,4]})
-    print(df)
-    print(designmatrix(['x1', 'x2', 'x3'], df))
-
+    pass
 
 if __name__ == '__main__':
     main()
