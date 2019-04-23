@@ -55,6 +55,8 @@ from collections import namedtuple
 import torch
 import numpy as np
 import pandas as pd
+# http://pandas.pydata.org/pandas-docs/stable/reference/general_utility_functions.html#dtype-introspection
+from pandas.api.types import is_numeric_dtype, is_categorical_dtype
 
 # TODO: Add a parser.
 # TODO: Make into classes. Add validation. Add repr.
@@ -353,17 +355,22 @@ def codefactor(dfcol):
 def join(lists):
     return sum(lists, [])
 
-# brms keeps track of the meaning of each column, and uses that when
-# e.g. presenting summaries. Collect that information here?
+# TODO: brms keeps track of the meaning of each column, and uses that
+# when e.g. presenting summaries. Collect that information here?
 
-# TODO: Complain when we don't know how to handle df. e.g A column is
-# neither numeric nor categorical.
+# Build a simple design matrix (as a torch tensor) from columns of a
+# pandas data frame.
 def designmatrix(terms, df):
     assert type(terms) == list
     def code(dfcol):
-        return (codefactor
-                if type(dfcol.dtype) == pd.CategoricalDtype
-                else codenumeric)(dfcol)
+        if is_categorical_dtype(dfcol):
+            return codefactor(dfcol)
+        # TODO: This built-in helper may not coincide exactly with
+        # what we want here, I've not checked.
+        elif is_numeric_dtype(dfcol):
+            return codenumeric(dfcol)
+        else:
+            raise Exception('Column type {} not supported.'.format(dfcol.dtype))
     bias_col = torch.ones(len(df))
     coded_cols = join([code(df[col]) for col in terms])
     X_T = torch.stack([bias_col] +
