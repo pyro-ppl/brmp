@@ -110,7 +110,7 @@ def designmatrix(terms, df):
             return codenumeric(dfcol)
         else:
             raise Exception('Column type {} not supported.'.format(dfcol.dtype))
-    bias_col = torch.ones(len(df))
+    bias_col = torch.ones(len(df), dtype=torch.float32)
     coded_cols = join([code(df[col]) for col in terms])
     X_T = torch.stack([bias_col] +
                       # TODO: It's possible to do torch.tensor(col)
