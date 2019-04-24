@@ -1,7 +1,11 @@
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from brm import Formula, Group, makedata, makecode, brm, print_marginals
+
+from pyro.contrib.brm import brm, makecode
+from pyro.contrib.brm.formula import Formula, Group
+from pyro.contrib.brm.design import makedata
+from pyro.contrib.brm.utils import print_marginals
 
 def f(x):
     eps = np.random.normal(0, 0.5, x.shape)
