@@ -12,7 +12,8 @@ from pyro.contrib.brm.design import dummydata, Factor, makedata
 from tests.common import assert_equal
 
 # TODO: Extend this. Could check that each random choice comes from
-# expected family? Could check shapes of sampled values? Check
+# expected family? Could check shapes of sampled values? (Although
+# there are already asserting in the generated code to do that.) Check
 # response is observed.
 @pytest.mark.parametrize('formula, metadata, expected', [
     (Formula('y', ['x'], []), [], ['b', 'sigma']),

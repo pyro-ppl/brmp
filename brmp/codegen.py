@@ -110,15 +110,15 @@ def gengroup(i, group, metadata):
     # it's not clear that this will have optimal performance in
     # PyTorch.
 
-    # One alternative is the following (rather than looping over each
-    # coefficient):
+    # TODO: One alternative is the following (rather than looping over
+    # each coefficient):
 
     # mu = mu + torch.sum(Z_1 * r_1[J_1], 1)
 
     # This is vectorised over N and M, but allocates a large
-    # intermediate tensor. (Though I don't think this is worse than
-    # the current implementation.) Perhaps this can be avoided with
-    # einsum notation.
+    # intermediate tensor `r_1[J_1]`. (Though I don't think this is
+    # worse than the current implementation.) Can this be avoided? (I
+    # guess einsum doesn't help because we'd have nested indices?)
 
     for j in range(M_i):
         code.append('r_{}_{} = r_{}[:, {}]'.format(i, j+1, i, j))
