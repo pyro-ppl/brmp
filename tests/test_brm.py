@@ -17,8 +17,14 @@ from tests.common import assert_equal
 @pytest.mark.parametrize('formula, metadata, expected', [
     (Formula('y', ['x'], []), [], ['b', 'sigma']),
     (Formula('y', ['x1', 'x2'], []), [], ['b', 'sigma']),
-    (Formula('y', ['x1', 'x2'], [Group(['x3'],'z')]), [Factor('z', 2)], ['b', 'sigma', 'z_1', 'sd_1', 'L_1']),
-    (Formula('y', ['x1', 'x2'], [Group(['x3', 'x4'], 'z1'), Group(['x5'],'z2')]),
+
+    # Group with intercept only:
+    (Formula('y', ['x'], [Group([],'z', True)]), [Factor('z', 2)], ['b', 'sigma', 'z_1', 'sd_1']),
+    (Formula('y', ['x'], [Group([],'z', False)]), [Factor('z', 2)], ['b', 'sigma', 'z_1', 'sd_1']),
+
+    (Formula('y', ['x1', 'x2'], [Group(['x3'],'z', True)]), [Factor('z', 2)], ['b', 'sigma', 'z_1', 'sd_1', 'L_1']),
+    (Formula('y', ['x1', 'x2'], [Group(['x3'],'z', False)]), [Factor('z', 2)], ['b', 'sigma', 'z_1', 'sd_1']),
+    (Formula('y', ['x1', 'x2'], [Group(['x3', 'x4'], 'z1', True), Group(['x5'], 'z2', True)]),
      [Factor('z1', 2), Factor('z2', 2)],
      ['b', 'sigma', 'z_1', 'sd_1', 'L_1', 'z_2', 'sd_2', 'L_2']),
 ])
@@ -50,7 +56,7 @@ def test_codegen(formula, metadata, expected):
                           [1., 1., 0.],
                           [1., 0., 1.]]),
           y_obs=torch.tensor([1., 2., 3.]))),
-    (Formula('y', [], [Group(['x1'], 'x2')]),
+    (Formula('y', [], [Group(['x1'], 'x2', True)]),
      pd.DataFrame(dict(y=[1, 2, 3],
                        x1=pd.Categorical(list('AAB')),
                        x2=pd.Categorical(list('ABC')))),

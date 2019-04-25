@@ -9,4 +9,5 @@ Formula = namedtuple('Formula',
 
 Group = namedtuple('Group',
                    ['gterms',       # list of group level columns
-                    'column'])      # name of grouping column
+                    'column',       # name of grouping column
+                    'corr'])        # model correlation between coeffs?
