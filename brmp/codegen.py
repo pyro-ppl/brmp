@@ -57,7 +57,7 @@ def gengroup(i, group, metadata):
     code.append(comment('[{}] {}'.format(i, group)))
 
     # The number of coefficients per level.
-    M_i = 1 + sum(width(col, metadata_lookup) for col in group.gterms)
+    M_i = width(group.gterms, metadata_lookup)
 
     # The number of levels.
     N_i = groupfactor.num_levels
@@ -144,7 +144,7 @@ def genmodel(formula, metadata):
 
     # The number of columns of the design matrix. We assume the
     # presence of an intercept.
-    M = 1 + sum(width(col, metadata_lookup) for col in formula.pterms)
+    M = width(formula.pterms, metadata_lookup)
     body.append('M = {}'.format(M))
     body.append('assert X.shape == (N, M)')
 

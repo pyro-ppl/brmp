@@ -6,7 +6,7 @@ import pandas as pd
 # http://pandas.pydata.org/pandas-docs/stable/reference/general_utility_functions.html#dtype-introspection
 from pandas.api.types import is_numeric_dtype, is_categorical_dtype
 
-from .formula import Formula
+from .formula import Formula, Intercept
 
 def make_metadata_lookup(metadata):
     assert type(metadata) == list
@@ -43,12 +43,6 @@ def make_metadata_lookup(metadata):
 # Subsequent factors are then coded as they would be were an intercept
 # present.
 
-def width(col, metadata_lookup):
-    if col in metadata_lookup:
-        return metadata_lookup[col].num_levels - 1
-    else:
-        return 1
-
 Factor = namedtuple('Factor',
                     ['name',        # column name
                      'num_levels']) # number of levels
@@ -68,10 +62,10 @@ def dummydata(formula, metadata, N):
     import torch
     metadata_lookup = make_metadata_lookup(metadata)
     data = {}
-    M = 1 + sum(width(col, metadata_lookup) for col in formula.pterms)
+    M = width(formula.pterms, metadata_lookup)
     data['X'] = torch.rand(N, M)
     for i, group in enumerate(formula.groups):
-        M_i = 1 + sum(width(col, metadata_lookup) for col in group.gterms)
+        M_i = width(group.gterms, metadata_lookup)
         num_levels = metadata_lookup[group.column].num_levels
         data['Z_{}'.format(i+1)] = torch.rand(N, M_i)
         # Maps (indices of) data points to (indices of) levels.
@@ -86,13 +80,42 @@ def dummydata(formula, metadata, N):
 def codenumeric(dfcol):
     return [dfcol]
 
-def codefactor(dfcol):
+def codefactor(dfcol, reduced):
     factors = dfcol.cat.categories
     num_levels = len(factors)
-    return [dfcol == factors[i] for i in range(1, num_levels)]
+    start = 1 if reduced else 0
+    return [dfcol == factors[i] for i in range(start, num_levels)]
 
 def join(lists):
     return sum(lists, [])
+
+def col2torch(col):
+    if type(col) == torch.Tensor:
+        assert col.dtype == torch.float32
+        return col
+    else:
+        # TODO: It's possible to do torch.tensor(col) here. What does
+        # that do? Is it preferable to this?
+        return torch.from_numpy(col.to_numpy(np.float32))
+
+def term_order(term):
+    return 0 if type(term) == Intercept else 1
+
+# TODO: This duplicates lots of logic from designmatrix. (That terms
+# should be sorted by term_order, that reduced coding is used for
+# everything but the left most term.)
+def width(terms, metadata_lookup):
+    def termwidth(i, term):
+        if type(term) == Intercept:
+            return 1
+        elif term in metadata_lookup:
+            reduced = i>0
+            return metadata_lookup[term].num_levels - (1 if reduced else 0)
+        else:
+            return 1
+    sorted_terms = sorted(terms, key=term_order)
+    return sum(termwidth(i, term) for i, term in enumerate(sorted_terms))
+
 
 # TODO: brms keeps track of the meaning of each column, and uses that
 # when e.g. presenting summaries. Collect that information here?
@@ -101,22 +124,27 @@ def join(lists):
 # pandas data frame.
 def designmatrix(terms, df):
     assert type(terms) == list
-    def code(dfcol):
+    def code(i, term):
+        assert type(term) in [str, Intercept]
+        if type(term) == Intercept:
+            return [torch.ones(len(df), dtype=torch.float32)]
+        dfcol = df[term]
         if is_categorical_dtype(dfcol):
-            return codefactor(dfcol)
+            return codefactor(dfcol, reduced=i>0)
         # TODO: This built-in helper may not coincide exactly with
         # what we want here, I've not checked.
         elif is_numeric_dtype(dfcol):
             return codenumeric(dfcol)
         else:
             raise Exception('Column type {} not supported.'.format(dfcol.dtype))
-    bias_col = torch.ones(len(df), dtype=torch.float32)
-    coded_cols = join([code(df[col]) for col in terms])
-    X_T = torch.stack([bias_col] +
-                      # TODO: It's possible to do torch.tensor(col)
-                      # here. What does that do? Is it preferable to
-                      # this?
-                      [torch.from_numpy(col.to_numpy(np.float32)) for col in coded_cols])
+    sorted_terms = sorted(terms, key=term_order)
+    coded_cols = join([code(i, term) for i, term in enumerate(sorted_terms)])
+    X_T = torch.stack([col2torch(col) for col in coded_cols])
+    # TODO: Remove once there's no longer any need to keep width and
+    # designmatrix in sync.
+    # Sanity check that sizes computed by width helper agree with
+    # on this instance.
+    assert width(terms, make_metadata_lookup(dfmetadata(df))) == X_T.size(0)
     return X_T.transpose(0, 1)
 
 

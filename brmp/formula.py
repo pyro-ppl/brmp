@@ -11,3 +11,6 @@ Group = namedtuple('Group',
                    ['gterms',       # list of group level columns
                     'column',       # name of grouping column
                     'corr'])        # model correlation between coeffs?
+
+Intercept = namedtuple('Intercept', [])
+_1 = Intercept()
