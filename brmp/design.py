@@ -52,7 +52,7 @@ Factor = namedtuple('Factor',
 def dfmetadata(df):
     return [Factor(c, len(df[c].dtype.categories))
             for c in df
-            if type(df[c].dtype) == pd.CategoricalDtype]
+            if is_categorical_dtype(df[c])]
 
 # TODO: Factor out the logic for figuring out how big each matrix is.
 # Could re-use here and when generating model code? (When generating
@@ -78,9 +78,11 @@ def dummydata(formula, metadata, N):
 # --------------------
 
 def codenumeric(dfcol):
+    assert is_numeric_dtype(dfcol)
     return [dfcol]
 
 def codefactor(dfcol, reduced):
+    assert is_categorical_dtype(dfcol)
     factors = dfcol.cat.categories
     num_levels = len(factors)
     start = 1 if reduced else 0
@@ -138,6 +140,16 @@ def width(terms, metadata_lookup):
 
 # Build a simple design matrix (as a torch tensor) from columns of a
 # pandas data frame.
+
+# TODO: There ought to be a check somewhere to ensure that all terms
+# are either numeric or categorical. We're making this assumption in
+# `coding`, where anything not mentioned in dfmetadata(df) is assumed
+# to be numeric. But we can't check it there because we don't have a
+# concreate dataframe at that point. Here we have a list of terms and
+# the df, so this seems like a good place. An alternative is to do
+# this in makedata, but we'd need to do so for population and group
+# levels.
+
 def designmatrix(terms, df):
     assert type(terms) == list
     N = len(df)
