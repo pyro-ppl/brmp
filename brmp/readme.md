@@ -1,47 +1,35 @@
-formulae
---------
+# Bayesian Regression Models
 
-the basic lme4 syntax looks like: response ~ pterms + (gterms | group)
+## Formulae
 
-a subset of this can be described using Formula and Group.
+The basic lme4 syntax looks like:
 
-examples:
+`response ~ pterms + (gterms | group)`
 
+A subset of this can be described using `Formula` and `Group`, for
+example:
+
+```python
 # y ~ x
-Formula('y', ['x'], [])
+Formula('y', [_1, 'x'], [])
 
-# y ~ x1 + x2 + (1 | x3) + (x4 + x5 | x6)
+# y ~ x1 + x2 + (1 | x3) + (x4 + x5 || x6)
 Formula('y',
-        ['x1', 'x2'],
-        [Group([], 'x3'), Group(['x4', 'x5'], 'x6')]
+        [_1, 'x1', 'x2'],
+        [Group([_1], 'x3', True), Group([_1, 'x4', 'x5'], 'x6', False)]
+```
 
-current limitations include:
+Functioning model code and design matrices (from a pandas dataframe)
+can be generated for this subset. See `ex0.py` for an example.
 
-- all formula terms are column names. expressions are not supported.
-  (e.g. I(X1*X2).)
-- the group syntax g1:g2 and g1/g2 is not supported.
-- interaction between terms in not supported. e.g. y ~ x1 * x2
-- the syntax to indicate the correlations between coefficients within
-  a group should not be modelled is not supported. e.g. (gterms ||
-  group).
-- the default intercept term cannot be suppressed.
+## Limitations
 
-metadata
---------
-
-the generated model depends on properties of the data set. rather than
-require a concrete data set be give, we instead ask for just the
-relevant metadata, which is currently just a list of those columns
-which are factors (in the R sense). all other columns are assumed to
-be numeric.
-
-examples:
-
-- []                    # all cols are numeric
-- [Factor("gender", 2)] # gender is a factor with two levels.
-
-other assumptions
------------------
-
-- the response is a scalar
-- the response is Gaussian distributed
+* All formula terms must be column names. Expressions such as
+  `I(x1*x2)` are not supported.
+* The group syntax `g1:g2` and `g1/g2` is not supported.
+* Interaction between terms in not supported. e.g. `y ~ x1*x2`
+* The response is always scalar.
+* The response is Gaussian distributed.
+* Some priors used in generated code are not sensible.
+* Priors cannot be customised.
+* Lots more...
