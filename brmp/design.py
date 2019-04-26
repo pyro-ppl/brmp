@@ -14,35 +14,6 @@ def make_metadata_lookup(metadata):
     # Turn a list of factors into a dictionary keyed by column name.
     return dict((factor.name, factor) for factor in metadata)
 
-# Computes the number of entries a column adds to the design matrix.
-# Each numeric column contributes 1 entry. Each factor contributes
-# num_levels-1.
-
-# The latter is because a factor with 4 levels (for example) is coded
-# like so in the design matrix:
-
-# x = factor(c(0, 1, 2, 3))
-#
-# Intercept x1 x2 x3
-# 1          0  0  0
-# 1          1  0  0
-# 1          0  1  0
-# 1          0  0  1
-
-# This is always the case when an intercept is present, otherwise
-# things are a little more subtle. Without an intercept, the factor
-# above would be coded like so if it appears as the first term in e.g.
-# pterms.
-
-# x0 x1 x2 x3
-#  1  0  0  0
-#  0  1  0  0
-#  0  0  1  0
-#  0  0  0  1
-
-# Subsequent factors are then coded as they would be were an intercept
-# present.
-
 Factor = namedtuple('Factor',
                     ['name',        # column name
                      'num_levels']) # number of levels
@@ -80,6 +51,26 @@ def dummydata(formula, metadata, N):
 def codenumeric(dfcol):
     assert is_numeric_dtype(dfcol)
     return [dfcol]
+
+# Codes a categorical column/factor. When reduced==False the column is
+# dummy/one-of-K coded.
+
+# x = [A, B, C, A]
+
+# x0 x1 x2
+#  1  0  0
+#  0  1  0
+#  0  0  1
+#  1  0  0
+
+# When reduced==True the same coding is used, but the first column is
+# dropped.
+
+# x1 x2
+#  0  0
+#  1  0
+#  0  1
+#  0  0
 
 def codefactor(dfcol, reduced):
     assert is_categorical_dtype(dfcol)
