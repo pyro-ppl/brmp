@@ -3,7 +3,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 from pyro.contrib.brm import brm, makecode
-from pyro.contrib.brm.formula import Formula, Group
+from pyro.contrib.brm.formula import Formula, Group, _1
 from pyro.contrib.brm.design import makedata
 from pyro.contrib.brm.utils import print_marginals
 
@@ -19,8 +19,8 @@ ys = f(xs)
 
 df = pd.DataFrame(dict(x=xs, y=ys))
 
-# y ~ x
-formula = Formula('y', ['x'], [])
+# y ~ 1 + x
+formula = Formula('y', [_1, 'x'], [])
 
 # data = makedata(formula, df)
 # for (k, v) in data.items():
