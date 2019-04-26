@@ -54,10 +54,10 @@ def dfmetadata(df):
             for c in df
             if is_categorical_dtype(df[c])]
 
-# TODO: Factor out the logic for figuring out how big each matrix is.
-# Could re-use here and when generating model code? (When generating
-# dimension checking code, constants N,M, parameters for model
-# function.)
+# TODO: Use the result of `coding` to generate more realistic dummy
+# data. i.e. Rather than just having X & Z matrices of the correct
+# size, intercepts can be all ones, and categorical columns can be
+# appropriately coded (width `codefactor`) random data.
 def dummydata(formula, metadata, N):
     import torch
     metadata_lookup = make_metadata_lookup(metadata)
@@ -107,6 +107,10 @@ def term_order(term):
 InterceptC = namedtuple('InterceptC', [])
 CategoricalC = namedtuple('CategoricalC', ['factor', 'reduced'])
 NumericC = namedtuple('NumericC', ['name'])
+
+# TODO: I do similar dispatching on type in `designmatrix`. It would
+# be more Pythonic to turn InterceptC etc. into classes with `width`
+# and `code` methods.
 
 def widthC(c):
     if type(c) in [InterceptC, NumericC]:
