@@ -99,9 +99,9 @@ InterceptC = namedtuple('InterceptC', [])
 CategoricalC = namedtuple('CategoricalC', ['factor', 'reduced'])
 NumericC = namedtuple('NumericC', ['name'])
 
-# TODO: I do similar dispatching on type in `designmatrix`. It would
-# be more Pythonic to turn InterceptC etc. into classes with `width`
-# and `code` methods.
+# TODO: I do similar dispatching on type in `designmatrix` and
+# `designmatrix_metadata`. It would be more Pythonic to turn
+# InterceptC etc. into classes with `width` and `code` methods.
 
 def widthC(c):
     if type(c) in [InterceptC, NumericC]:
@@ -162,8 +162,52 @@ def designmatrix(terms, df):
     coded_cols = join([dispatch(c) for c in coding_desc])
     X = torch.stack([col2torch(col) for col in coded_cols], dim=1) if coded_cols else torch.empty(N, 0)
     assert X.shape == (N, width(terms, metadata_lookup))
+    #print(designmatrix_metadata(terms, df))
     return X
 
+# --------------------------------------------------
+# Experimenting with design matrix metadata:
+#
+# `designmatrix_metadata` computes a list of readable design matrix
+# column names. The idea is that (following brms) this information has
+# a number of uses:
+#
+# - Improve readability of e.g. `Fit` summary. e.g. Instead of just
+#   showing the `b` vector, we can use this information to identify
+#   each coefficient.
+#
+# - Users need to be able to specify their own priors for individual
+#   coefficients. I think this information is used as the basis of
+#   that, allowing priors to be specified by coefficient name?
+
+# TODO: Does it make sense for this to work with a concrete dataframe,
+# or should it work with an abstract description of the data? i.e.
+# With `Factor` extended to include level names?
+
+def numeric_metadata(code):
+    return [code.name]
+
+def categorical_metadata(code, dfcol):
+    start = 1 if code.reduced else 0
+    return ['{}[{}]'.format(code.factor.name, cat)
+            for cat in dfcol.cat.categories[start:]]
+
+def designmatrix_metadata(terms, df):
+    assert type(terms) == list
+    def dispatch(code):
+        if type(code) == InterceptC:
+            return ['intercept']
+        elif type(code) == CategoricalC:
+            return categorical_metadata(code, df[code.factor.name])
+        elif type(code) == NumericC:
+            return numeric_metadata(code)
+        else:
+            raise Exception('Unknown coding type.')
+    metadata_lookup = make_metadata_lookup(dfmetadata(df))
+    coding_desc = coding(terms, metadata_lookup)
+    return join([dispatch(c) for c in coding_desc])
+
+# --------------------------------------------------
 
 def lookupvector(column, df):
     assert type(column) == str
