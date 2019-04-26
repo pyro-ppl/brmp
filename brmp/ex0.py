@@ -2,9 +2,8 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from pyro.contrib.brm import brm, makecode
+from pyro.contrib.brm import brm
 from pyro.contrib.brm.formula import Formula, Group, _1
-from pyro.contrib.brm.design import makedata
 from pyro.contrib.brm.fit import print_marginals
 
 def f(x):
