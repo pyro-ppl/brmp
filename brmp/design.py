@@ -101,21 +101,37 @@ def col2torch(col):
 def term_order(term):
     return 0 if type(term) == Intercept else 1
 
-# TODO: This duplicates lots of logic from designmatrix. (That terms
-# should be sorted by term_order, that reduced coding is used for
-# everything but the left most term.)
-def width(terms, metadata_lookup):
-    def termwidth(i, term):
-        if type(term) == Intercept:
-            return 1
-        elif term in metadata_lookup:
-            reduced = i>0
-            return metadata_lookup[term].num_levels - (1 if reduced else 0)
-        else:
-            return 1
-    sorted_terms = sorted(terms, key=term_order)
-    return sum(termwidth(i, term) for i, term in enumerate(sorted_terms))
 
+InterceptC = namedtuple('InterceptC', [])
+CategoricalC = namedtuple('CategoricalC', ['factor', 'reduced'])
+NumericC = namedtuple('NumericC', ['name'])
+
+def widthC(c):
+    if type(c) in [InterceptC, NumericC]:
+        return 1
+    elif type(c) == CategoricalC:
+        return c.factor.num_levels - (1 if c.reduced else 0)
+    else:
+        raise Exception('Unknown coding type.')
+
+# Generates a description of how the given terms ought to be coded
+# into a design matrix.
+def coding(terms, metadata_lookup):
+    assert type(terms) == list
+    def code(i, term):
+        assert type(term) in [str, Intercept]
+        if type(term) == Intercept:
+            return InterceptC()
+        elif term in metadata_lookup:
+            factor = metadata_lookup[term]
+            return CategoricalC(factor, reduced=i>0)
+        else:
+            return NumericC(term)
+    sorted_terms = sorted(terms, key=term_order)
+    return [code(i, term) for i, term in enumerate(sorted_terms)]
+
+def width(terms, metadata_lookup):
+    return sum(widthC(c) for c in coding(terms, metadata_lookup))
 
 # TODO: brms keeps track of the meaning of each column, and uses that
 # when e.g. presenting summaries. Collect that information here?
@@ -125,27 +141,20 @@ def width(terms, metadata_lookup):
 def designmatrix(terms, df):
     assert type(terms) == list
     N = len(df)
-    def code(i, term):
-        assert type(term) in [str, Intercept]
-        if type(term) == Intercept:
+    def dispatch(code):
+        if type(code) == InterceptC:
             return [torch.ones(N, dtype=torch.float32)]
-        dfcol = df[term]
-        if is_categorical_dtype(dfcol):
-            return codefactor(dfcol, reduced=i>0)
-        # TODO: This built-in helper may not coincide exactly with
-        # what we want here, I've not checked.
-        elif is_numeric_dtype(dfcol):
-            return codenumeric(dfcol)
+        elif type(code) == CategoricalC:
+            return codefactor(df[code.factor.name], code.reduced)
+        elif type(code) == NumericC:
+            return codenumeric(df[code.name])
         else:
-            raise Exception('Column type {} not supported.'.format(dfcol.dtype))
-    sorted_terms = sorted(terms, key=term_order)
-    coded_cols = join([code(i, term) for i, term in enumerate(sorted_terms)])
+            raise Exception('Unknown coding type.')
+    metadata_lookup = make_metadata_lookup(dfmetadata(df))
+    coding_desc = coding(terms, metadata_lookup)
+    coded_cols = join([dispatch(c) for c in coding_desc])
     X = torch.stack([col2torch(col) for col in coded_cols], dim=1) if coded_cols else torch.empty(N, 0)
-    # TODO: Remove once there's no longer any need to keep width and
-    # designmatrix in sync.
-    # Sanity check that sizes computed by width helper agree with
-    # on this instance.
-    assert width(terms, make_metadata_lookup(dfmetadata(df))) == X.size(1)
+    assert X.shape == (N, width(terms, metadata_lookup))
     return X
 
 
