@@ -124,10 +124,11 @@ def width(terms, metadata_lookup):
 # pandas data frame.
 def designmatrix(terms, df):
     assert type(terms) == list
+    N = len(df)
     def code(i, term):
         assert type(term) in [str, Intercept]
         if type(term) == Intercept:
-            return [torch.ones(len(df), dtype=torch.float32)]
+            return [torch.ones(N, dtype=torch.float32)]
         dfcol = df[term]
         if is_categorical_dtype(dfcol):
             return codefactor(dfcol, reduced=i>0)
@@ -139,13 +140,13 @@ def designmatrix(terms, df):
             raise Exception('Column type {} not supported.'.format(dfcol.dtype))
     sorted_terms = sorted(terms, key=term_order)
     coded_cols = join([code(i, term) for i, term in enumerate(sorted_terms)])
-    X_T = torch.stack([col2torch(col) for col in coded_cols])
+    X = torch.stack([col2torch(col) for col in coded_cols], dim=1) if coded_cols else torch.empty(N, 0)
     # TODO: Remove once there's no longer any need to keep width and
     # designmatrix in sync.
     # Sanity check that sizes computed by width helper agree with
     # on this instance.
-    assert width(terms, make_metadata_lookup(dfmetadata(df))) == X_T.size(0)
-    return X_T.transpose(0, 1)
+    assert width(terms, make_metadata_lookup(dfmetadata(df))) == X.size(1)
+    return X
 
 
 def lookupvector(column, df):
