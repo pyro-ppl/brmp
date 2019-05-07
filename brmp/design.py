@@ -31,13 +31,13 @@ def dfmetadata(df):
 # appropriately coded (width `codefactor`) random data.
 def dummydata(formula, metadata, N):
     import torch
-    metadata_lookup = make_metadata_lookup(metadata)
+    assert type(metadata) == dict
     data = {}
-    M = width(formula.pterms, metadata_lookup)
+    M = width(formula.pterms, metadata)
     data['X'] = torch.rand(N, M)
     for i, group in enumerate(formula.groups):
-        M_i = width(group.gterms, metadata_lookup)
-        num_levels = metadata_lookup[group.column].num_levels
+        M_i = width(group.gterms, metadata)
+        num_levels = metadata[group.column].num_levels
         data['Z_{}'.format(i+1)] = torch.rand(N, M_i)
         # Maps (indices of) data points to (indices of) levels.
         data['J_{}'.format(i+1)] = torch.randint(0, num_levels, size=[N])
@@ -113,22 +113,24 @@ def widthC(c):
 
 # Generates a description of how the given terms ought to be coded
 # into a design matrix.
-def coding(terms, metadata_lookup):
+def coding(terms, metadata):
     assert type(terms) == list
+    assert type(metadata) == dict
     def code(i, term):
         assert type(term) in [str, Intercept]
         if type(term) == Intercept:
             return InterceptC()
-        elif term in metadata_lookup:
-            factor = metadata_lookup[term]
+        elif term in metadata:
+            factor = metadata[term]
             return CategoricalC(factor, reduced=i>0)
         else:
             return NumericC(term)
     sorted_terms = sorted(terms, key=term_order)
     return [code(i, term) for i, term in enumerate(sorted_terms)]
 
-def width(terms, metadata_lookup):
-    return sum(widthC(c) for c in coding(terms, metadata_lookup))
+def width(terms, metadata):
+    assert type(metadata) == dict
+    return sum(widthC(c) for c in coding(terms, metadata))
 
 # TODO: brms keeps track of the meaning of each column, and uses that
 # when e.g. presenting summaries. Collect that information here?
@@ -157,11 +159,11 @@ def designmatrix(terms, df):
             return codenumeric(df[code.name])
         else:
             raise Exception('Unknown coding type.')
-    metadata_lookup = make_metadata_lookup(dfmetadata(df))
-    coding_desc = coding(terms, metadata_lookup)
+    metadata = make_metadata_lookup(dfmetadata(df))
+    coding_desc = coding(terms, metadata)
     coded_cols = join([dispatch(c) for c in coding_desc])
     X = torch.stack([col2torch(col) for col in coded_cols], dim=1) if coded_cols else torch.empty(N, 0)
-    assert X.shape == (N, width(terms, metadata_lookup))
+    assert X.shape == (N, width(terms, metadata))
     #print(designmatrix_metadata(terms, df))
     return X
 
@@ -209,8 +211,8 @@ def designmatrix_metadata(terms, df):
             return numeric_metadata(code)
         else:
             raise Exception('Unknown coding type.')
-    metadata_lookup = make_metadata_lookup(dfmetadata(df))
-    coding_desc = coding(terms, metadata_lookup)
+    metadata = make_metadata_lookup(dfmetadata(df))
+    coding_desc = coding(terms, metadata)
     return join([dispatch(c) for c in coding_desc])
 
 # --------------------------------------------------

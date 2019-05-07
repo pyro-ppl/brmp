@@ -7,7 +7,7 @@ import pyro.poutine as poutine
 
 from pyro.contrib.brm.formula import Formula, Group, _1
 from pyro.contrib.brm.codegen import genmodel, eval_model
-from pyro.contrib.brm.design import dummydata, Factor, makedata
+from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup
 
 from tests.common import assert_equal
 
@@ -35,6 +35,7 @@ from tests.common import assert_equal
      ['b', 'sigma', 'z_1', 'sd_1', 'L_1', 'z_2', 'sd_2', 'L_2']),
 ])
 def test_codegen(formula, metadata, expected):
+    metadata = make_metadata_lookup(metadata)
     model = eval_model(genmodel(formula, metadata))
     data = dummydata(formula, metadata, 5)
     trace = poutine.trace(model).get_trace(**data)

@@ -1,5 +1,5 @@
 from .formula import Formula, Group
-from .design import make_metadata_lookup, width
+from .design import width
 
 # This assumes that all dims are event dims.
 def std_cauchy(shape):
@@ -48,16 +48,16 @@ def genpopulation():
 def gengroup(i, group, metadata):
     assert type(i) == int # A unique int assigned to each group.
     assert type(group) == Group
-    metadata_lookup = make_metadata_lookup(metadata)
+    assert type(metadata) == dict
     # The column on which we group must be a factor.
-    assert group.column in metadata_lookup, 'group column must be a factor'
-    groupfactor = metadata_lookup[group.column]
+    assert group.column in metadata, 'group column must be a factor'
+    groupfactor = metadata[group.column]
 
     code = ['']
     code.append(comment('[{}] {}'.format(i, group)))
 
     # The number of coefficients per level.
-    M_i = width(group.gterms, metadata_lookup)
+    M_i = width(group.gterms, metadata)
 
     # The number of levels.
     N_i = groupfactor.num_levels
@@ -134,7 +134,7 @@ def genresponse():
 
 def genmodel(formula, metadata):
     assert type(formula) == Formula
-    metadata_lookup = make_metadata_lookup(metadata)
+    assert type(metadata) == dict
     num_groups = len(formula.groups)
 
     body = []
@@ -144,7 +144,7 @@ def genmodel(formula, metadata):
 
     # The number of columns of the design matrix. We assume the
     # presence of an intercept.
-    M = width(formula.pterms, metadata_lookup)
+    M = width(formula.pterms, metadata)
     body.append('M = {}'.format(M))
     body.append('assert X.shape == (N, M)')
 
