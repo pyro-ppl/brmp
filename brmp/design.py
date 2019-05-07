@@ -182,7 +182,13 @@ def designmatrix(terms, df):
 
 # TODO: Does it make sense for this to work with a concrete dataframe,
 # or should it work with an abstract description of the data? i.e.
-# With `Factor` extended to include level names?
+# With `Factor` extended to include level names? I guess that code
+# generation will eventually require this metadata (in order handle
+# requests for custom priors specified by coeff name, for example),
+# and since I'd like to continue allowing code to be generated without
+# a concrete dataframe (i.e. from only a high-level description of the
+# data) then I think I'll need to be able to generate metadata from
+# such a description also.
 
 def numeric_metadata(code):
     return [code.name]
