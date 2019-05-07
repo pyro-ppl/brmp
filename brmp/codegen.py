@@ -39,9 +39,6 @@ def method(name, parameters, body):
 def comment(s):
     return '# {}'.format(s)
 
-def genpopulation():
-    pass
-
 # Generates model code for a single group. More specifically, this
 # generates code to sample group level priors and to accumulate the
 # groups contribution to mu.
@@ -128,9 +125,6 @@ def gengroup(i, group, metadata):
         code.append('mu = mu + r_{}_{}[J_{}] * Z_{}_{}'.format(i, j+1, i, i, j+1))
 
     return code
-
-def genresponse():
-    pass
 
 def genmodel(formula, metadata):
     assert type(formula) == Formula
