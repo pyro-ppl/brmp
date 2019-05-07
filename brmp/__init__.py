@@ -8,7 +8,7 @@ def makecode(formula, df):
     return genmodel(formula, make_metadata_lookup(dfmetadata(df)))
 
 def brm(formula, df):
-    code = genmodel(formula, make_metadata_lookup(dfmetadata(df)))
+    code = makecode(formula, df)
     model = eval_model(code)
     data = makedata(formula, df)
     nuts_kernel = NUTS(model, jit_compile=False, adapt_step_size=True)
