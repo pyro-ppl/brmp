@@ -60,7 +60,9 @@ def default_prior(population_meta, group_metas):
     assert all(type(gm) == GroupMeta for gm in group_metas)
     ptree = Node('b', None, [leaf(name) for name in population_meta.coefs])
     gtrees = [Node(gm.name, None, [leaf(name) for name in gm.coefs]) for gm in group_metas]
-    tree = Node('root', None, [ptree, Node('sd', None, gtrees)])
+    # TODO: I need to ensure every coef has a default prior in order
+    # to generate code. This is OK for now, but it doesn't match brms.
+    tree = Node('root', Prior('Normal', [0., 1.]), [ptree, Node('sd', None, gtrees)])
     return tree
 
 # TODO: This ought to warn/error when an element of `priors` has a
@@ -131,11 +133,21 @@ def norepeats(xs):
     return len(contig(xs, False)) == len(xs)
 
 
+# TODO: Rename.
 # This is an example of using this stuff to compute a description of
 # vectorized priors as might be used for codegen.
 def foobar(tree, path):
     return contig([n.prior for n in select(tree, path).children])
 
+
+def get_priors(p, gs, priors):
+    # TODO: maybe get_prior should be renamed to `build_prior_tree`?
+    # (Since get_prior is similar to `get_priors` though they are a
+    # bit different. Also, `get_priors` seems like an ok name for this
+    # when used from codege.)
+    tree = get_prior(p, gs, priors)
+    # TODO: Add sd priors; incorporate into codegen.
+    return dict(b=foobar(tree, ['b']))
 
 def main():
     p = get_prior(

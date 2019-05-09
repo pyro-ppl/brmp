@@ -1,6 +1,6 @@
 from .formula import Formula, Group
-from .design import width
-from .priors import Prior
+from .design import width, designmatrices_metadata
+from .priors import Prior, get_priors
 
 def gendist(prior, shape):
     assert type(prior) == Prior
@@ -144,10 +144,25 @@ def genmodel(formula, metadata):
     assert type(metadata) == dict
     num_groups = len(formula.groups)
 
+    # TODO: Have `designmatrices_metadata` return something like a
+    # DesignMetadata instance?
+
+    # (p,gs) is useful elsewhere, e.g. instead of calling `width`.
+    p, gs = designmatrices_metadata(formula, metadata)
+    # TODO: Replace [] with prior_edits parameter.
+    priors = get_priors(p, gs, [])
+
     body = []
 
     body.append('assert type(X) == torch.Tensor')
     body.append('N = X.shape[0]')
+
+
+    # TODO: Internally, `width` figures out the width by (re)computing
+    # the design matrix coding. Since we're probably going to have
+    # design matrix metadata floating around (in order to compute
+    # priors) it probably makes sense to re-use it to determine
+    # widths.
 
     # The number of columns of the design matrix. We assume the
     # presence of an intercept.
@@ -160,7 +175,26 @@ def genmodel(formula, metadata):
 
     # Prior over b. (The population level coefficients.)
     # TODO: brms uses an improper uniform here.
-    body.append(sample('b', std_cauchy(shape=[M])))
+
+
+    # TODO: I'm missing opportunities to vectorise here. Adjacent
+    # segments that share a family and differ only in parameters can
+    # be handled with a single `sample` statement with suitable
+    # paramters.
+    for i, (prior, start, end) in enumerate(priors['b']):
+        # TODO: Replace start/end with length in data structure?
+        body.append(sample('b{}'.format(i), gendist(prior, shape=[end-start])))
+
+    # Concat to produce `b` vector.
+    # TODO: Optimisation -- avoid concat when only `b0` is sampled.
+    # (Bind the sampled value directly to `b`.)
+    if len(priors['b']) > 0:
+        body.append('b = torch.cat([{}])'.format(', '.join('b{}'.format(i) for i in range(len(priors['b'])))))
+    else:
+        body.append('b = torch.tensor([])')
+
+    body.append('assert b.shape == (M,)')
+
     # Compute mu.
     body.append('mu = torch.mv(X, b)')
 
