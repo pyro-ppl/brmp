@@ -11,13 +11,16 @@ Node = namedtuple('Node', 'name prior children')
 def leaf(name):
     return Node(name, None, [])
 
+# e.g. Prior('Normal', [0., 1.]). I'm imagining that `parameters` will
+# be a list of floats. Also see the related `gendist` function in
+# codegen.py.
+Prior = namedtuple('Prior', 'family parameters')
+
 # This is similar to brms `set_prior`. (e.g. `set_prior('<prior>',
 # coef='x1')` is similar to `PriorEdit(['x1'], '<prior>)`.) By
 # specifying paths (rather than class/group/coef) we're diverging from
 # brms, but the hope is that a brms-like interface can be put in front
 # of this.
-
-# TODO: Something better than strings for specifying prior.
 
 PriorEdit = namedtuple('PriorEdit', 'path prior')
 

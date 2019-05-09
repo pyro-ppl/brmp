@@ -1,5 +1,18 @@
 from .formula import Formula, Group
 from .design import width
+from .priors import Prior
+
+def gendist(prior, shape):
+    assert type(prior) == Prior
+    assert type(shape) == list
+    # This is likely only useful when `len(shape) == 1`. And even then
+    # it's not very flexible since we assume parameters are given as
+    # scalars which we can always expand into parameter vectors.
+    assert len(shape) == 1 # See comment above.
+    # TODO: Would there be any perf. increase associated with using
+    # e.g. `torch.zeros(shape)` over `torch.tensor(0.).expand(shape)`?
+    params_code = ['torch.tensor({}).expand({})'.format(param, shape) for param in prior.parameters]
+    return '{}({}).to_event({})'.format(prior.family, ', '.join(params_code), len(shape))
 
 # This assumes that all dims are event dims.
 def std_cauchy(shape):
