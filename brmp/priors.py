@@ -86,6 +86,33 @@ def foo(node, path=[], default=None):
         # Internal node.
         return join(foo(n, path + [n.name], default) for n in node.children)
 
+# e.g.
+# contig(list('abb')) == [('a', 0, 1), ('b', 1, 3)]
+def contig(xs, chk=True):
+    assert type(xs) == list # Though really more general than this.
+    assert all(x is not None for x in xs) # Since None used as initial value of `cur`.
+    cur = None
+    segments = []
+    for i, x in enumerate(xs):
+        if x == cur:
+            segments[-1][1].append(i) # Extend segment.
+        else:
+            cur = x
+            segments.append((cur, [i])) # New segment.
+    # Post-process.
+    segments = [(x, ix[0], ix[0] + len(ix)) for (x, ix) in segments]
+    # Some (partial) correctness checks.
+    for val, start, end in segments:
+        assert all(x == val for x in xs[start:end])
+    if chk:
+        segment_vals = [val for (val, _, _) in segments]
+        assert norepeats(segment_vals)
+    return segments
+
+def norepeats(xs):
+    return len(contig(xs, False)) == len(xs)
+
+
 # TODO: These (or similar) ought to be defined in design.py, and
 # returned by a function that takes a formula and a df desc., and
 # returns population/group design matrix metadata.
