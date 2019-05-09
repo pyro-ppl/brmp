@@ -127,6 +127,12 @@ def norepeats(xs):
     return len(contig(xs, False)) == len(xs)
 
 
+# This is an example of using this stuff to compute a description of
+# vectorized priors as might be used for codegen.
+def foobar(tree, path):
+    return contig([n.prior for n in select(tree, path).children])
+
+
 # TODO: These (or similar) ought to be defined in design.py, and
 # returned by a function that takes a formula and a df desc., and
 # returns population/group design matrix metadata.
@@ -160,6 +166,13 @@ def main():
     #  ('sd/grp2/intercept', 'c'),
     #  ('sd/grp2/z',         'd'),
     #  ('sd/grp3/intercept', 'a')]
+
+    print(foobar(p, ['b']))
+    # All coefs use prior 'b':
+    # [('b', 0, 3)]
+    print(foobar(p, ['sd', 'grp2']))
+    # First coef uses prior 'c', the second 'd'.
+    # [('c', 0, 1), ('d', 1, 2)]
 
 if __name__ == '__main__':
     main()
