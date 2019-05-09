@@ -12,13 +12,14 @@ def leaf(name):
     return Node(name, None, [])
 
 # This is similar to brms `set_prior`. (e.g. `set_prior('<prior>',
-# coef='x1')` is similar to `Prior(['x1'], '<prior>)`.) By specifying
-# paths (rather than class/group/coef) we're diverging from brms, but
-# the hope is that a brms-like interface can be put in front of this.
+# coef='x1')` is similar to `PriorEdit(['x1'], '<prior>)`.) By
+# specifying paths (rather than class/group/coef) we're diverging from
+# brms, but the hope is that a brms-like interface can be put in front
+# of this.
 
 # TODO: Something better than strings for specifying prior.
 
-Prior = namedtuple('Prior', 'path prior')
+PriorEdit = namedtuple('PriorEdit', 'path prior')
 
 def select(node, path):
     if len(path) == 0:
@@ -62,17 +63,17 @@ def default_prior(population_meta, group_metas):
 # TODO: This ought to warn/error when an element of `priors` has a
 # path that doesn't correspond to a node in the tree.
 
-def customize_prior(tree, priors):
+def customize_prior(tree, prior_edits):
     assert type(tree) == Node
-    assert type(priors) == list
-    assert all(type(p) == Prior for p in priors)
-    for p in priors:
+    assert type(prior_edits) == list
+    assert all(type(p) == PriorEdit for p in prior_edits)
+    for p in prior_edits:
         tree = edit(tree, p.path,
                     lambda n: Node(n.name, p.prior, n.children))
     return tree
 
-def get_prior(population_meta, group_metas, priors):
-    return fill(customize_prior(default_prior(population_meta, group_metas), priors))
+def get_prior(population_meta, group_metas, prior_edits):
+    return fill(customize_prior(default_prior(population_meta, group_metas), prior_edits))
 
 # TODO: dedup
 def join(lists):
@@ -145,10 +146,10 @@ def main():
         ],
         # priors
         [
-            Prior(['b'], 'b'),
-            Prior(['sd'], 'a'),
-            Prior(['sd', 'grp2'], 'c'),
-            Prior(['sd', 'grp2', 'z'], 'd'),
+            PriorEdit(['b'], 'b'),
+            PriorEdit(['sd'], 'a'),
+            PriorEdit(['sd', 'grp2'], 'c'),
+            PriorEdit(['sd', 'grp2', 'z'], 'd'),
         ])
 
     pp([('/'.join(path), prior) for path, prior in leaves(p)])
