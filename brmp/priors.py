@@ -4,7 +4,7 @@ from pprint import pprint as pp
 import pandas as pd
 
 from pyro.contrib.brm.formula import Formula, _1
-from pyro.contrib.brm.design import dfmetadata, designmatrix_metadata
+from pyro.contrib.brm.design import dfmetadata, designmatrix_metadata, PopulationMeta, GroupMeta
 
 Node = namedtuple('Node', 'name prior children')
 
@@ -132,12 +132,6 @@ def norepeats(xs):
 def foobar(tree, path):
     return contig([n.prior for n in select(tree, path).children])
 
-
-# TODO: These (or similar) ought to be defined in design.py, and
-# returned by a function that takes a formula and a df desc., and
-# returns population/group design matrix metadata.
-PopulationMeta = namedtuple('PopulationMeta', 'coefs')
-GroupMeta = namedtuple('GroupMeta', 'name coefs')
 
 def main():
     p = get_prior(

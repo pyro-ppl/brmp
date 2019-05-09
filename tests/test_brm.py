@@ -7,7 +7,7 @@ import pyro.poutine as poutine
 
 from pyro.contrib.brm.formula import Formula, Group, _1
 from pyro.contrib.brm.codegen import genmodel, eval_model
-from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrix_metadata
+from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrices_metadata
 
 from tests.common import assert_equal
 
@@ -138,13 +138,14 @@ def test_designmatrix(formula, df, expected):
         assert_equal(data[k], expected[k])
 
 
-# Temporary tests of `designmatrix_metadata`.
-@pytest.mark.parametrize('terms, metadata, expected', [
-    (['x'],     [],                         ['x']),
-    ([_1, 'x'], [],                         ['intercept', 'x']),
-    (['x'],     [Factor('x', list('AB'))],  ['x[A]', 'x[B]']),
-    ([_1, 'x'], [Factor('x', list('AB'))],  ['intercept', 'x[B]']),
-    ([_1, 'x'], [Factor('x', list('ABC'))], ['intercept', 'x[B]', 'x[C]']),
+# Temporary tests of `designmatrices_metadata`.
+@pytest.mark.parametrize('formula, metadata, expected', [
+    (Formula(['y'], ['x'], []),     [],                         ['x']),
+    (Formula(['y'], [_1, 'x'], []), [],                         ['intercept', 'x']),
+    (Formula(['y'], ['x'], []),     [Factor('x', list('AB'))],  ['x[A]', 'x[B]']),
+    (Formula(['y'], [_1, 'x'], []), [Factor('x', list('AB'))],  ['intercept', 'x[B]']),
+    (Formula(['y'], [_1, 'x'], []), [Factor('x', list('ABC'))], ['intercept', 'x[B]', 'x[C]']),
 ])
-def test_designmatrix_metadata(terms, metadata, expected):
-    assert designmatrix_metadata(terms, make_metadata_lookup(metadata)) == expected
+def test_designmatrix_metadata(formula, metadata, expected):
+    p, _ = designmatrices_metadata(formula, make_metadata_lookup(metadata))
+    assert p.coefs == expected

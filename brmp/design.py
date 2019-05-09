@@ -204,6 +204,15 @@ def designmatrix_metadata(terms, metadata):
     coding_desc = coding(terms, metadata)
     return join([dispatch(c) for c in coding_desc])
 
+PopulationMeta = namedtuple('PopulationMeta', 'coefs')
+GroupMeta = namedtuple('GroupMeta', 'name coefs')
+
+def designmatrices_metadata(formula, metadata):
+    p = PopulationMeta(designmatrix_metadata(formula.pterms, metadata))
+    gs = [GroupMeta(group.column, designmatrix_metadata(group.gterms, metadata))
+          for group in formula.groups]
+    return p, gs
+
 # --------------------------------------------------
 
 def lookupvector(column, df):
