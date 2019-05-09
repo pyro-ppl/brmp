@@ -75,16 +75,24 @@ def join(lists):
 def tree2list(node, path=[]):
     return [('/'.join(path), node.prior)] + join(tree2list(n, path+[n.name]) for n in node.children)
 
-# An example function making use of the tree. Here we compute the
-# prior to use for each coefficient.
-def foo(node, path=[], default=None):
-    default = node.prior if not node.prior is None else default
+
+# `fill` populates the `prior` property of all nodes in a tree. Each
+# node uses its own `prior` value if set, otherwise the first `prior`
+# value encountered when walking up the tree from the node is used.
+# (This is the behaviour, not the implementation.)
+def fill(node, default=None):
+    prior = node.prior if not node.prior is None else default
+    return Node(node.name, prior, [fill(n, prior) for n in node.children])
+
+
+def leaves(node, path=[]):
     if len(node.children) == 0:
-        # Leaf.
-        return [('/'.join(path), default)]
+        # Return `node.prior` rather than the entire `node`, since the
+        # other properties are recoverable from path and fact that
+        # node is a leaf.
+        return [(path, node.prior)]
     else:
-        # Internal node.
-        return join(foo(n, path + [n.name], default) for n in node.children)
+        return join(leaves(n, path + [n.name]) for n in node.children)
 
 # e.g.
 # contig(list('abb')) == [('a', 0, 1), ('b', 1, 3)]
@@ -120,7 +128,7 @@ PopulationMeta = namedtuple('PopulationMeta', 'coefs')
 GroupMeta = namedtuple('GroupMeta', 'name coefs')
 
 def main():
-    pp(foo(desc_prior(
+    p = desc_prior(
         # population
         PopulationMeta(['intercept', 'x1', 'x2']),
         # groups
@@ -135,7 +143,9 @@ def main():
             Prior(['sd'], 'a'),
             Prior(['sd', 'grp2'], 'c'),
             Prior(['sd', 'grp2', 'z'], 'd'),
-        ])))
+        ])
+
+    pp([('/'.join(path), prior) for path, prior in leaves(fill(p))])
 
     # [('b/intercept',       'b'),
     #  ('b/x1',              'b'),
