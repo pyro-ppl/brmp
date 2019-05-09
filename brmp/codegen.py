@@ -57,7 +57,7 @@ def gengroup(i, group, metadata):
     M_i = width(group.gterms, metadata)
 
     # The number of levels.
-    N_i = groupfactor.num_levels
+    N_i = len(groupfactor.levels)
 
     # This follows the names used in brms.
     code.append('M_{} = {} # Number of coeffs'.format(i, M_i))

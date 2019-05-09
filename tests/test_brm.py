@@ -20,18 +20,18 @@ from tests.common import assert_equal
     (Formula('y', [_1, 'x'], []), [], ['b', 'sigma']),
     (Formula('y', [_1, 'x1', 'x2'], []), [], ['b', 'sigma']),
 
-    (Formula('y', [], [Group([], 'z', True)]), [Factor('z', 2)], ['b', 'sigma', 'z_1', 'sd_1']),
+    (Formula('y', [], [Group([], 'z', True)]), [Factor('z', list('ab'))], ['b', 'sigma', 'z_1', 'sd_1']),
 
     # Groups with less than two terms don't sample the (Cholesky
     # decomp. of the) correlation matrix.
-    (Formula('y', [], [Group([], 'z', True)]), [Factor('z', 2)], ['b', 'sigma', 'z_1', 'sd_1']),
-    (Formula('y', [], [Group([_1], 'z', True)]), [Factor('z', 2)], ['b', 'sigma', 'z_1', 'sd_1']),
-    (Formula('y', [], [Group(['x'], 'z', True)]), [Factor('z', 2)], ['b', 'sigma', 'z_1', 'sd_1']),
+    (Formula('y', [], [Group([], 'z', True)]), [Factor('z', list('ab'))], ['b', 'sigma', 'z_1', 'sd_1']),
+    (Formula('y', [], [Group([_1], 'z', True)]), [Factor('z', list('ab'))], ['b', 'sigma', 'z_1', 'sd_1']),
+    (Formula('y', [], [Group(['x'], 'z', True)]), [Factor('z', list('ab'))], ['b', 'sigma', 'z_1', 'sd_1']),
 
-    (Formula('y', [_1, 'x1', 'x2'], [Group([_1, 'x3'],'z', True)]), [Factor('z', 2)], ['b', 'sigma', 'z_1', 'sd_1', 'L_1']),
-    (Formula('y', [_1, 'x1', 'x2'], [Group([_1, 'x3'],'z', False)]), [Factor('z', 2)], ['b', 'sigma', 'z_1', 'sd_1']),
+    (Formula('y', [_1, 'x1', 'x2'], [Group([_1, 'x3'],'z', True)]), [Factor('z', list('ab'))], ['b', 'sigma', 'z_1', 'sd_1', 'L_1']),
+    (Formula('y', [_1, 'x1', 'x2'], [Group([_1, 'x3'],'z', False)]), [Factor('z', list('ab'))], ['b', 'sigma', 'z_1', 'sd_1']),
     (Formula('y', [_1, 'x1', 'x2'], [Group([_1, 'x3', 'x4'], 'z1', True), Group([_1, 'x5'], 'z2', True)]),
-     [Factor('z1', 2), Factor('z2', 2)],
+     [Factor('z1', list('ab')), Factor('z2', list('ab'))],
      ['b', 'sigma', 'z_1', 'sd_1', 'L_1', 'z_2', 'sd_2', 'L_2']),
 ])
 def test_codegen(formula, metadata, expected):

@@ -15,13 +15,13 @@ def make_metadata_lookup(metadata):
     return dict((factor.name, factor) for factor in metadata)
 
 Factor = namedtuple('Factor',
-                    ['name',        # column name
-                     'num_levels']) # number of levels
+                    ['name',    # column name
+                     'levels']) # list of level names
 
 # Extract metadata (as expected by `genmodel`) from a pandas
 # dataframe.
 def dfmetadata(df):
-    return [Factor(c, len(df[c].dtype.categories))
+    return [Factor(c, list(df[c].dtype.categories))
             for c in df
             if is_categorical_dtype(df[c])]
 
@@ -37,7 +37,7 @@ def dummydata(formula, metadata, N):
     data['X'] = torch.rand(N, M)
     for i, group in enumerate(formula.groups):
         M_i = width(group.gterms, metadata)
-        num_levels = metadata[group.column].num_levels
+        num_levels = len(metadata[group.column].levels)
         data['Z_{}'.format(i+1)] = torch.rand(N, M_i)
         # Maps (indices of) data points to (indices of) levels.
         data['J_{}'.format(i+1)] = torch.randint(0, num_levels, size=[N])
@@ -107,7 +107,7 @@ def widthC(c):
     if type(c) in [InterceptC, NumericC]:
         return 1
     elif type(c) == CategoricalC:
-        return c.factor.num_levels - (1 if c.reduced else 0)
+        return len(c.factor.levels) - (1 if c.reduced else 0)
     else:
         raise Exception('Unknown coding type.')
 
