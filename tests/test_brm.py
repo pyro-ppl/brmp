@@ -7,7 +7,7 @@ import pyro.poutine as poutine
 
 from pyro.contrib.brm.formula import Formula, Group, _1
 from pyro.contrib.brm.codegen import genmodel, eval_model
-from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup
+from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrix_metadata
 
 from tests.common import assert_equal
 
@@ -136,3 +136,15 @@ def test_designmatrix(formula, df, expected):
     assert set(data.keys()) == set(expected.keys())
     for k in expected.keys():
         assert_equal(data[k], expected[k])
+
+
+# Temporary tests of `designmatrix_metadata`.
+@pytest.mark.parametrize('terms, metadata, expected', [
+    (['x'],     [],                         ['x']),
+    ([_1, 'x'], [],                         ['intercept', 'x']),
+    (['x'],     [Factor('x', list('AB'))],  ['x[A]', 'x[B]']),
+    ([_1, 'x'], [Factor('x', list('AB'))],  ['intercept', 'x[B]']),
+    ([_1, 'x'], [Factor('x', list('ABC'))], ['intercept', 'x[B]', 'x[C]']),
+])
+def test_designmatrix_metadata(terms, metadata, expected):
+    assert designmatrix_metadata(terms, make_metadata_lookup(metadata)) == expected

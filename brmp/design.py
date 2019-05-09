@@ -182,36 +182,25 @@ def designmatrix(terms, df):
 #   coefficients. I think this information is used as the basis of
 #   that, allowing priors to be specified by coefficient name?
 
-# TODO: Does it make sense for this to work with a concrete dataframe,
-# or should it work with an abstract description of the data? i.e.
-# With `Factor` extended to include level names? I guess that code
-# generation will eventually require this metadata (in order handle
-# requests for custom priors specified by coeff name, for example),
-# and since I'd like to continue allowing code to be generated without
-# a concrete dataframe (i.e. from only a high-level description of the
-# data) then I think I'll need to be able to generate metadata from
-# such a description also.
-
 def numeric_metadata(code):
     return [code.name]
 
-def categorical_metadata(code, dfcol):
+def categorical_metadata(code):
     start = 1 if code.reduced else 0
     return ['{}[{}]'.format(code.factor.name, cat)
-            for cat in dfcol.cat.categories[start:]]
+            for cat in code.factor.levels[start:]]
 
-def designmatrix_metadata(terms, df):
+def designmatrix_metadata(terms, metadata):
     assert type(terms) == list
     def dispatch(code):
         if type(code) == InterceptC:
             return ['intercept']
         elif type(code) == CategoricalC:
-            return categorical_metadata(code, df[code.factor.name])
+            return categorical_metadata(code)
         elif type(code) == NumericC:
             return numeric_metadata(code)
         else:
             raise Exception('Unknown coding type.')
-    metadata = make_metadata_lookup(dfmetadata(df))
     coding_desc = coding(terms, metadata)
     return join([dispatch(c) for c in coding_desc])
 
