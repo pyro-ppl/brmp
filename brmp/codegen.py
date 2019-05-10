@@ -148,8 +148,6 @@ def genmodel(formula, metadata, prior_edits):
     assert type(prior_edits) == list
     num_groups = len(formula.groups)
 
-    # design_metadata is useful elsewhere, e.g. instead of calling
-    # `width`.
     design_metadata = designmatrices_metadata(formula, metadata)
     priors = get_priors(design_metadata, prior_edits)
 
@@ -158,15 +156,15 @@ def genmodel(formula, metadata, prior_edits):
     body.append('assert type(X) == torch.Tensor')
     body.append('N = X.shape[0]')
 
+    # The number of columns in the design matrix.
+    M = len(design_metadata.population.coefs)
 
-    # TODO: Internally, `width` figures out the width by (re)computing
-    # the design matrix coding. Since we're probably going to have
-    # design matrix metadata floating around (in order to compute
-    # priors) it probably makes sense to re-use it to determine
-    # widths.
+    # TODO: Once I happy `design_metadata` is here to stay, remove
+    # this check that the old method of computing the width returns
+    # the same result as the new method. (The new method avoids
+    # recomputing the design matrix coding in `width`.)
+    assert M == width(formula.pterms, metadata)
 
-    # The number of columns of the design matrix.
-    M = width(formula.pterms, metadata)
     body.append('M = {}'.format(M))
     body.append('assert X.shape == (N, M)')
 
