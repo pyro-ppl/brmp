@@ -84,6 +84,7 @@ def gengroup(i, group, metadata):
     code.append('assert J_{}.shape == (N,)'.format(i))
 
     # Prior over coefficient scales.
+    # TODO: Respect user defined priors.
     code.append(sample('sd_{}'.format(i), half_cauchy(scale=3.0, shape=[M_i])))
     code.append('assert sd_{}.shape == (M_{},) # {}'.format(i, i, M_i))
 

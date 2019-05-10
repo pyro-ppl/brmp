@@ -141,8 +141,10 @@ def get_priors(design_metadata, prior_edits):
     tree = build_prior_tree(design_metadata, prior_edits)
     def get(path):
         return contig([n.prior for n in select(tree, path).children])
-    # TODO: Add sd priors; incorporate into codegen.
-    return dict(b=get(['b']))
+    return dict(
+        b=get(['b']),
+        sd=dict((group_meta.name, get(['sd', group_meta.name]))
+                for group_meta in design_metadata.groups))
 
 def main():
     design_metadata = DesignMeta(
@@ -171,8 +173,11 @@ def main():
     #  ('sd/grp3/intercept', 'a')]
 
     priors = get_priors(design_metadata, prior_edits)
-    print(priors)
-    # {'b': [('b', 0, 3)]}
+    pp(priors)
+    # {'b': [('b', 0, 3)],
+    #  'sd': {'grp1': [('a', 0, 1)],
+    #         'grp2': [('c', 0, 1), ('d', 1, 2)],
+    #         'grp3': [('a', 0, 1)]}}
 
 if __name__ == '__main__':
     main()
