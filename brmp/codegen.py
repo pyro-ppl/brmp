@@ -180,9 +180,8 @@ def genmodel(formula, metadata, prior_edits):
     # segments that share a family and differ only in parameters can
     # be handled with a single `sample` statement with suitable
     # paramters.
-    for i, (prior, start, end) in enumerate(priors['b']):
-        # TODO: Replace start/end with length in data structure?
-        body.append(sample('b{}'.format(i), gendist(prior, shape=[end-start])))
+    for i, (prior, length) in enumerate(priors['b']):
+        body.append(sample('b{}'.format(i), gendist(prior, shape=[length])))
 
     # Concat to produce `b` vector.
     # TODO: Optimisation -- avoid concat when only `b0` is sampled.

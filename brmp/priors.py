@@ -110,8 +110,8 @@ def leaves(node, path=[]):
         return join(leaves(n, path + [n.name]) for n in node.children)
 
 # e.g.
-# contig(list('abb')) == [('a', 0, 1), ('b', 1, 3)]
-def contig(xs, chk=True):
+# contig(list('abb')) == [('a', 1), ('b', 2)]
+def contig(xs):
     assert type(xs) == list # Though really more general than this.
     assert all(x is not None for x in xs) # Since None used as initial value of `cur`.
     cur = None
@@ -123,17 +123,9 @@ def contig(xs, chk=True):
             cur = x
             segments.append((cur, [i])) # New segment.
     # Post-process.
-    segments = [(x, ix[0], ix[0] + len(ix)) for (x, ix) in segments]
-    # Some (partial) correctness checks.
-    for val, start, end in segments:
-        assert all(x == val for x in xs[start:end])
-    if chk:
-        segment_vals = [val for (val, _, _) in segments]
-        assert norepeats(segment_vals)
+    segments = [(x, len(ix)) for (x, ix) in segments]
     return segments
 
-def norepeats(xs):
-    return len(contig(xs, False)) == len(xs)
 
 def get_priors(design_metadata, prior_edits):
     assert type(design_metadata) == DesignMeta
@@ -174,10 +166,9 @@ def main():
 
     priors = get_priors(design_metadata, prior_edits)
     pp(priors)
-    # {'b': [('b', 0, 3)],
-    #  'sd': {'grp1': [('a', 0, 1)],
-    #         'grp2': [('c', 0, 1), ('d', 1, 2)],
-    #         'grp3': [('a', 0, 1)]}}
+    # {'b': [('b', 3)],
+    #  'sd': {'grp1': [('a', 1)], 'grp2': [('c', 1), ('d', 1)], 'grp3': [('a', 1)]}}
+
 
 if __name__ == '__main__':
     main()
