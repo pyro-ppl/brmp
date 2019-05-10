@@ -80,7 +80,7 @@ def customize_prior(tree, prior_edits):
                     lambda n: Node(n.name, p.prior, n.children))
     return tree
 
-def get_prior(design_metadata, prior_edits):
+def build_prior_tree(design_metadata, prior_edits):
     return fill(customize_prior(default_prior(design_metadata), prior_edits))
 
 # TODO: dedup
@@ -135,42 +135,32 @@ def contig(xs, chk=True):
 def norepeats(xs):
     return len(contig(xs, False)) == len(xs)
 
-
-# TODO: Rename.
-# This is an example of using this stuff to compute a description of
-# vectorized priors as might be used for codegen.
-def foobar(tree, path):
-    return contig([n.prior for n in select(tree, path).children])
-
-
-def get_priors(design_metadata, priors):
+def get_priors(design_metadata, prior_edits):
     assert type(design_metadata) == DesignMeta
-    # TODO: maybe get_prior should be renamed to `build_prior_tree`?
-    # (Since get_prior is similar to `get_priors` though they are a
-    # bit different. Also, `get_priors` seems like an ok name for this
-    # when used from codegen.)
-    tree = get_prior(design_metadata, priors)
+    assert type(prior_edits) == list
+    tree = build_prior_tree(design_metadata, prior_edits)
+    def get(path):
+        return contig([n.prior for n in select(tree, path).children])
     # TODO: Add sd priors; incorporate into codegen.
-    return dict(b=foobar(tree, ['b']))
+    return dict(b=get(['b']))
 
 def main():
-    p = get_prior(
-        DesignMeta(
-            PopulationMeta(['intercept', 'x1', 'x2']),
-            [
-                GroupMeta('grp1', ['intercept']),
-                GroupMeta('grp2', ['intercept', 'z']),
-                GroupMeta('grp3', ['intercept'])
-            ]),
-        # priors
+    design_metadata = DesignMeta(
+        PopulationMeta(['intercept', 'x1', 'x2']),
         [
-            PriorEdit(['b'], 'b'),
-            PriorEdit(['sd'], 'a'),
-            PriorEdit(['sd', 'grp2'], 'c'),
-            PriorEdit(['sd', 'grp2', 'z'], 'd'),
+            GroupMeta('grp1', ['intercept']),
+            GroupMeta('grp2', ['intercept', 'z']),
+            GroupMeta('grp3', ['intercept'])
         ])
+    prior_edits = [
+        PriorEdit(['b'], 'b'),
+        PriorEdit(['sd'], 'a'),
+        PriorEdit(['sd', 'grp2'], 'c'),
+        PriorEdit(['sd', 'grp2', 'z'], 'd'),
+    ]
+    tree = build_prior_tree(design_metadata, prior_edits)
 
-    pp([('/'.join(path), prior) for path, prior in leaves(p)])
+    pp([('/'.join(path), prior) for path, prior in leaves(tree)])
 
     # [('b/intercept',       'b'),
     #  ('b/x1',              'b'),
@@ -180,12 +170,9 @@ def main():
     #  ('sd/grp2/z',         'd'),
     #  ('sd/grp3/intercept', 'a')]
 
-    print(foobar(p, ['b']))
-    # All coefs use prior 'b':
-    # [('b', 0, 3)]
-    print(foobar(p, ['sd', 'grp2']))
-    # First coef uses prior 'c', the second 'd'.
-    # [('c', 0, 1), ('d', 1, 2)]
+    priors = get_priors(design_metadata, prior_edits)
+    print(priors)
+    # {'b': [('b', 0, 3)]}
 
 if __name__ == '__main__':
     main()
