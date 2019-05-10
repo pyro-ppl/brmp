@@ -85,10 +85,6 @@ def build_prior_tree(design_metadata, prior_edits):
     return fill(customize_prior(default_prior(design_metadata), prior_edits))
 
 
-def tree2list(node, path=[]):
-    return [('/'.join(path), node.prior)] + join(tree2list(n, path+[n.name]) for n in node.children)
-
-
 # `fill` populates the `prior` property of all nodes in a tree. Each
 # node uses its own `prior` value if set, otherwise the first `prior`
 # value encountered when walking up the tree from the node is used.
