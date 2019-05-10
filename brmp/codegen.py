@@ -147,12 +147,10 @@ def genmodel(formula, metadata, prior_edits):
     assert type(prior_edits) == list
     num_groups = len(formula.groups)
 
-    # TODO: Have `designmatrices_metadata` return something like a
-    # DesignMetadata instance?
-
-    # (p,gs) is useful elsewhere, e.g. instead of calling `width`.
-    p, gs = designmatrices_metadata(formula, metadata)
-    priors = get_priors(p, gs, prior_edits)
+    # design_metadata is useful elsewhere, e.g. instead of calling
+    # `width`.
+    design_metadata = designmatrices_metadata(formula, metadata)
+    priors = get_priors(design_metadata, prior_edits)
 
     body = []
 

@@ -4,7 +4,7 @@ from pprint import pprint as pp
 import pandas as pd
 
 from pyro.contrib.brm.formula import Formula, _1
-from pyro.contrib.brm.design import dfmetadata, designmatrix_metadata, PopulationMeta, GroupMeta
+from pyro.contrib.brm.design import dfmetadata, designmatrix_metadata, DesignMeta, PopulationMeta, GroupMeta
 
 Node = namedtuple('Node', 'name prior children')
 
@@ -56,12 +56,13 @@ def edit(node, path, f):
 # TODO: Figure out how to incorporate priors on the response
 # distribution.
 
-def default_prior(population_meta, group_metas):
-    assert type(population_meta) == PopulationMeta
-    assert type(group_metas) == list
-    assert all(type(gm) == GroupMeta for gm in group_metas)
-    ptree = Node('b', None, [leaf(name) for name in population_meta.coefs])
-    gtrees = [Node(gm.name, None, [leaf(name) for name in gm.coefs]) for gm in group_metas]
+def default_prior(design_metadata):
+    assert type(design_metadata) == DesignMeta
+    assert type(design_metadata.population) == PopulationMeta
+    assert type(design_metadata.groups) == list
+    assert all(type(gm) == GroupMeta for gm in design_metadata.groups)
+    ptree = Node('b', None, [leaf(name) for name in design_metadata.population.coefs])
+    gtrees = [Node(gm.name, None, [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
     # TODO: I need to ensure every coef has a default prior in order
     # to generate code. This is OK for now, but it doesn't match brms.
     tree = Node('root', Prior('Normal', [0., 1.]), [ptree, Node('sd', None, gtrees)])
@@ -79,8 +80,8 @@ def customize_prior(tree, prior_edits):
                     lambda n: Node(n.name, p.prior, n.children))
     return tree
 
-def get_prior(population_meta, group_metas, prior_edits):
-    return fill(customize_prior(default_prior(population_meta, group_metas), prior_edits))
+def get_prior(design_metadata, prior_edits):
+    return fill(customize_prior(default_prior(design_metadata), prior_edits))
 
 # TODO: dedup
 def join(lists):
@@ -142,25 +143,25 @@ def foobar(tree, path):
     return contig([n.prior for n in select(tree, path).children])
 
 
-def get_priors(p, gs, priors):
+def get_priors(design_metadata, priors):
+    assert type(design_metadata) == DesignMeta
     # TODO: maybe get_prior should be renamed to `build_prior_tree`?
     # (Since get_prior is similar to `get_priors` though they are a
     # bit different. Also, `get_priors` seems like an ok name for this
     # when used from codegen.)
-    tree = get_prior(p, gs, priors)
+    tree = get_prior(design_metadata, priors)
     # TODO: Add sd priors; incorporate into codegen.
     return dict(b=foobar(tree, ['b']))
 
 def main():
     p = get_prior(
-        # population
-        PopulationMeta(['intercept', 'x1', 'x2']),
-        # groups
-        [
-            GroupMeta('grp1', ['intercept']),
-            GroupMeta('grp2', ['intercept', 'z']),
-            GroupMeta('grp3', ['intercept'])
-        ],
+        DesignMeta(
+            PopulationMeta(['intercept', 'x1', 'x2']),
+            [
+                GroupMeta('grp1', ['intercept']),
+                GroupMeta('grp2', ['intercept', 'z']),
+                GroupMeta('grp3', ['intercept'])
+            ]),
         # priors
         [
             PriorEdit(['b'], 'b'),

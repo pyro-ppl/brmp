@@ -173,5 +173,5 @@ def test_designmatrix(formula, df, expected):
     (Formula(['y'], [_1, 'x'], []), [Factor('x', list('ABC'))], ['intercept', 'x[B]', 'x[C]']),
 ])
 def test_designmatrix_metadata(formula, metadata, expected):
-    p, _ = designmatrices_metadata(formula, make_metadata_lookup(metadata))
-    assert p.coefs == expected
+    design_metadata = designmatrices_metadata(formula, make_metadata_lookup(metadata))
+    assert design_metadata.population.coefs == expected
