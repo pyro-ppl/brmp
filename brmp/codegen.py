@@ -139,9 +139,10 @@ def gengroup(i, group, metadata):
 
     return code
 
-def genmodel(formula, metadata):
+def genmodel(formula, metadata, prior_edits):
     assert type(formula) == Formula
     assert type(metadata) == dict
+    assert type(prior_edits) == list
     num_groups = len(formula.groups)
 
     # TODO: Have `designmatrices_metadata` return something like a
@@ -149,8 +150,7 @@ def genmodel(formula, metadata):
 
     # (p,gs) is useful elsewhere, e.g. instead of calling `width`.
     p, gs = designmatrices_metadata(formula, metadata)
-    # TODO: Replace [] with prior_edits parameter.
-    priors = get_priors(p, gs, [])
+    priors = get_priors(p, gs, prior_edits)
 
     body = []
 

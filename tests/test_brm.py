@@ -8,6 +8,7 @@ import pyro.poutine as poutine
 from pyro.contrib.brm.formula import Formula, Group, _1
 from pyro.contrib.brm.codegen import genmodel, eval_model
 from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrices_metadata
+from pyro.contrib.brm.priors import Prior, PriorEdit
 
 from tests.common import assert_equal
 
@@ -15,28 +16,53 @@ from tests.common import assert_equal
 # expected family? Could check shapes of sampled values? (Although
 # there are already asserting in the generated code to do that.) Check
 # response is observed.
-@pytest.mark.parametrize('formula, metadata, expected', [
-    (Formula('y', [], []), [], ['sigma']),
-    (Formula('y', [_1, 'x'], []), [], ['b0', 'sigma']),
-    (Formula('y', [_1, 'x1', 'x2'], []), [], ['b0', 'sigma']),
+@pytest.mark.parametrize('formula, metadata, prior_edits, expected', [
+    (Formula('y', [], []), [], [], ['sigma']),
+    (Formula('y', [_1, 'x'], []), [], [], ['b0', 'sigma']),
+    (Formula('y', [_1, 'x1', 'x2'], []), [], [], ['b0', 'sigma']),
 
-    (Formula('y', [], [Group([], 'z', True)]), [Factor('z', list('ab'))], ['sigma', 'z_1', 'sd_1']),
+    (Formula('y', [], [Group([], 'z', True)]), [Factor('z', list('ab'))], [], ['sigma', 'z_1', 'sd_1']),
 
     # Groups with less than two terms don't sample the (Cholesky
     # decomp. of the) correlation matrix.
-    (Formula('y', [], [Group([], 'z', True)]), [Factor('z', list('ab'))], ['sigma', 'z_1', 'sd_1']),
-    (Formula('y', [], [Group([_1], 'z', True)]), [Factor('z', list('ab'))], ['sigma', 'z_1', 'sd_1']),
-    (Formula('y', [], [Group(['x'], 'z', True)]), [Factor('z', list('ab'))], ['sigma', 'z_1', 'sd_1']),
+    (Formula('y', [], [Group([], 'z', True)]), [Factor('z', list('ab'))], [], ['sigma', 'z_1', 'sd_1']),
+    (Formula('y', [], [Group([_1], 'z', True)]), [Factor('z', list('ab'))], [], ['sigma', 'z_1', 'sd_1']),
+    (Formula('y', [], [Group(['x'], 'z', True)]), [Factor('z', list('ab'))], [], ['sigma', 'z_1', 'sd_1']),
 
-    (Formula('y', [_1, 'x1', 'x2'], [Group([_1, 'x3'],'z', True)]), [Factor('z', list('ab'))], ['b0', 'sigma', 'z_1', 'sd_1', 'L_1']),
-    (Formula('y', [_1, 'x1', 'x2'], [Group([_1, 'x3'],'z', False)]), [Factor('z', list('ab'))], ['b0', 'sigma', 'z_1', 'sd_1']),
+    (Formula('y', [_1, 'x1', 'x2'], [Group([_1, 'x3'],'z', True)]), [Factor('z', list('ab'))], [], ['b0', 'sigma', 'z_1', 'sd_1', 'L_1']),
+    (Formula('y', [_1, 'x1', 'x2'], [Group([_1, 'x3'],'z', False)]), [Factor('z', list('ab'))], [], ['b0', 'sigma', 'z_1', 'sd_1']),
     (Formula('y', [_1, 'x1', 'x2'], [Group([_1, 'x3', 'x4'], 'z1', True), Group([_1, 'x5'], 'z2', True)]),
      [Factor('z1', list('ab')), Factor('z2', list('ab'))],
+     [],
      ['b0', 'sigma', 'z_1', 'sd_1', 'L_1', 'z_2', 'sd_2', 'L_2']),
+
+    # Custom priors.
+    # TODO: Check that values are sampled from the distribution specified.
+    (Formula('y', [_1, 'x1', 'x2'], []),
+     [],
+     [PriorEdit(['b'], Prior('Normal', [0., 100.]))],
+     ['b0', 'sigma']),
+
+    (Formula('y', [_1, 'x1', 'x2'], []),
+     [],
+     [PriorEdit(['b', 'intercept'], Prior('Normal', [0., 100.]))],
+     ['b0', 'b1', 'sigma']),
+
+    (Formula('y', [_1, 'x1', 'x2'], []),
+     [],
+     [PriorEdit(['b', 'x1'], Prior('Normal', [0., 100.]))],
+     ['b0', 'b1', 'b2', 'sigma']),
+
+    # Prior on coef of a factor.
+    (Formula('y', [_1, 'x'], []),
+     [Factor('x', list('ab'))],
+     [PriorEdit(['b', 'x[b]'], Prior('Normal', [0., 100.]))],
+     ['b0', 'b1', 'sigma']),
+
 ])
-def test_codegen(formula, metadata, expected):
+def test_codegen(formula, metadata, prior_edits, expected):
     metadata = make_metadata_lookup(metadata)
-    model = eval_model(genmodel(formula, metadata))
+    model = eval_model(genmodel(formula, metadata, prior_edits))
     data = dummydata(formula, metadata, 5)
     trace = poutine.trace(model).get_trace(**data)
     assert set(trace.stochastic_nodes) - {'obs'} == set(expected)
