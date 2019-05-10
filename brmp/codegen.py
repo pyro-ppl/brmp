@@ -14,12 +14,8 @@ def gendist(prior, shape):
     params_code = ['torch.tensor({}).expand({})'.format(param, shape) for param in prior.parameters]
     return '{}({}).to_event({})'.format(prior.family, ', '.join(params_code), len(shape))
 
-# TODO: Replace `std_cauchy`, `half_cauchy`, `std_normal` with `gendist`?
-
-# This assumes that all dims are event dims.
-def std_cauchy(shape):
-    assert type(shape) == list
-    return 'Cauchy(torch.zeros({}), torch.ones({})).to_event({})'.format(shape, shape, len(shape))
+# `half_cauchy`, `std_normal` with `gendist` will become redundant
+# once all priors are customisable.
 
 # This assumes that all dims are event dims.
 def half_cauchy(scale, shape):
