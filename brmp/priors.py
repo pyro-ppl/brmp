@@ -52,21 +52,24 @@ def edit(node, path, f):
                     for n in node.children]
         return Node(node.name, node.prior, children)
 
-# TODO: Add "class" for correlation matrices.
+# TODO: Add correlation matrices. (Only the parameter of LKJ can be
+# customised in brms.)
 
 # TODO: Figure out how to incorporate priors on the response
 # distribution.
+
+# TODO: Match default priors used by brms. (An improper uniform is
+# used for `b`. A Half Student-t here is used for priors on standard
+# deviations, with its scale derived from the data.
 
 def default_prior(design_metadata):
     assert type(design_metadata) == DesignMeta
     assert type(design_metadata.population) == PopulationMeta
     assert type(design_metadata.groups) == list
     assert all(type(gm) == GroupMeta for gm in design_metadata.groups)
-    ptree = Node('b', None, [leaf(name) for name in design_metadata.population.coefs])
-    gtrees = [Node(gm.name, None, [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
-    # TODO: I need to ensure every coef has a default prior in order
-    # to generate code. This is OK for now, but it doesn't match brms.
-    tree = Node('root', Prior('Normal', [0., 1.]), [ptree, Node('sd', None, gtrees)])
+    ptree = Node('b', Prior('Cauchy', [0., 1.]), [leaf(name) for name in design_metadata.population.coefs])
+    gtrees = [Node(gm.name, Prior('HalfCauchy', [3.]), [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
+    tree = Node('root', None, [ptree, Node('sd', None, gtrees)])
     return tree
 
 # TODO: This ought to warn/error when an element of `priors` has a
@@ -120,6 +123,9 @@ def contig(xs):
     segments = [(x, len(ix)) for (x, ix) in segments]
     return segments
 
+# TODO: I'm missing opportunities to vectorise here. Adjacent segments
+# that share a family and differ only in parameters can be handled
+# with a single `sample` statement with suitable parameters.
 
 def get_priors(design_metadata, prior_edits):
     assert type(design_metadata) == DesignMeta
