@@ -6,6 +6,7 @@ import pandas as pd
 # http://pandas.pydata.org/pandas-docs/stable/reference/general_utility_functions.html#dtype-introspection
 from pandas.api.types import is_numeric_dtype, is_categorical_dtype
 
+from pyro.contrib.brm.utils import join
 from .formula import Formula, Intercept
 
 def make_metadata_lookup(metadata):
@@ -78,9 +79,6 @@ def codefactor(dfcol, reduced):
     num_levels = len(factors)
     start = 1 if reduced else 0
     return [dfcol == factors[i] for i in range(start, num_levels)]
-
-def join(lists):
-    return sum(lists, [])
 
 def col2torch(col):
     if type(col) == torch.Tensor:

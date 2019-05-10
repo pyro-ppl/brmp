@@ -3,6 +3,7 @@ from pprint import pprint as pp
 
 import pandas as pd
 
+from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula, _1
 from pyro.contrib.brm.design import dfmetadata, designmatrix_metadata, DesignMeta, PopulationMeta, GroupMeta
 
@@ -83,9 +84,6 @@ def customize_prior(tree, prior_edits):
 def build_prior_tree(design_metadata, prior_edits):
     return fill(customize_prior(default_prior(design_metadata), prior_edits))
 
-# TODO: dedup
-def join(lists):
-    return sum(lists, [])
 
 def tree2list(node, path=[]):
     return [('/'.join(path), node.prior)] + join(tree2list(n, path+[n.name]) for n in node.children)
