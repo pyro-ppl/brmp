@@ -41,7 +41,9 @@ print(fit.code)
 #     N = X.shape[0]
 #     M = 2
 #     assert X.shape == (N, M)
-#     b = pyro.sample("b", dist.Cauchy(torch.zeros([2]), torch.ones([2])).to_event(1))
+#     b_0 = pyro.sample("b_0", dist.Cauchy(torch.tensor(0.0).expand([2]), torch.tensor(1.0).expand([2])).to_event(1))
+#     b = torch.cat([b_0])
+#     assert b.shape == (M,)
 #     mu = torch.mv(X, b)
 #     sigma = pyro.sample("sigma", dist.HalfCauchy(torch.tensor(3.0).expand([1])).to_event(1))
 #     with pyro.plate("obs", N):
