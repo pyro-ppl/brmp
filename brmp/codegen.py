@@ -14,6 +14,8 @@ def gendist(prior, shape):
     params_code = ['torch.tensor({}).expand({})'.format(param, shape) for param in prior.parameters]
     return '{}({}).to_event({})'.format(prior.family, ', '.join(params_code), len(shape))
 
+# TODO: Replace `std_cauchy`, `half_cauchy`, `std_normal` with `gendist`?
+
 # This assumes that all dims are event dims.
 def std_cauchy(shape):
     assert type(shape) == list
@@ -164,8 +166,7 @@ def genmodel(formula, metadata, prior_edits):
     # priors) it probably makes sense to re-use it to determine
     # widths.
 
-    # The number of columns of the design matrix. We assume the
-    # presence of an intercept.
+    # The number of columns of the design matrix.
     M = width(formula.pterms, metadata)
     body.append('M = {}'.format(M))
     body.append('assert X.shape == (N, M)')
@@ -175,7 +176,6 @@ def genmodel(formula, metadata, prior_edits):
 
     # Prior over b. (The population level coefficients.)
     # TODO: brms uses an improper uniform here.
-
 
     # TODO: I'm missing opportunities to vectorise here. Adjacent
     # segments that share a family and differ only in parameters can

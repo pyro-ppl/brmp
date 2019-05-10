@@ -11,9 +11,11 @@ Node = namedtuple('Node', 'name prior children')
 def leaf(name):
     return Node(name, None, [])
 
-# e.g. Prior('Normal', [0., 1.]). I'm imagining that `parameters` will
-# be a list of floats. Also see the related `gendist` function in
-# codegen.py.
+# e.g. Prior('Normal', [0., 1.]).
+# Also see the related `gendist` function in codegen.py.
+
+# TODO: This currently requires `parameters` to be a list of floats.
+# This ought to be checked.
 Prior = namedtuple('Prior', 'family parameters')
 
 # This is similar to brms `set_prior`. (e.g. `set_prior('<prior>',
@@ -144,7 +146,7 @@ def get_priors(p, gs, priors):
     # TODO: maybe get_prior should be renamed to `build_prior_tree`?
     # (Since get_prior is similar to `get_priors` though they are a
     # bit different. Also, `get_priors` seems like an ok name for this
-    # when used from codege.)
+    # when used from codegen.)
     tree = get_prior(p, gs, priors)
     # TODO: Add sd priors; incorporate into codegen.
     return dict(b=foobar(tree, ['b']))
