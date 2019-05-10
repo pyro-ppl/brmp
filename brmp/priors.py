@@ -75,6 +75,10 @@ def default_prior(design_metadata):
 # TODO: This ought to warn/error when an element of `priors` has a
 # path that doesn't correspond to a node in the tree.
 
+# TODO: We need to check (somehow, somewhere) that users specified
+# priors have the correct support. e.g. R for population level
+# effects, R+ for standard deviations.
+
 def customize_prior(tree, prior_edits):
     assert type(tree) == Node
     assert type(prior_edits) == list
@@ -84,6 +88,9 @@ def customize_prior(tree, prior_edits):
                     lambda n: Node(n.name, p.prior, n.children))
     return tree
 
+# It's important that trees maintain the order of their children,
+# otherwise the output of `get_priors` will silently fail to line-up
+# with the column ordering in the data.
 def build_prior_tree(design_metadata, prior_edits):
     return fill(customize_prior(default_prior(design_metadata), prior_edits))
 

@@ -9,6 +9,9 @@ from pandas.api.types import is_numeric_dtype, is_categorical_dtype
 from pyro.contrib.brm.utils import join
 from .formula import Formula, Intercept
 
+
+# TODO: Refer to dataframe metadata as 'schema' in order to avoid
+# confusion with the similarly named design matrix metadata?
 def make_metadata_lookup(metadata):
     assert type(metadata) == list
     assert all(type(factor) == Factor for factor in metadata)
