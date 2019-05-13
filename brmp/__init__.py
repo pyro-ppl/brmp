@@ -1,5 +1,6 @@
 from pyro.infer.mcmc import MCMC, NUTS
 
+from pyro.contrib.brm.formula import parse
 from pyro.contrib.brm.codegen import genmodel, eval_model
 from pyro.contrib.brm.design import makedata, dfmetadata, make_metadata_lookup
 from pyro.contrib.brm.fit import Fit
@@ -7,7 +8,8 @@ from pyro.contrib.brm.fit import Fit
 def makecode(formula, df, prior_edits):
     return genmodel(formula, make_metadata_lookup(dfmetadata(df)), prior_edits)
 
-def brm(formula, df, prior_edits=[]):
+def brm(formula_str, df, prior_edits=[]):
+    formula = parse(formula_str)
     code = makecode(formula, df, prior_edits)
     model = eval_model(code)
     data = makedata(formula, df)

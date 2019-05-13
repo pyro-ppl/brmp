@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 from pyro.contrib.brm import makecode
-from pyro.contrib.brm.formula import Formula, Group, _1
+from pyro.contrib.brm.formula import parse
 from pyro.contrib.brm.design import makedata
 from pyro.contrib.brm.priors import Prior, PriorEdit
 
@@ -11,8 +11,7 @@ from pyro.contrib.brm.priors import Prior, PriorEdit
 # --------------------------------------------------
 
 # Here's a simple formula:
-# `y ~ 1 + x`
-f1 = Formula('y', [_1, 'x'], [])
+f1 = 'y ~ 1 + x'
 
 # Given a data frame:
 df1a = pd.DataFrame(dict(y=[0., 1., 2.],
@@ -20,7 +19,7 @@ df1a = pd.DataFrame(dict(y=[0., 1., 2.],
 
 # ... we can generate model code and a design matrix:
 
-print(makecode(f1, df1a, []))
+print(makecode(parse(f1), df1a, []))
 # def model(X, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
@@ -35,7 +34,7 @@ print(makecode(f1, df1a, []))
 #         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)), obs=y_obs)
 #     return dict(b=b, sigma=sigma, y=y)
 
-print(makedata(f1, df1a))
+print(makedata(parse(f1), df1a))
 # {'X': tensor([[ 1., 10.],
 #               [ 1., 20.],
 #               [ 1., 30.]]),
@@ -50,7 +49,7 @@ print(makedata(f1, df1a))
 df1b = pd.DataFrame(dict(y=[0., 0., 0.],
                          x=pd.Categorical(['a', 'b', 'c'])))
 
-print(makecode(f1, df1b, []))
+print(makecode(parse(f1), df1b, []))
 # def model(X, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
@@ -65,7 +64,7 @@ print(makecode(f1, df1b, []))
 #         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)), obs=y_obs)
 #     return dict(b=b, sigma=sigma, y=y)
 
-print(makedata(f1, df1b))
+print(makedata(parse(f1), df1b))
 # {'X': tensor([[1., 0., 0.],
 #               [1., 1., 0.],
 #               [1., 0., 1.]]),
@@ -76,8 +75,7 @@ print(makedata(f1, df1b))
 # --------------------------------------------------
 
 # Here's a formula with group-level effects:
-# `y ~ x1 + (1 + x2 | x3)`
-f2 = Formula('y', ['x1'], [Group([_1, 'x2'], 'x3', True)])
+f2 = 'y ~ x1 + (1 + x2 | x3)'
 
 # ... and a data frame:
 df2 = pd.DataFrame(dict(y=[0., 1., 2.],
@@ -87,7 +85,7 @@ df2 = pd.DataFrame(dict(y=[0., 1., 2.],
 
 # And the generated model code and design matrices etc.:
 
-print(makecode(f2, df2, []))
+print(makecode(parse(f2), df2, []))
 # def model(X, Z_1, J_1, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
@@ -125,7 +123,7 @@ print(makecode(f2, df2, []))
 #         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)), obs=y_obs)
 #     return dict(b=b, sigma=sigma, y=y)
 
-print(makedata(f2, df2))
+print(makedata(parse(f2), df2))
 # {'X': tensor([[1.],
 #               [2.],
 #               [3.]]),
@@ -136,8 +134,7 @@ print(makedata(f2, df2))
 #  'J_1': tensor([0, 1, 2])}
 
 # (Note that modelling of correlations between group-level coefficient
-# can be turned of by passing `False` as the third argument to
-# `Group`.)
+# can be turned of using the `(gterms || col)` syntax.)
 
 # --------------------------------------------------
 # Ex 3. Custom priors
@@ -164,8 +161,8 @@ print(makedata(f2, df2))
 # Here's a simple example in which we specify custom priors for the
 # population-level coefficients.
 
-# `y ~ 1 + x1 + x2`
-f3 = Formula('y', [_1, 'x1', 'x2'], [])
+#
+f3 = 'y ~ 1 + x1 + x2'
 df1a = pd.DataFrame(dict(y=[0., 1., 2.],
                          x1=[1., 2., 3.],
                          x2=[10., 20., 30.]))
@@ -182,7 +179,7 @@ priors3 = [
 
 # Here's the code this generates:
 
-print(makecode(f3, df1a, priors3))
+print(makecode(parse(f3), df1a, priors3))
 # def model(X, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
