@@ -175,16 +175,3 @@ def test_designmatrix(formula, df, expected):
     assert set(data.keys()) == set(expected.keys())
     for k in expected.keys():
         assert_equal(data[k], expected[k])
-
-
-# Temporary tests of `designmatrices_metadata`.
-@pytest.mark.parametrize('formula, metadata, expected', [
-    (Formula(['y'], ['x'], []),     [],                         ['x']),
-    (Formula(['y'], [_1, 'x'], []), [],                         ['intercept', 'x']),
-    (Formula(['y'], ['x'], []),     [Factor('x', list('AB'))],  ['x[A]', 'x[B]']),
-    (Formula(['y'], [_1, 'x'], []), [Factor('x', list('AB'))],  ['intercept', 'x[B]']),
-    (Formula(['y'], [_1, 'x'], []), [Factor('x', list('ABC'))], ['intercept', 'x[B]', 'x[C]']),
-])
-def test_designmatrix_metadata(formula, metadata, expected):
-    design_metadata = designmatrices_metadata(formula, make_metadata_lookup(metadata))
-    assert design_metadata.population.coefs == expected
