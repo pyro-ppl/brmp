@@ -68,8 +68,8 @@ def default_prior(design_metadata):
     assert type(design_metadata.groups) == list
     assert all(type(gm) == GroupMeta for gm in design_metadata.groups)
     ptree = Node('b', Prior('Cauchy', [0., 1.]), [leaf(name) for name in design_metadata.population.coefs])
-    gtrees = [Node(gm.name, Prior('HalfCauchy', [3.]), [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
-    tree = Node('root', None, [ptree, Node('sd', None, gtrees)])
+    gtrees = [Node(gm.name, None, [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
+    tree = Node('root', None, [ptree, Node('sd', Prior('HalfCauchy', [3.]), gtrees)])
     return tree
 
 # TODO: This ought to warn/error when an element of `priors` has a
