@@ -52,9 +52,6 @@ def edit(node, path, f):
                     for n in node.children]
         return Node(node.name, node.prior, children)
 
-# TODO: Add correlation matrices. (Only the parameter of LKJ can be
-# customised in brms.)
-
 # TODO: Figure out how to incorporate priors on the response
 # distribution.
 
@@ -68,10 +65,21 @@ def default_prior(formula, design_metadata):
     assert type(design_metadata.population) == PopulationMeta
     assert type(design_metadata.groups) == list
     assert all(type(gm) == GroupMeta for gm in design_metadata.groups)
-    ptree = Node('b', Prior('Cauchy', [0., 1.]), [leaf(name) for name in design_metadata.population.coefs])
-    gtrees = [Node(gm.name, None, [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
-    tree = Node('root', None, [ptree, Node('sd', Prior('HalfCauchy', [3.]), gtrees)])
-    return tree
+    # It's assumed that `formula` and `design_metadata` are
+    # consistent. Something like, there exists dataframe metadata
+    # `metadata` s.t.:
+    # `design_metadata = designmatrices_metadata(formula, metadata)`
+    # This sanity checks the these two agree about which groups are present.
+    assert all(meta.name == group.column
+               for (meta, group)
+               in zip(design_metadata.groups, formula.groups))
+    b_children = [leaf(name) for name in design_metadata.population.coefs]
+    L_children = [Node(group.column, None, []) for group in formula.groups if group.corr]
+    sd_children = [Node(gm.name, None, [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
+    return Node('root', None, [
+        Node('b',  Prior('Cauchy', [0., 1.]), b_children),
+        Node('sd', Prior('HalfCauchy', [3.]), sd_children),
+        Node('L',  Prior('LKJ', [1.]),        L_children)])
 
 # TODO: This ought to warn/error when an element of `priors` has a
 # path that doesn't correspond to a node in the tree.
@@ -136,10 +144,6 @@ def contig(xs):
 # with a single `sample` statement with suitable parameters.
 
 def get_priors(formula, design_metadata, prior_edits):
-    # It's assumed that `formula` and `design_metadata` are
-    # consistent. Something like, there exists dataframe metadata
-    # `metadata` s.t.:
-    # `design_metadata = designmatrices_metadata(formula, metadata)`
     assert type(formula) == Formula
     assert type(design_metadata) == DesignMeta
     assert type(prior_edits) == list
@@ -149,10 +153,11 @@ def get_priors(formula, design_metadata, prior_edits):
     return dict(
         b=get(['b']),
         sd=dict((group_meta.name, get(['sd', group_meta.name]))
-                for group_meta in design_metadata.groups))
+                for group_meta in design_metadata.groups),
+        L=dict((n.name, n.prior) for n in select(tree, 'L').children))
 
 def main():
-    formula = parse('y ~ 1 + x1 + x2 + (1 | grp1) + (1 + z | grp2) + (1 | grp3)')
+    formula = parse('y ~ 1 + x1 + x2 + (1 || grp1) + (1 + z | grp2) + (1 | grp3)')
     design_metadata = designmatrices_metadata(
         formula,
         make_metadata_lookup([]))
@@ -161,6 +166,8 @@ def main():
         PriorEdit(['sd'], 'a'),
         PriorEdit(['sd', 'grp2'], 'c'),
         PriorEdit(['sd', 'grp2', 'z'], 'd'),
+        PriorEdit(['L'], 'e'),
+        PriorEdit(['L', 'grp3'], 'f'),
     ]
 
     tree = build_prior_tree(formula, design_metadata, prior_edits)
@@ -172,11 +179,14 @@ def main():
     #  ('sd/grp1/intercept', 'a'),
     #  ('sd/grp2/intercept', 'c'),
     #  ('sd/grp2/z',         'd'),
-    #  ('sd/grp3/intercept', 'a')]
+    #  ('sd/grp3/intercept', 'a'),
+    #  ('L/grp2',            'e'),
+    #  ('L/grp3',            'f')]
 
     priors = get_priors(formula, design_metadata, prior_edits)
     pp(priors)
-    # {'b': [('b', 3)],
+    # {'L': {'grp2': 'e', 'grp3': 'f'},
+    #  'b': [('b', 3)],
     #  'sd': {'grp1': [('a', 1)], 'grp2': [('c', 1), ('d', 1)], 'grp3': [('a', 1)]}}
 
 
