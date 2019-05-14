@@ -16,7 +16,7 @@ from tests.common import assert_equal
 # expected family? Could check shapes of sampled values? (Although
 # there are already asserting in the generated code to do that.) Check
 # response is observed.
-@pytest.mark.parametrize('formula, metadata, prior_edits, expected', [
+@pytest.mark.parametrize('formula_str, metadata, prior_edits, expected', [
     # TODO: This (and similar examples below) can't be expressed with
     # the current parser. Is it useful to fix this (`y ~ -1`?), or can
     # these be dropped?
@@ -80,17 +80,17 @@ from tests.common import assert_equal
      ['sigma', 'sd_1_0', 'z_1', 'L_1']),
 
 ])
-def test_codegen(formula, metadata, prior_edits, expected):
-    f = parse(formula)
+def test_codegen(formula_str, metadata, prior_edits, expected):
+    formula = parse(formula_str)
     metadata = make_metadata_lookup(metadata)
-    code = genmodel(f, metadata, prior_edits)
+    code = genmodel(formula, metadata, prior_edits)
     #print(code)
     model = eval_model(code)
-    data = dummydata(f, metadata, 5)
+    data = dummydata(formula, metadata, 5)
     trace = poutine.trace(model).get_trace(**data)
     assert set(trace.stochastic_nodes) - {'obs'} == set(expected)
 
-@pytest.mark.parametrize('formula, df, expected', [
+@pytest.mark.parametrize('formula_str, df, expected', [
     # (Formula('y', [], []),
     #  pd.DataFrame(dict(y=[1, 2, 3])),
     #  dict(X=torch.tensor([[],
@@ -180,8 +180,8 @@ def test_codegen(formula, metadata, prior_edits, expected):
                             [1., 0.],
                             [1., 1.]]))),
 ])
-def test_designmatrix(formula, df, expected):
-    data = makedata(parse(formula), df)
+def test_designmatrix(formula_str, df, expected):
+    data = makedata(parse(formula_str), df)
     assert set(data.keys()) == set(expected.keys())
     for k in expected.keys():
         assert_equal(data[k], expected[k])
