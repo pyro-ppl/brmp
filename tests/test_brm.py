@@ -26,7 +26,7 @@ from tests.common import assert_equal
     ('y ~ 1 + x1 + x2', [], [], ['b_0', 'sigma']),
 
     #(Formula('y', [], [Group([], 'z', True)]), [Factor('z', list('ab'))], [], ['sigma', 'z_1']),
-    # Groups with less than two terms don't sample the (Cholesky
+    # Groups with fewer than two terms don't sample the (Cholesky
     # decomp. of the) correlation matrix.
     #(Formula('y', [], [Group([], 'z', True)]), [Factor('z', list('ab'))], [], ['sigma', 'z_1']),
     ('y ~ 1 | z', [Factor('z', list('ab'))], [], ['sigma', 'z_1', 'sd_1_0']),

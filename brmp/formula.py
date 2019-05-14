@@ -79,7 +79,7 @@ def shunt(tokens):
         output.append(opstack.pop())
     return output
 
-# Evaluate rpn (as produced by `parse`) to an ast.
+# Evaluate rpn (as produced by `shunt`) to an ast.
 def rpn2ast(tokens):
     out = []
     for token in tokens:
