@@ -73,6 +73,12 @@ from tests.common import assert_equal
      [PriorEdit(['sd', 'x1', 'intercept'], Prior('HalfCauchy', [4.]))],
      ['sigma', 'sd_1_0', 'sd_1_1', 'z_1']),
 
+    # Prior on L.
+    ('y ~ 1 + x2 | x1',
+     [Factor('x1', list('ab'))],
+     [PriorEdit(['L'], Prior('LKJ', [2.]))],
+     ['sigma', 'sd_1_0', 'z_1', 'L_1']),
+
 ])
 def test_codegen(formula, metadata, prior_edits, expected):
     f = parse(formula)
