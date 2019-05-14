@@ -172,8 +172,12 @@ def genmodel(formula, metadata, prior_edits):
     assert type(prior_edits) == list
     num_groups = len(formula.groups)
 
+    # TODO: Eventually `design_metadata` will be passed in as an
+    # argument, since it will be useful outside of `genmodel` (e.g.
+    # for including readable column name when printing design
+    # matrices) and we'll want to avoid computing it multiple times.
     design_metadata = designmatrices_metadata(formula, metadata)
-    priors = get_priors(design_metadata, prior_edits)
+    priors = get_priors(formula, design_metadata, prior_edits)
 
     body = []
 

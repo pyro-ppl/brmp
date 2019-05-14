@@ -4,8 +4,8 @@ from pprint import pprint as pp
 import pandas as pd
 
 from pyro.contrib.brm.utils import join
-from pyro.contrib.brm.formula import Formula, _1
-from pyro.contrib.brm.design import dfmetadata, designmatrix_metadata, DesignMeta, PopulationMeta, GroupMeta
+from pyro.contrib.brm.formula import Formula, parse
+from pyro.contrib.brm.design import designmatrices_metadata, DesignMeta, PopulationMeta, GroupMeta, make_metadata_lookup
 
 Node = namedtuple('Node', 'name prior children')
 
@@ -62,7 +62,8 @@ def edit(node, path, f):
 # used for `b`. A Half Student-t here is used for priors on standard
 # deviations, with its scale derived from the data.
 
-def default_prior(design_metadata):
+def default_prior(formula, design_metadata):
+    assert type(formula) == Formula
     assert type(design_metadata) == DesignMeta
     assert type(design_metadata.population) == PopulationMeta
     assert type(design_metadata.groups) == list
@@ -91,8 +92,8 @@ def customize_prior(tree, prior_edits):
 # It's important that trees maintain the order of their children,
 # otherwise the output of `get_priors` will silently fail to line-up
 # with the column ordering in the data.
-def build_prior_tree(design_metadata, prior_edits):
-    return fill(customize_prior(default_prior(design_metadata), prior_edits))
+def build_prior_tree(formula, design_metadata, prior_edits):
+    return fill(customize_prior(default_prior(formula, design_metadata), prior_edits))
 
 
 # `fill` populates the `prior` property of all nodes in a tree. Each
@@ -134,10 +135,15 @@ def contig(xs):
 # that share a family and differ only in parameters can be handled
 # with a single `sample` statement with suitable parameters.
 
-def get_priors(design_metadata, prior_edits):
+def get_priors(formula, design_metadata, prior_edits):
+    # It's assumed that `formula` and `design_metadata` are
+    # consistent. Something like, there exists dataframe metadata
+    # `metadata` s.t.:
+    # `design_metadata = designmatrices_metadata(formula, metadata)`
+    assert type(formula) == Formula
     assert type(design_metadata) == DesignMeta
     assert type(prior_edits) == list
-    tree = build_prior_tree(design_metadata, prior_edits)
+    tree = build_prior_tree(formula, design_metadata, prior_edits)
     def get(path):
         return contig([n.prior for n in select(tree, path).children])
     return dict(
@@ -146,21 +152,18 @@ def get_priors(design_metadata, prior_edits):
                 for group_meta in design_metadata.groups))
 
 def main():
-    design_metadata = DesignMeta(
-        PopulationMeta(['intercept', 'x1', 'x2']),
-        [
-            GroupMeta('grp1', ['intercept']),
-            GroupMeta('grp2', ['intercept', 'z']),
-            GroupMeta('grp3', ['intercept'])
-        ])
+    formula = parse('y ~ 1 + x1 + x2 + (1 | grp1) + (1 + z | grp2) + (1 | grp3)')
+    design_metadata = designmatrices_metadata(
+        formula,
+        make_metadata_lookup([]))
     prior_edits = [
         PriorEdit(['b'], 'b'),
         PriorEdit(['sd'], 'a'),
         PriorEdit(['sd', 'grp2'], 'c'),
         PriorEdit(['sd', 'grp2', 'z'], 'd'),
     ]
-    tree = build_prior_tree(design_metadata, prior_edits)
 
+    tree = build_prior_tree(formula, design_metadata, prior_edits)
     pp([('/'.join(path), prior) for path, prior in leaves(tree)])
 
     # [('b/intercept',       'b'),
@@ -171,7 +174,7 @@ def main():
     #  ('sd/grp2/z',         'd'),
     #  ('sd/grp3/intercept', 'a')]
 
-    priors = get_priors(design_metadata, prior_edits)
+    priors = get_priors(formula, design_metadata, prior_edits)
     pp(priors)
     # {'b': [('b', 3)],
     #  'sd': {'grp1': [('a', 1)], 'grp2': [('c', 1), ('d', 1)], 'grp3': [('a', 1)]}}
