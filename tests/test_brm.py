@@ -127,7 +127,7 @@ default_params = dict(
     # Prior on L.
     ('y ~ 1 + x2 | x1',
      [Factor('x1', list('ab'))],
-     [PriorEdit(['L'], Prior('LKJ', [2.]))],
+     [PriorEdit(['cor'], Prior('LKJ', [2.]))],
      [('sigma', HalfCauchy, {}),
       ('sd_1_0', HalfCauchy, {}),
       ('z_1', Normal, {}),

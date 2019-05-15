@@ -124,7 +124,7 @@ def gengroup(i, group, metadata, design_metadata, priors):
         # Model correlations between the coefficients.
 
         # Prior over correlations.
-        prior = priors['L'][group.column]
+        prior = priors['cor'][group.column]
         # TODO: Move this elsewhere. I think it will be better to
         # perform all prior checks in one place, rather than
         # scattering them throughout codegen.

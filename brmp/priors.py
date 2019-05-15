@@ -74,12 +74,12 @@ def default_prior(formula, design_metadata):
                for (meta, group)
                in zip(design_metadata.groups, formula.groups))
     b_children = [leaf(name) for name in design_metadata.population.coefs]
-    L_children = [Node(group.column, None, []) for group in formula.groups if group.corr]
+    cor_children = [Node(group.column, None, []) for group in formula.groups if group.corr]
     sd_children = [Node(gm.name, None, [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
     return Node('root', None, [
-        Node('b',  Prior('Cauchy', [0., 1.]), b_children),
-        Node('sd', Prior('HalfCauchy', [3.]), sd_children),
-        Node('L',  Prior('LKJ', [1.]),        L_children)])
+        Node('b',    Prior('Cauchy', [0., 1.]), b_children),
+        Node('sd',   Prior('HalfCauchy', [3.]), sd_children),
+        Node('cor',  Prior('LKJ', [1.]),        cor_children)])
 
 # TODO: This ought to warn/error when an element of `priors` has a
 # path that doesn't correspond to a node in the tree.
@@ -154,7 +154,7 @@ def get_priors(formula, design_metadata, prior_edits):
         b=get(['b']),
         sd=dict((group_meta.name, get(['sd', group_meta.name]))
                 for group_meta in design_metadata.groups),
-        L=dict((n.name, n.prior) for n in select(tree, 'L').children))
+        cor=dict((n.name, n.prior) for n in select(tree, ['cor']).children))
 
 def main():
     formula = parse('y ~ 1 + x1 + x2 + (1 || grp1) + (1 + z | grp2) + (1 | grp3)')
@@ -166,8 +166,8 @@ def main():
         PriorEdit(['sd'], 'a'),
         PriorEdit(['sd', 'grp2'], 'c'),
         PriorEdit(['sd', 'grp2', 'z'], 'd'),
-        PriorEdit(['L'], 'e'),
-        PriorEdit(['L', 'grp3'], 'f'),
+        PriorEdit(['cor'], 'e'),
+        PriorEdit(['cor', 'grp3'], 'f'),
     ]
 
     tree = build_prior_tree(formula, design_metadata, prior_edits)
@@ -180,13 +180,13 @@ def main():
     #  ('sd/grp2/intercept', 'c'),
     #  ('sd/grp2/z',         'd'),
     #  ('sd/grp3/intercept', 'a'),
-    #  ('L/grp2',            'e'),
-    #  ('L/grp3',            'f')]
+    #  ('cor/grp2',          'e'),
+    #  ('cor/grp3',          'f')]
 
     priors = get_priors(formula, design_metadata, prior_edits)
     pp(priors)
-    # {'L': {'grp2': 'e', 'grp3': 'f'},
-    #  'b': [('b', 3)],
+    # {'b': [('b', 3)],
+    #  'cor': {'grp2': 'e', 'grp3': 'f'},
     #  'sd': {'grp1': [('a', 1)], 'grp2': [('c', 1), ('d', 1)], 'grp3': [('a', 1)]}}
 
 
