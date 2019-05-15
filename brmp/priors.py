@@ -27,17 +27,20 @@ Prior = namedtuple('Prior', 'family parameters')
 
 PriorEdit = namedtuple('PriorEdit', 'path prior')
 
-def select(node, path):
+def walk(node, path):
     assert type(node) == Node
     assert type(path) == list
     if len(path) == 0:
-        return node
+        return [node]
     else:
         name = path[0]
         selected_node = next((n for n in node.children if n.name == name), None)
         if selected_node is None:
             raise Exception('Invalid path')
-        return select(selected_node, path[1:])
+        return [node] + walk(selected_node, path[1:])
+
+def select(node, path):
+    return walk(node, path)[-1]
 
 def edit(node, path, f):
     assert type(node) == Node
