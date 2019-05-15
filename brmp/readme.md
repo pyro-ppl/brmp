@@ -20,8 +20,12 @@ See [`ex0.py`](./ex0.py) for an example of this.
 * The syntax for removing columns is not supported. e.g. `y ~ x - 1`
 * The response is always scalar.
 * The response is Gaussian distributed.
-* Some priors used in generated code are not sensible.
+* Some priors used in the generated code don't match those generated
+  by brms. e.g. There's no Half Student-t distribution, setting prior
+  parameters based on the data isn't supported.
 * Not all priors can be customised.
+* The centering data transform, performed by brms to improve sampling
+  efficiency, is not implemented.
 * This doesn't include any of the fancy stuff brms does, such as its
   extensions to the lme4 grouping syntax, splines, monotonic effects,
   GP terms, etc.
