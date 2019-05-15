@@ -28,6 +28,8 @@ Prior = namedtuple('Prior', 'family parameters')
 PriorEdit = namedtuple('PriorEdit', 'path prior')
 
 def select(node, path):
+    assert type(node) == Node
+    assert type(path) == list
     if len(path) == 0:
         return node
     else:
@@ -38,6 +40,8 @@ def select(node, path):
         return select(selected_node, path[1:])
 
 def edit(node, path, f):
+    assert type(node) == Node
+    assert type(path) == list
     if len(path) == 0:
         # We're at the node to be edited. (i.e. Empty path picks out
         # the root node.)
