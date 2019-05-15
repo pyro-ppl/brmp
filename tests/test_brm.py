@@ -13,6 +13,13 @@ from pyro.contrib.brm.priors import Prior, PriorEdit
 
 from tests.common import assert_equal
 
+default_params = dict(
+    Normal          = dict(loc=0., scale=1.),
+    Cauchy          = dict(loc=0., scale=1.),
+    HalfCauchy      = dict(scale=3.),
+    LKJCorrCholesky = dict(eta=1.),
+)
+
 # TODO: Extend this. Could check shapes of sampled values? (Although
 # there are already asserting in the generated code to do that.) Check
 # response is observed.
@@ -22,70 +29,109 @@ from tests.common import assert_equal
     # these be dropped?
     #(Formula('y', [], []), [], [], ['sigma']),
 
-    ('y ~ 1 + x', [], [], [('b_0', Cauchy), ('sigma', HalfCauchy)]),
-    ('y ~ 1 + x1 + x2', [], [], [('b_0', Cauchy), ('sigma', HalfCauchy)]),
+    ('y ~ 1 + x', [], [],
+     [('b_0', Cauchy, {}),
+      ('sigma', HalfCauchy, {})]),
+
+    ('y ~ 1 + x1 + x2', [], [],
+     [('b_0', Cauchy, {}),
+      ('sigma', HalfCauchy, {})]),
 
     #(Formula('y', [], [Group([], 'z', True)]), [Factor('z', list('ab'))], [], ['sigma', 'z_1']),
     # Groups with fewer than two terms don't sample the (Cholesky
     # decomp. of the) correlation matrix.
     #(Formula('y', [], [Group([], 'z', True)]), [Factor('z', list('ab'))], [], ['sigma', 'z_1']),
     ('y ~ 1 | z', [Factor('z', list('ab'))], [],
-     [('sigma', HalfCauchy), ('z_1', Normal), ('sd_1_0', HalfCauchy)]),
+     [('sigma', HalfCauchy, {}),
+      ('z_1', Normal, {}),
+      ('sd_1_0', HalfCauchy, {})]),
+
     ('y ~ x | z', [Factor('z', list('ab'))], [],
-     [('sigma', HalfCauchy), ('z_1', Normal), ('sd_1_0', HalfCauchy)]),
+     [('sigma', HalfCauchy, {}),
+      ('z_1', Normal, {}),
+      ('sd_1_0', HalfCauchy, {})]),
 
     ('y ~ 1 + x1 + x2 + (1 + x3 | z)', [Factor('z', list('ab'))], [],
-     [('b_0', Cauchy), ('sigma', HalfCauchy), ('z_1', Normal),
-      ('sd_1_0', HalfCauchy), ('L_1', LKJCorrCholesky)]),
+     [('b_0', Cauchy, {}),
+      ('sigma', HalfCauchy, {}),
+      ('z_1', Normal, {}),
+      ('sd_1_0', HalfCauchy, {}),
+      ('L_1', LKJCorrCholesky, {})]),
+
     ('y ~ 1 + x1 + x2 + (1 + x3 || z)', [Factor('z', list('ab'))], [],
-     [('b_0', Cauchy), ('sigma', HalfCauchy), ('z_1', Normal), ('sd_1_0', HalfCauchy)]),
+     [('b_0', Cauchy, {}),
+      ('sigma', HalfCauchy, {}),
+      ('z_1', Normal, {}),
+      ('sd_1_0', HalfCauchy, {})]),
+
     ('y ~ 1 + x1 + x2 + (1 + x3 + x4 | z1) + (1 + x5 | z2)',
      [Factor('z1', list('ab')), Factor('z2', list('ab'))],
      [],
-     [('b_0', Cauchy), ('sigma', HalfCauchy),
-      ('z_1', Normal), ('sd_1_0', HalfCauchy), ('L_1', LKJCorrCholesky),
-      ('z_2', Normal), ('sd_2_0', HalfCauchy), ('L_2', LKJCorrCholesky)]),
+     [('b_0', Cauchy, {}),
+      ('sigma', HalfCauchy, {}),
+      ('z_1', Normal, {}),
+      ('sd_1_0', HalfCauchy, {}),
+      ('L_1', LKJCorrCholesky, {}),
+      ('z_2', Normal, {}),
+      ('sd_2_0', HalfCauchy, {}),
+      ('L_2', LKJCorrCholesky, {})]),
 
     # Custom priors.
     ('y ~ 1 + x1 + x2',
      [],
      [PriorEdit(['b'], Prior('Normal', [0., 100.]))],
-     [('b_0', Normal), ('sigma', HalfCauchy)]),
+     [('b_0', Normal, {'loc': 0., 'scale': 100.}),
+      ('sigma', HalfCauchy, {})]),
 
     ('y ~ 1 + x1 + x2',
      [],
      [PriorEdit(['b', 'intercept'], Prior('Normal', [0., 100.]))],
-     [('b_0', Normal), ('b_1', Cauchy), ('sigma', HalfCauchy)]),
+     [('b_0', Normal, {'loc': 0., 'scale': 100.}),
+      ('b_1', Cauchy, {}),
+      ('sigma', HalfCauchy, {})]),
 
     ('y ~ 1 + x1 + x2',
      [],
      [PriorEdit(['b', 'x1'], Prior('Normal', [0., 100.]))],
-     [('b_0', Cauchy), ('b_1', Normal), ('b_2', Cauchy), ('sigma', HalfCauchy)]),
+     [('b_0', Cauchy, {}),
+      ('b_1', Normal, {'loc': 0., 'scale': 100.}),
+      ('b_2', Cauchy, {}),
+      ('sigma', HalfCauchy, {})]),
 
     # Prior on coef of a factor.
     ('y ~ 1 + x',
      [Factor('x', list('ab'))],
      [PriorEdit(['b', 'x[b]'], Prior('Normal', [0., 100.]))],
-     [('b_0', Cauchy), ('b_1', Normal), ('sigma', HalfCauchy)]),
+     [('b_0', Cauchy, {}),
+      ('b_1', Normal, {'loc': 0., 'scale': 100.}),
+      ('sigma', HalfCauchy, {})]),
 
     # Prior on group level `sd` choice.
     ('y ~ 1 + x2 + x3 | x1',
      [Factor('x1', list('ab'))],
      [PriorEdit(['sd', 'x1', 'intercept'], Prior('HalfCauchy', [4.]))],
-     [('sigma', HalfCauchy), ('sd_1_0', HalfCauchy),
-      ('sd_1_1', HalfCauchy), ('z_1', Normal), ('L_1', LKJCorrCholesky)]),
+     [('sigma', HalfCauchy, {}),
+      ('sd_1_0', HalfCauchy, {'scale': 4.}),
+      ('sd_1_1', HalfCauchy, {}),
+      ('z_1', Normal, {}),
+      ('L_1', LKJCorrCholesky, {})]),
 
     ('y ~ 1 + x2 + x3 || x1',
      [Factor('x1', list('ab'))],
      [PriorEdit(['sd', 'x1', 'intercept'], Prior('HalfCauchy', [4.]))],
-     [('sigma', HalfCauchy), ('sd_1_0', HalfCauchy),
-      ('sd_1_1', HalfCauchy), ('z_1', Normal)]),
+     [('sigma', HalfCauchy, {}),
+      ('sd_1_0', HalfCauchy, {'scale': 4.}),
+      ('sd_1_1', HalfCauchy, {}),
+      ('z_1', Normal, {})]),
 
     # Prior on L.
     ('y ~ 1 + x2 | x1',
      [Factor('x1', list('ab'))],
      [PriorEdit(['L'], Prior('LKJ', [2.]))],
-     [('sigma', HalfCauchy), ('sd_1_0', HalfCauchy), ('z_1', Normal), ('L_1', LKJCorrCholesky)]),
+     [('sigma', HalfCauchy, {}),
+      ('sd_1_0', HalfCauchy, {}),
+      ('z_1', Normal, {}),
+      ('L_1', LKJCorrCholesky, {'eta': 2.})]),
 
 ])
 def test_codegen(formula_str, metadata, prior_edits, expected):
@@ -96,10 +142,16 @@ def test_codegen(formula_str, metadata, prior_edits, expected):
     model = eval_model(code)
     data = dummydata(formula, metadata, 5)
     trace = poutine.trace(model).get_trace(**data)
-    expected_sites = [site for (site, _) in expected]
+    expected_sites = [site for (site, _, _) in expected]
     assert set(trace.stochastic_nodes) - {'obs'} == set(expected_sites)
-    for (site, family) in expected:
-        assert type(unwrapfn(trace.nodes[site]['fn'])) == family
+    for (site, family, maybe_params) in expected:
+        fn = unwrapfn(trace.nodes[site]['fn'])
+        params = maybe_params or default_params[fn.__class__.__name__]
+        assert type(fn) == family
+        for (name, expected_val) in params.items():
+            val = fn.__getattribute__(name)
+            assert_equal(val, torch.tensor(expected_val).expand(val.shape))
+
 
 def unwrapfn(fn):
     return unwrapfn(fn.base_dist) if type(fn) == Independent else fn
