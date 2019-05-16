@@ -1,27 +1,29 @@
 from .formula import Formula, Group
 from .design import width, designmatrices_metadata, GroupMeta
 from .priors import Prior, get_priors
+from .family import Family, Dist, getfamily, nonlocparams, LinkFn
 
-def gendist(prior, shape):
-    assert type(prior) == Prior
+def gendist(family, args, shape, batch):
+    assert type(family) == Family
+    assert type(args) == list
+    assert len(args) == len(family.params)
+    # Floats are expanded to `shape`, string are assumed to be literal
+    # code.
+    assert all(type(arg) in [float, str] for arg in args)
     assert type(shape) == list
-    # This is likely only useful when `len(shape) == 1`. And even then
-    # it's not very flexible since we assume parameters are given as
-    # scalars which we can always expand into parameter vectors.
-    assert len(shape) == 1 # See comment above.
-    # TODO: Would there be any perf. increase associated with using
-    # e.g. `torch.zeros(shape)` over `torch.tensor(0.).expand(shape)`?
-    params_code = ['torch.tensor({}).expand({})'.format(param, shape) for param in prior.parameters]
-    return '{}({}).to_event({})'.format(prior.family, ', '.join(params_code), len(shape))
+    # Dimensions are ints (when statically known) or strings (when
+    # know at run-time only).
+    assert all(type(dim) in [int, str] for dim in shape)
+    assert type(batch) == bool
+    eventdims = len(shape) - 1 if batch else len(shape)
+    args_code = [arg if type(arg) == str else 'torch.tensor({}).expand({})'.format(arg, shape) for arg in args]
+    # TODO: When len(shape) == 1 and batch==True, then this
+    # `to_event()` call is a no-op, and could therefore be dropped as
+    # an optimisation. (Eqv., when eventdims == 0?)
+    return '{}({}).to_event({})'.format(family.name, ', '.join(args_code), eventdims)
 
-# `half_cauchy`, `std_normal` with `gendist` will become redundant
-# once all priors are customisable.
-
-# This assumes that all dims are event dims.
-def half_cauchy(scale, shape):
-    assert type(scale) == float
-    assert type(shape) == list
-    return 'HalfCauchy(torch.tensor({}).expand({})).to_event({})'.format(scale, shape, len(shape))
+# `std_normal` with `gendist` will become redundant once all priors
+# are customisable.
 
 def lkj_corr_cholesky(size, shape):
     assert type(size) == int # the size of the matrix
@@ -54,14 +56,14 @@ def genprior(varname, prior_desc):
     assert type(varname) == str
     assert type(prior_desc) == list
     assert all(type(p)    == tuple and
-               type(p[0]) == Prior and
+               type(p[0]) == Dist and
                type(p[1]) == int
                for p in prior_desc)
     code = []
 
     # Sample each segment of a coefficient vector.
     for i, (prior, length) in enumerate(prior_desc):
-        code.append(sample('{}_{}'.format(varname, i), gendist(prior, shape=[length])))
+        code.append(sample('{}_{}'.format(varname, i), gendist(prior.family, prior.arguments, [length], False)))
 
     # TODO: Optimisation -- avoid `torch.concat` when only sample is
     # drawn. (Binding the sampled value directly to `varname`.)
@@ -125,8 +127,8 @@ def gengroup(i, group, metadata, design_metadata, priors):
 
         # Prior over correlations.
         prior = priors['cor'][group.column]
-        assert len(prior.parameters) == 1
-        code.append(sample('L_{}'.format(i), lkj_corr_cholesky(M_i, shape=prior.parameters[0])))
+        assert len(prior.arguments) == 1
+        code.append(sample('L_{}'.format(i), lkj_corr_cholesky(M_i, shape=prior.arguments[0])))
         code.append('assert L_{}.shape == (M_{}, M_{}) # {} x {}'.format(i, i, i, M_i, M_i))
 
         # Compute the final (scaled, correlated) coefficients.
@@ -167,6 +169,12 @@ def gengroup(i, group, metadata, design_metadata, priors):
 
     return code
 
+def geninvlinkfn(linkfn, code):
+    if linkfn == LinkFn.identity:
+        return code
+    else:
+        raise NotImplementedError('code generation for link function {} not implemented'.format(linkfn))
+
 def genmodel(formula, metadata, prior_edits):
     assert type(formula) == Formula
     assert type(metadata) == dict
@@ -178,7 +186,8 @@ def genmodel(formula, metadata, prior_edits):
     # for including readable column name when printing design
     # matrices) and we'll want to avoid computing it multiple times.
     design_metadata = designmatrices_metadata(formula, metadata)
-    priors = get_priors(formula, design_metadata, prior_edits)
+    family = getfamily('Normal')
+    priors = get_priors(formula, design_metadata, family, prior_edits)
 
     body = []
 
@@ -217,13 +226,25 @@ def genmodel(formula, metadata, prior_edits):
     # Response
     # --------------------------------------------------
 
-    # Prior over the std. dev. of the response distribution.
-    body.append(sample('sigma', half_cauchy(scale=3., shape=[1])))
+    assert set(nonlocparams(family)) == set(priors['resp'].keys())
+
+    # Sample from priors over the response distribution parameters
+    # that aren't predicted from the data.
+    for param in nonlocparams(family):
+        param_prior = priors['resp'][param]
+        body.append(sample(param, gendist(param_prior.family, param_prior.arguments, [1], False)))
+
+    # TODO: This relies on the parameters defined in each Family
+    # appearing in the same order as Pyro expects.
+    def response_arg(param):
+        if param == family.response.param:
+            return geninvlinkfn(family.response.linkfn, 'mu')
+        else:
+            return '{}.expand(N)'.format(param)
+    response_args = [response_arg(p) for p in family.params]
 
     body.append('with pyro.plate("obs", N):')
-    body.append(indent(sample('y', 'Normal(mu, sigma.expand(N))', 'y_obs')))
-
-    body.append('return dict(b=b, sigma=sigma, y=y)')
+    body.append(indent(sample('y', gendist(family, response_args, shape=['N'], batch=True), 'y_obs')))
 
     params = (['X'] +
               ['Z_{}'.format(i+1) for i in range(num_groups)] +

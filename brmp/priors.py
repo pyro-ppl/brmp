@@ -8,6 +8,8 @@ import pyro.distributions as dists
 from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula, parse
 from pyro.contrib.brm.design import designmatrices_metadata, DesignMeta, PopulationMeta, GroupMeta, make_metadata_lookup
+from pyro.contrib.brm.family import getfamily, Family, Dist, nonlocparams
+
 
 Node = namedtuple('Node', 'name prior checks children')
 
@@ -19,7 +21,23 @@ def leaf(name):
 
 # TODO: This currently requires `parameters` to be a list of floats.
 # This ought to be checked.
-Prior = namedtuple('Prior', 'family parameters')
+#Prior = namedtuple('Prior', 'family parameters')
+def Prior(family_name, params):
+    return Dist(getfamily(family_name), params)
+
+RESPONSE_PRIORS = {
+    'Normal': {
+        'sigma': Prior('HalfCauchy', [3.])
+    }
+}
+
+def check_response_priors_is_complete():
+    # TODO: Ensure every family with a Response has priors for all
+    # non-location args.
+    pass
+
+def get_response_prior(family, parameter):
+    return RESPONSE_PRIORS[family][parameter]
 
 # This is similar to brms `set_prior`. (e.g. `set_prior('<prior>',
 # coef='x1')` is similar to `PriorEdit(['x1'], '<prior>)`.) By
@@ -61,9 +79,6 @@ def edit(node, path, f):
                     for n in node.children]
         return Node(node.name, node.prior, node.checks, children)
 
-# TODO: Figure out how to incorporate priors on the response
-# distribution.
-
 # TODO: Match default priors used by brms. (An improper uniform is
 # used for `b`. A Half Student-t here is used for priors on standard
 # deviations, with its scale derived from the data.
@@ -75,9 +90,11 @@ def edit(node, path, f):
 # thing is to make an separate pass over the entire default tree once
 # built, and assert its consistency.
 
-def default_prior(formula, design_metadata):
+def default_prior(formula, design_metadata, family):
     assert type(formula) == Formula
     assert type(design_metadata) == DesignMeta
+    assert type(family) == Family
+    assert family.response is not None
     assert type(design_metadata.population) == PopulationMeta
     assert type(design_metadata.groups) == list
     assert all(type(gm) == GroupMeta for gm in design_metadata.groups)
@@ -92,10 +109,15 @@ def default_prior(formula, design_metadata):
     b_children = [leaf(name) for name in design_metadata.population.coefs]
     cor_children = [Node(group.column, None, [], []) for group in formula.groups if group.corr]
     sd_children = [Node(gm.name, None, [], [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
+    # TODO: Consider adding a check that ensures the support of the
+    # prior matches any constraint on the parameter. (Would require
+    # families extending with additional info.)
+    resp_children = [Node(p, get_response_prior(family.name, p), [], []) for p in nonlocparams(family)]
     return Node('root', None, [chk_known_dist], [
-        Node('b',   Prior('Cauchy', [0., 1.]), [], b_children),
-        Node('sd',  Prior('HalfCauchy', [3.]), [chk_pos_support], sd_children),
-        Node('cor', Prior('LKJ', [1.]),        [chk_lkj], cor_children)])
+        Node('b',    Prior('Cauchy', [0., 1.]), [], b_children),
+        Node('sd',   Prior('HalfCauchy', [3.]), [chk_pos_support], sd_children),
+        Node('cor',  Prior('LKJ', [1.]),        [chk_lkj], cor_children),
+        Node('resp', None,                      [], resp_children)])
 
 # TODO: This ought to warn/error when an element of `priors` has a
 # path that doesn't correspond to a node in the tree.
@@ -116,8 +138,8 @@ def customize_prior(tree, prior_edits):
 # It's important that trees maintain the order of their children,
 # otherwise the output of `get_priors` will silently fail to line-up
 # with the column ordering in the data.
-def build_prior_tree(formula, design_metadata, prior_edits):
-    return fill(customize_prior(default_prior(formula, design_metadata), prior_edits))
+def build_prior_tree(formula, design_metadata, family, prior_edits):
+    return fill(customize_prior(default_prior(formula, design_metadata, family), prior_edits))
 
 
 # `fill` populates the `prior` property of all nodes in a tree. Each
@@ -159,11 +181,12 @@ def contig(xs):
 # that share a family and differ only in parameters can be handled
 # with a single `sample` statement with suitable parameters.
 
-def get_priors(formula, design_metadata, prior_edits, chk=True):
+def get_priors(formula, design_metadata, family, prior_edits, chk=True):
     assert type(formula) == Formula
     assert type(design_metadata) == DesignMeta
+    assert type(family) == Family
     assert type(prior_edits) == list
-    tree = build_prior_tree(formula, design_metadata, prior_edits)
+    tree = build_prior_tree(formula, design_metadata, family, prior_edits)
     if chk:
         check_prior_edits(tree, prior_edits)
     def get(path):
@@ -172,13 +195,15 @@ def get_priors(formula, design_metadata, prior_edits, chk=True):
         b=get(['b']),
         sd=dict((group_meta.name, get(['sd', group_meta.name]))
                 for group_meta in design_metadata.groups),
-        cor=dict((n.name, n.prior) for n in select(tree, ['cor']).children))
+        cor=dict((n.name, n.prior) for n in select(tree, ['cor']).children),
+        resp=dict((n.name, n.prior) for n in select(tree, ['resp']).children))
 
 # Sanity checks
 
 def chk(error):
     def decorate(predicate):
         def f(prior):
+            assert type(prior) == Dist
             retval = predicate(prior)
             assert type(retval) == bool
             return None if retval else error
@@ -188,7 +213,7 @@ def chk(error):
 
 @chk('A distribution with support on only the positive reals expected here.')
 def chk_pos_support(prior):
-    dist = dists.__getattribute__(prior.family)
+    dist = dists.__getattribute__(prior.family.name)
     return dist.support == constraints.positive
 
 @chk('Unknown distribution family.')
@@ -196,14 +221,14 @@ def chk_known_dist(prior):
     if chk_lkj.predicate(prior):
         return True
     try:
-        dists.__getattribute__(prior.family)
+        dists.__getattribute__(prior.family.name)
         return True
     except AttributeError:
         return False
 
 @chk('Only the LKJ(...) family is supported here.')
 def chk_lkj(prior):
-    return prior.family == 'LKJ'
+    return prior.family.name == 'LKJ'
 
 # TODO: We could have a further check that attempt to instantiate the
 # distribution as a way of validating parameters? LKJ would again
@@ -241,29 +266,32 @@ def main():
         PriorEdit(['sd', 'grp2', 'z'], 'd'),
         PriorEdit(['cor'], 'e'),
         PriorEdit(['cor', 'grp3'], 'f'),
+        PriorEdit(['resp', 'sigma'], 'g'),
     ]
 
-    tree = build_prior_tree(formula, design_metadata, prior_edits)
+    tree = build_prior_tree(formula, design_metadata, getfamily('Normal'), prior_edits)
     pp([('/'.join(path), prior) for path, prior in leaves(tree)])
 
-    # [('b/intercept',       'b'),
-    #  ('b/x1',              'b'),
-    #  ('b/x2',              'b'),
+    # [('b/intercept', 'b'),
+    #  ('b/x1', 'b'),
+    #  ('b/x2', 'b'),
     #  ('sd/grp1/intercept', 'a'),
     #  ('sd/grp2/intercept', 'c'),
-    #  ('sd/grp2/z',         'd'),
+    #  ('sd/grp2/z', 'd'),
     #  ('sd/grp3/intercept', 'a'),
-    #  ('cor/grp2',          'e'),
-    #  ('cor/grp3',          'f')]
+    #  ('cor/grp2', 'e'),
+    #  ('cor/grp3', 'f'),
+    #  ('resp/sigma', 'g')]
 
-    priors = get_priors(formula, design_metadata, prior_edits, chk=False)
+    priors = get_priors(formula, design_metadata, getfamily('Normal'), prior_edits, chk=False)
     pp(priors)
     # {'b': [('b', 3)],
     #  'cor': {'grp2': 'e', 'grp3': 'f'},
+    #  'resp': {'sigma': 'g'},
     #  'sd': {'grp1': [('a', 1)], 'grp2': [('c', 1), ('d', 1)], 'grp3': [('a', 1)]}}
 
-    print(check_prior_edit(tree, PriorEdit([], Prior('Normal2', []))))
-    # Unknown distribution ...
+    # print(check_prior_edit(tree, PriorEdit([], Prior('Normal2', []))))
+    # # Unknown distribution ...
 
     print(check_prior_edit(tree, PriorEdit(['cor', 'grp2'], Prior('Normal', []))))
     # Only LKJ ...

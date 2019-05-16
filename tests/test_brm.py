@@ -133,6 +133,13 @@ default_params = dict(
       ('z_1', Normal, {}),
       ('L_1', LKJCorrCholesky, {'eta': 2.})]),
 
+    # Prior on parameter of response distribution.
+    ('y ~ x',
+     [],
+     [PriorEdit(['resp', 'sigma'], Prior('HalfCauchy', [4.]))],
+     [('b_0', Cauchy, {}),
+      ('sigma', HalfCauchy, {'scale': 4.})]),
+
 ])
 def test_codegen(formula_str, metadata, prior_edits, expected):
     formula = parse(formula_str)
