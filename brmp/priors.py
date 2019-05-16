@@ -68,6 +68,13 @@ def edit(node, path, f):
 # used for `b`. A Half Student-t here is used for priors on standard
 # deviations, with its scale derived from the data.
 
+# TODO: It might be a good idea to build the tree with checks but no
+# priors, and then add the priors using in the same way as user edits
+# are applied, in order to ensure that the default meet the
+# contraints. Or, perhaps a more convenient way of achieving the same
+# thing is to make an separate pass over the entire default tree once
+# built, and assert its consistency.
+
 def default_prior(formula, design_metadata):
     assert type(formula) == Formula
     assert type(design_metadata) == DesignMeta
@@ -262,6 +269,47 @@ def main():
     # Only LKJ ...
 
 
+
+    # BUG:
+
+    tree = Node('parent',
+                None,
+                [],
+                [Node('child', None, [chk_pos_support], [])])
+    edit = PriorEdit([], Prior('Normal', [0., 1.]))
+    tree = customize_prior(tree, [edit])
+    tree = fill(tree)
+    # print(tree)
+
+    # check_prior_edit says this edit is OK:
+    assert check_prior_edit(tree, edit) is None
+
+    # However, if we manually check the prior on the child node
+    # against the check for that node (as returned by `getchecks`),
+    # then we find there's an error.
+    child_check = getchecks(tree, ['child'])[0]
+    child_prior = select(tree, ['child']).prior
+    #print(child_check(child_prior))
+    assert child_check(child_prior) is not None
+
+    # The problem is that by only collecting checks from the root to
+    # the node at which we're setting the prior, we're not ensure that
+    # nodes lower down in the tree that inherit the new prior, don't
+    # have more local checks that prohibit the prior. Here, the +ve
+    # check on child ought to prevent setting a `Normal` at the root,
+    # since it would be inherited by the child, leading to a prior
+    # that violates the checks.
+
+    # I guess the correct thing to do is to explore the whole sub-tree
+    # starting from the node at which the prior is set. This would
+    # start with the checks collected while walking from the root to
+    # that node, and accumulate checks as the exploration progresses.
+    # The prior at each node would be checked along the way. (It
+    # probably makes sense to do this once fill has happened.)
+
+    # It may be that this situation won't arise with the default prior
+    # tree currently in use, but it makes sense to fix this to avoid
+    # running in to hard to debug problems in the future.
 
 if __name__ == '__main__':
     main()
