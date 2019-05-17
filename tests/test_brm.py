@@ -9,8 +9,8 @@ from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, LKJCorrC
 from pyro.contrib.brm.formula import parse
 from pyro.contrib.brm.codegen import genmodel, eval_model
 from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrices_metadata
-from pyro.contrib.brm.priors import prior, PriorEdit
-from pyro.contrib.brm.family import getfamily
+from pyro.contrib.brm.priors import prior, Prior, PriorEdit, get_response_prior
+from pyro.contrib.brm.family import getfamily, FAMILIES
 
 from tests.common import assert_equal
 
@@ -275,3 +275,10 @@ def test_designmatrix(formula_str, df, expected):
     assert set(data.keys()) == set(expected.keys())
     for k in expected.keys():
         assert_equal(data[k], expected[k])
+
+def test_response_priors_is_complete():
+    for family in FAMILIES:
+        if family.response is not None:
+            for param in family.params:
+                if not param == family.response.param:
+                    assert type(get_response_prior(family.name, param)) == Prior

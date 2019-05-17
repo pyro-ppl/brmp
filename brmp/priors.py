@@ -29,11 +29,6 @@ RESPONSE_PRIORS = {
     }
 }
 
-def check_response_priors_is_complete():
-    # TODO: Ensure every family with a Response has priors for all
-    # non-location args.
-    pass
-
 def get_response_prior(family, parameter):
     return RESPONSE_PRIORS[family][parameter]
 
