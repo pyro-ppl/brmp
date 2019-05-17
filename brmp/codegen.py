@@ -1,7 +1,7 @@
 from .formula import Formula, Group
 from .design import width, designmatrices_metadata, GroupMeta
 from .priors import Prior, get_priors
-from .family import Family, getfamily, nonlocparams, LinkFn
+from .family import Family, nonlocparams, LinkFn
 
 def gendist(family, args, shape, batch):
     assert type(family) == Family
@@ -175,9 +175,10 @@ def geninvlinkfn(linkfn, code):
     else:
         raise NotImplementedError('code generation for link function {} not implemented'.format(linkfn))
 
-def genmodel(formula, metadata, prior_edits):
+def genmodel(formula, metadata, family, prior_edits):
     assert type(formula) == Formula
     assert type(metadata) == dict
+    assert type(family) == Family
     assert type(prior_edits) == list
     num_groups = len(formula.groups)
 
@@ -186,7 +187,6 @@ def genmodel(formula, metadata, prior_edits):
     # for including readable column name when printing design
     # matrices) and we'll want to avoid computing it multiple times.
     design_metadata = designmatrices_metadata(formula, metadata)
-    family = getfamily('Normal')
     priors = get_priors(formula, design_metadata, family, prior_edits)
 
     body = []

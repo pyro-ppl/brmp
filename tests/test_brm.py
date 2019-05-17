@@ -10,6 +10,7 @@ from pyro.contrib.brm.formula import parse
 from pyro.contrib.brm.codegen import genmodel, eval_model
 from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrices_metadata
 from pyro.contrib.brm.priors import prior, PriorEdit
+from pyro.contrib.brm.family import getfamily
 
 from tests.common import assert_equal
 
@@ -23,17 +24,17 @@ default_params = dict(
 # TODO: Extend this. Could check shapes of sampled values? (Although
 # there are already asserting in the generated code to do that.) Check
 # response is observed.
-@pytest.mark.parametrize('formula_str, metadata, prior_edits, expected', [
+@pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', [
     # TODO: This (and similar examples below) can't be expressed with
     # the current parser. Is it useful to fix this (`y ~ -1`?), or can
     # these be dropped?
     #(Formula('y', [], []), [], [], ['sigma']),
 
-    ('y ~ 1 + x', [], [],
+    ('y ~ 1 + x', [], getfamily('Normal'), [],
      [('b_0', Cauchy, {}),
       ('sigma', HalfCauchy, {})]),
 
-    ('y ~ 1 + x1 + x2', [], [],
+    ('y ~ 1 + x1 + x2', [], getfamily('Normal'), [],
      [('b_0', Cauchy, {}),
       ('sigma', HalfCauchy, {})]),
 
@@ -41,24 +42,24 @@ default_params = dict(
     # Groups with fewer than two terms don't sample the (Cholesky
     # decomp. of the) correlation matrix.
     #(Formula('y', [], [Group([], 'z', True)]), [Factor('z', list('ab'))], [], ['sigma', 'z_1']),
-    ('y ~ 1 | z', [Factor('z', list('ab'))], [],
+    ('y ~ 1 | z', [Factor('z', list('ab'))], getfamily('Normal'), [],
      [('sigma', HalfCauchy, {}),
       ('z_1', Normal, {}),
       ('sd_1_0', HalfCauchy, {})]),
 
-    ('y ~ x | z', [Factor('z', list('ab'))], [],
+    ('y ~ x | z', [Factor('z', list('ab'))], getfamily('Normal'), [],
      [('sigma', HalfCauchy, {}),
       ('z_1', Normal, {}),
       ('sd_1_0', HalfCauchy, {})]),
 
-    ('y ~ 1 + x1 + x2 + (1 + x3 | z)', [Factor('z', list('ab'))], [],
+    ('y ~ 1 + x1 + x2 + (1 + x3 | z)', [Factor('z', list('ab'))], getfamily('Normal'), [],
      [('b_0', Cauchy, {}),
       ('sigma', HalfCauchy, {}),
       ('z_1', Normal, {}),
       ('sd_1_0', HalfCauchy, {}),
       ('L_1', LKJCorrCholesky, {})]),
 
-    ('y ~ 1 + x1 + x2 + (1 + x3 || z)', [Factor('z', list('ab'))], [],
+    ('y ~ 1 + x1 + x2 + (1 + x3 || z)', [Factor('z', list('ab'))], getfamily('Normal'), [],
      [('b_0', Cauchy, {}),
       ('sigma', HalfCauchy, {}),
       ('z_1', Normal, {}),
@@ -66,6 +67,7 @@ default_params = dict(
 
     ('y ~ 1 + x1 + x2 + (1 + x3 + x4 | z1) + (1 + x5 | z2)',
      [Factor('z1', list('ab')), Factor('z2', list('ab'))],
+     getfamily('Normal'),
      [],
      [('b_0', Cauchy, {}),
       ('sigma', HalfCauchy, {}),
@@ -79,12 +81,14 @@ default_params = dict(
     # Custom priors.
     ('y ~ 1 + x1 + x2',
      [],
+     getfamily('Normal'),
      [PriorEdit(['b'], prior('Normal', [0., 100.]))],
      [('b_0', Normal, {'loc': 0., 'scale': 100.}),
       ('sigma', HalfCauchy, {})]),
 
     ('y ~ 1 + x1 + x2',
      [],
+     getfamily('Normal'),
      [PriorEdit(['b', 'intercept'], prior('Normal', [0., 100.]))],
      [('b_0', Normal, {'loc': 0., 'scale': 100.}),
       ('b_1', Cauchy, {}),
@@ -92,6 +96,7 @@ default_params = dict(
 
     ('y ~ 1 + x1 + x2',
      [],
+     getfamily('Normal'),
      [PriorEdit(['b', 'x1'], prior('Normal', [0., 100.]))],
      [('b_0', Cauchy, {}),
       ('b_1', Normal, {'loc': 0., 'scale': 100.}),
@@ -101,6 +106,7 @@ default_params = dict(
     # Prior on coef of a factor.
     ('y ~ 1 + x',
      [Factor('x', list('ab'))],
+     getfamily('Normal'),
      [PriorEdit(['b', 'x[b]'], prior('Normal', [0., 100.]))],
      [('b_0', Cauchy, {}),
       ('b_1', Normal, {'loc': 0., 'scale': 100.}),
@@ -109,6 +115,7 @@ default_params = dict(
     # Prior on group level `sd` choice.
     ('y ~ 1 + x2 + x3 | x1',
      [Factor('x1', list('ab'))],
+     getfamily('Normal'),
      [PriorEdit(['sd', 'x1', 'intercept'], prior('HalfCauchy', [4.]))],
      [('sigma', HalfCauchy, {}),
       ('sd_1_0', HalfCauchy, {'scale': 4.}),
@@ -118,6 +125,7 @@ default_params = dict(
 
     ('y ~ 1 + x2 + x3 || x1',
      [Factor('x1', list('ab'))],
+     getfamily('Normal'),
      [PriorEdit(['sd', 'x1', 'intercept'], prior('HalfCauchy', [4.]))],
      [('sigma', HalfCauchy, {}),
       ('sd_1_0', HalfCauchy, {'scale': 4.}),
@@ -127,6 +135,7 @@ default_params = dict(
     # Prior on L.
     ('y ~ 1 + x2 | x1',
      [Factor('x1', list('ab'))],
+     getfamily('Normal'),
      [PriorEdit(['cor'], prior('LKJ', [2.]))],
      [('sigma', HalfCauchy, {}),
       ('sd_1_0', HalfCauchy, {}),
@@ -136,15 +145,16 @@ default_params = dict(
     # Prior on parameter of response distribution.
     ('y ~ x',
      [],
+     getfamily('Normal'),
      [PriorEdit(['resp', 'sigma'], prior('HalfCauchy', [4.]))],
      [('b_0', Cauchy, {}),
       ('sigma', HalfCauchy, {'scale': 4.})]),
 
 ])
-def test_codegen(formula_str, metadata, prior_edits, expected):
+def test_codegen(formula_str, metadata, family, prior_edits, expected):
     formula = parse(formula_str)
     metadata = make_metadata_lookup(metadata)
-    code = genmodel(formula, metadata, prior_edits)
+    code = genmodel(formula, metadata, family, prior_edits)
     #print(code)
     model = eval_model(code)
     data = dummydata(formula, metadata, 5)

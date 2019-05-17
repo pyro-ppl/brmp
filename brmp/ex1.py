@@ -5,6 +5,7 @@ from pyro.contrib.brm import makecode
 from pyro.contrib.brm.formula import parse
 from pyro.contrib.brm.design import makedata
 from pyro.contrib.brm.priors import prior, PriorEdit
+from pyro.contrib.brm.family import getfamily
 
 # --------------------------------------------------
 # Ex 1. Population-level effects only
@@ -19,7 +20,7 @@ df1a = pd.DataFrame(dict(y=[0., 1., 2.],
 
 # ... we can generate model code and a design matrix:
 
-print(makecode(parse(f1), df1a, []))
+print(makecode(parse(f1), df1a, getfamily('Normal'), []))
 # def model(X, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
@@ -49,7 +50,7 @@ print(makedata(parse(f1), df1a))
 df1b = pd.DataFrame(dict(y=[0., 0., 0.],
                          x=pd.Categorical(['a', 'b', 'c'])))
 
-print(makecode(parse(f1), df1b, []))
+print(makecode(parse(f1), df1b, getfamily('Normal'), []))
 # def model(X, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
@@ -85,7 +86,7 @@ df2 = pd.DataFrame(dict(y=[0., 1., 2.],
 
 # And the generated model code and design matrices etc.:
 
-print(makecode(parse(f2), df2, []))
+print(makecode(parse(f2), df2, getfamily('Normal'), []))
 # def model(X, Z_1, J_1, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
@@ -179,7 +180,7 @@ priors3 = [
 
 # Here's the code this generates:
 
-print(makecode(parse(f3), df1a, priors3))
+print(makecode(parse(f3), df1a, getfamily('Normal'), priors3))
 # def model(X, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
