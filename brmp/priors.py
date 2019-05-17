@@ -111,7 +111,7 @@ def default_prior(formula, design_metadata, family):
     # prior matches any constraint on the parameter. (Would require
     # families extending with additional info.)
     resp_children = [Node(p, get_response_prior(family.name, p), [], []) for p in nonlocparams(family)]
-    return Node('root', None, [chk_known_dist], [
+    return Node('root', None, [], [
         Node('b',    prior('Cauchy', [0., 1.]), [], b_children),
         Node('sd',   prior('HalfCauchy', [3.]), [chk_pos_support], sd_children),
         Node('cor',  prior('LKJ', [1.]),        [chk_lkj], cor_children),
@@ -214,16 +214,6 @@ def chk_pos_support(prior):
     dist = dists.__getattribute__(prior.family.name)
     return dist.support == constraints.positive
 
-@chk('Unknown distribution family.')
-def chk_known_dist(prior):
-    if chk_lkj.predicate(prior):
-        return True
-    try:
-        dists.__getattribute__(prior.family.name)
-        return True
-    except AttributeError:
-        return False
-
 @chk('Only the LKJ(...) family is supported here.')
 def chk_lkj(prior):
     return prior.family.name == 'LKJ'
@@ -287,9 +277,6 @@ def main():
     #  'cor': {'grp2': 'e', 'grp3': 'f'},
     #  'resp': {'sigma': 'g'},
     #  'sd': {'grp1': [('a', 1)], 'grp2': [('c', 1), ('d', 1)], 'grp3': [('a', 1)]}}
-
-    # print(check_prior_edit(tree, PriorEdit([], Prior('Normal2', []))))
-    # # Unknown distribution ...
 
     print(check_prior_edit(tree, PriorEdit(['cor', 'grp2'], Prior(getfamily('Normal'), []))))
     # Only LKJ ...
