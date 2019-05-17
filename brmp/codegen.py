@@ -229,6 +229,12 @@ def genmodel(formula, metadata, family, prior_edits):
         param_prior = priors['resp'][param]
         body.append(sample(param, gendist(param_prior.family, param_prior.arguments, [1], False)))
 
+    # TODO: Optimisations (for numerical stability/perf.) are
+    # available for some response family/link function pairs. (Though
+    # maybe only for particular back-ends.) e.g. In Pyro `Bernoulli`
+    # has a `logits` param, so it's possible to pass `mu` directly as
+    # that.
+
     # TODO: This relies on the parameters defined in each Family
     # appearing in the same order as Pyro expects.
     def response_arg(param):

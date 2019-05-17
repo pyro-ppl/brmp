@@ -19,6 +19,9 @@ Response = namedtuple('Response', 'param linkfn')
 # families. (Because the order it used, it does mean the names doesn't
 # have match, so I can use names here that ensure that the args. you
 # need to give when customising priors is similar to brms.)
+
+# TODO: Add more response families.
+
 FAMILIES = [
     Family('Normal', ['mu', 'sigma'], Response('mu', LinkFn.identity)),
     Family('Bernoulli', ['probs'], Response('probs', LinkFn.logit)),

@@ -79,7 +79,7 @@ def edit(node, path, f):
 
 # TODO: Match default priors used by brms. (An improper uniform is
 # used for `b`. A Half Student-t here is used for priors on standard
-# deviations, with its scale derived from the data.
+# deviations, with its scale derived from the data.)
 
 # TODO: It might be a good idea to build the tree with checks but no
 # priors, and then add the priors using in the same way as user edits
@@ -209,6 +209,9 @@ def chk(error):
         return f
     return decorate
 
+# TODO: Replace this Pyro specific check with something backend
+# agnostic. (By extending the info we keep about families to include
+# information about their support.)
 @chk('A distribution with support on only the positive reals expected here.')
 def chk_pos_support(prior):
     dist = dists.__getattribute__(prior.family.name)
