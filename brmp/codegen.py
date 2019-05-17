@@ -1,7 +1,7 @@
 from .formula import Formula, Group
 from .design import width, designmatrices_metadata, GroupMeta
 from .priors import Prior, get_priors
-from .family import Family, nonlocparams, LinkFn
+from .family import Family, nonlocparams, LinkFn, getfamily
 
 def gendist(family, args, shape, batch):
     assert type(family) == Family
@@ -22,17 +22,10 @@ def gendist(family, args, shape, batch):
     # an optimisation. (Eqv., when eventdims == 0?)
     return '{}({}).to_event({})'.format(family.name, ', '.join(args_code), eventdims)
 
-# `std_normal` with `gendist` will become redundant once all priors
-# are customisable.
-
 def lkj_corr_cholesky(size, shape):
     assert type(size) == int # the size of the matrix
     assert type(shape) == float # shape parameter of distribution
     return 'LKJCorrCholesky({}, torch.tensor({}))'.format(size, shape)
-
-def std_normal(shape):
-    assert type(shape) == list
-    return 'Normal(torch.zeros({}), torch.ones({})).to_event({})'.format(shape, shape, len(shape))
 
 def sample(name, distribution, obs=None):
     args = ['"{}"'.format(name),
@@ -119,7 +112,7 @@ def gengroup(i, group, metadata, design_metadata, priors):
     # be to pass `torch.mm(torch.diag(sd_{}), L_{})` as the
     # `scale_tril` argument of a `MultivariateNormal`. Is there any
     # significant different between these two approaches?
-    code.append(sample('z_{}'.format(i), std_normal([M_i, N_i])))
+    code.append(sample('z_{}'.format(i), gendist(getfamily('Normal'), [0., 1.], [M_i, N_i], batch=False)))
     code.append('assert z_{}.shape == (M_{}, N_{}) # {} x {}'.format(i, i, i, M_i, N_i))
 
     if group.corr and M_i > 1:
