@@ -150,6 +150,13 @@ default_params = dict(
      [('b_0', Cauchy, {}),
       ('sigma', HalfCauchy, {'scale': 4.})]),
 
+    # Custom response family.
+    ('y ~ x',
+     [],
+     getfamily('Bernoulli'),
+     [],
+     [('b_0', Cauchy, {})]),
+
 ])
 def test_codegen(formula_str, metadata, family, prior_edits, expected):
     formula = parse(formula_str)

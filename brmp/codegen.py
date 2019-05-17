@@ -165,6 +165,8 @@ def gengroup(i, group, metadata, design_metadata, priors):
 def geninvlinkfn(linkfn, code):
     if linkfn == LinkFn.identity:
         return code
+    elif linkfn == LinkFn.logit:
+        return 'torch.sigmoid({})'.format(code)
     else:
         raise NotImplementedError('code generation for link function {} not implemented'.format(linkfn))
 
