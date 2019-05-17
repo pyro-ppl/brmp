@@ -1,7 +1,7 @@
 from .formula import Formula, Group
 from .design import width, designmatrices_metadata, GroupMeta
 from .priors import Prior, get_priors
-from .family import Family, Dist, getfamily, nonlocparams, LinkFn
+from .family import Family, getfamily, nonlocparams, LinkFn
 
 def gendist(family, args, shape, batch):
     assert type(family) == Family
@@ -56,7 +56,7 @@ def genprior(varname, prior_desc):
     assert type(varname) == str
     assert type(prior_desc) == list
     assert all(type(p)    == tuple and
-               type(p[0]) == Dist and
+               type(p[0]) == Prior and
                type(p[1]) == int
                for p in prior_desc)
     code = []

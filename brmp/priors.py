@@ -8,26 +8,24 @@ import pyro.distributions as dists
 from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula, parse
 from pyro.contrib.brm.design import designmatrices_metadata, DesignMeta, PopulationMeta, GroupMeta, make_metadata_lookup
-from pyro.contrib.brm.family import getfamily, Family, Dist, nonlocparams
-
+from pyro.contrib.brm.family import getfamily, Family, nonlocparams
 
 Node = namedtuple('Node', 'name prior checks children')
 
 def leaf(name):
     return Node(name, None, [], [])
 
-# e.g. Prior('Normal', [0., 1.]).
-# Also see the related `gendist` function in codegen.py.
-
 # TODO: This currently requires `parameters` to be a list of floats.
 # This ought to be checked.
-#Prior = namedtuple('Prior', 'family parameters')
-def Prior(family_name, params):
-    return Dist(getfamily(family_name), params)
+Prior = namedtuple('Prior', 'family arguments')
+
+# e.g. Prior('Normal', [0., 1.])
+def prior(family_name, args):
+    return Prior(getfamily(family_name), args)
 
 RESPONSE_PRIORS = {
     'Normal': {
-        'sigma': Prior('HalfCauchy', [3.])
+        'sigma': Prior(getfamily('HalfCauchy'), [3.])
     }
 }
 
@@ -114,9 +112,9 @@ def default_prior(formula, design_metadata, family):
     # families extending with additional info.)
     resp_children = [Node(p, get_response_prior(family.name, p), [], []) for p in nonlocparams(family)]
     return Node('root', None, [chk_known_dist], [
-        Node('b',    Prior('Cauchy', [0., 1.]), [], b_children),
-        Node('sd',   Prior('HalfCauchy', [3.]), [chk_pos_support], sd_children),
-        Node('cor',  Prior('LKJ', [1.]),        [chk_lkj], cor_children),
+        Node('b',    prior('Cauchy', [0., 1.]), [], b_children),
+        Node('sd',   prior('HalfCauchy', [3.]), [chk_pos_support], sd_children),
+        Node('cor',  prior('LKJ', [1.]),        [chk_lkj], cor_children),
         Node('resp', None,                      [], resp_children)])
 
 # TODO: This ought to warn/error when an element of `priors` has a
@@ -203,7 +201,7 @@ def get_priors(formula, design_metadata, family, prior_edits, chk=True):
 def chk(error):
     def decorate(predicate):
         def f(prior):
-            assert type(prior) == Dist
+            assert type(prior) == Prior
             retval = predicate(prior)
             assert type(retval) == bool
             return None if retval else error
@@ -293,7 +291,7 @@ def main():
     # print(check_prior_edit(tree, PriorEdit([], Prior('Normal2', []))))
     # # Unknown distribution ...
 
-    print(check_prior_edit(tree, PriorEdit(['cor', 'grp2'], Prior('Normal', []))))
+    print(check_prior_edit(tree, PriorEdit(['cor', 'grp2'], Prior(getfamily('Normal'), []))))
     # Only LKJ ...
 
 
@@ -304,7 +302,7 @@ def main():
                 None,
                 [],
                 [Node('child', None, [chk_pos_support], [])])
-    edit = PriorEdit([], Prior('Normal', [0., 1.]))
+    edit = PriorEdit([], Prior(getfamily('Normal'), [0., 1.]))
     tree = customize_prior(tree, [edit])
     tree = fill(tree)
     # print(tree)

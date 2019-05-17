@@ -9,7 +9,7 @@ from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, LKJCorrC
 from pyro.contrib.brm.formula import parse
 from pyro.contrib.brm.codegen import genmodel, eval_model
 from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrices_metadata
-from pyro.contrib.brm.priors import Prior, PriorEdit
+from pyro.contrib.brm.priors import prior, PriorEdit
 
 from tests.common import assert_equal
 
@@ -79,20 +79,20 @@ default_params = dict(
     # Custom priors.
     ('y ~ 1 + x1 + x2',
      [],
-     [PriorEdit(['b'], Prior('Normal', [0., 100.]))],
+     [PriorEdit(['b'], prior('Normal', [0., 100.]))],
      [('b_0', Normal, {'loc': 0., 'scale': 100.}),
       ('sigma', HalfCauchy, {})]),
 
     ('y ~ 1 + x1 + x2',
      [],
-     [PriorEdit(['b', 'intercept'], Prior('Normal', [0., 100.]))],
+     [PriorEdit(['b', 'intercept'], prior('Normal', [0., 100.]))],
      [('b_0', Normal, {'loc': 0., 'scale': 100.}),
       ('b_1', Cauchy, {}),
       ('sigma', HalfCauchy, {})]),
 
     ('y ~ 1 + x1 + x2',
      [],
-     [PriorEdit(['b', 'x1'], Prior('Normal', [0., 100.]))],
+     [PriorEdit(['b', 'x1'], prior('Normal', [0., 100.]))],
      [('b_0', Cauchy, {}),
       ('b_1', Normal, {'loc': 0., 'scale': 100.}),
       ('b_2', Cauchy, {}),
@@ -101,7 +101,7 @@ default_params = dict(
     # Prior on coef of a factor.
     ('y ~ 1 + x',
      [Factor('x', list('ab'))],
-     [PriorEdit(['b', 'x[b]'], Prior('Normal', [0., 100.]))],
+     [PriorEdit(['b', 'x[b]'], prior('Normal', [0., 100.]))],
      [('b_0', Cauchy, {}),
       ('b_1', Normal, {'loc': 0., 'scale': 100.}),
       ('sigma', HalfCauchy, {})]),
@@ -109,7 +109,7 @@ default_params = dict(
     # Prior on group level `sd` choice.
     ('y ~ 1 + x2 + x3 | x1',
      [Factor('x1', list('ab'))],
-     [PriorEdit(['sd', 'x1', 'intercept'], Prior('HalfCauchy', [4.]))],
+     [PriorEdit(['sd', 'x1', 'intercept'], prior('HalfCauchy', [4.]))],
      [('sigma', HalfCauchy, {}),
       ('sd_1_0', HalfCauchy, {'scale': 4.}),
       ('sd_1_1', HalfCauchy, {}),
@@ -118,7 +118,7 @@ default_params = dict(
 
     ('y ~ 1 + x2 + x3 || x1',
      [Factor('x1', list('ab'))],
-     [PriorEdit(['sd', 'x1', 'intercept'], Prior('HalfCauchy', [4.]))],
+     [PriorEdit(['sd', 'x1', 'intercept'], prior('HalfCauchy', [4.]))],
      [('sigma', HalfCauchy, {}),
       ('sd_1_0', HalfCauchy, {'scale': 4.}),
       ('sd_1_1', HalfCauchy, {}),
@@ -127,7 +127,7 @@ default_params = dict(
     # Prior on L.
     ('y ~ 1 + x2 | x1',
      [Factor('x1', list('ab'))],
-     [PriorEdit(['cor'], Prior('LKJ', [2.]))],
+     [PriorEdit(['cor'], prior('LKJ', [2.]))],
      [('sigma', HalfCauchy, {}),
       ('sd_1_0', HalfCauchy, {}),
       ('z_1', Normal, {}),
@@ -136,7 +136,7 @@ default_params = dict(
     # Prior on parameter of response distribution.
     ('y ~ x',
      [],
-     [PriorEdit(['resp', 'sigma'], Prior('HalfCauchy', [4.]))],
+     [PriorEdit(['resp', 'sigma'], prior('HalfCauchy', [4.]))],
      [('b_0', Cauchy, {}),
       ('sigma', HalfCauchy, {'scale': 4.})]),
 

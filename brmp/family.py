@@ -41,11 +41,6 @@ def nonlocparams(family):
     assert family.response is not None
     return list(set(family.params) - {family.response.param})
 
-# This constructor could check that it receives the correct number of
-# arguments. (These are all assumed ot be reals at present.)
-Dist = namedtuple('Dist', 'family arguments')
-
-
 def main():
     pass
 
