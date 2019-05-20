@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 from pprint import pprint as pp
 
 import pandas as pd
@@ -10,7 +10,7 @@ from pyro.contrib.brm.formula import Formula, parse
 from pyro.contrib.brm.design import designmatrices_metadata, DesignMeta, PopulationMeta, GroupMeta, make_metadata_lookup
 from pyro.contrib.brm.family import getfamily, Family, nonlocparams
 
-Node = namedtuple('Node', 'name prior checks children')
+Node = namedtuple('Node', 'name prior_edit checks children')
 
 def leaf(name):
     return Node(name, None, [], [])
@@ -42,7 +42,7 @@ PriorEdit = namedtuple('PriorEdit', 'path prior')
 
 def walk(node, path):
     assert type(node) == Node
-    assert type(path) == list
+    assert type(path) == tuple
     if len(path) == 0:
         return [node]
     else:
@@ -57,7 +57,7 @@ def select(node, path):
 
 def edit(node, path, f):
     assert type(node) == Node
-    assert type(path) == list
+    assert type(path) == tuple
     if len(path) == 0:
         # We're at the node to be edited. (i.e. Empty path picks out
         # the root node.)
@@ -70,7 +70,7 @@ def edit(node, path, f):
         name = path[0]
         children = [edit(n, path[1:], f) if n.name == name else n
                     for n in node.children]
-        return Node(node.name, node.prior, node.checks, children)
+        return Node(node.name, node.prior_edit, node.checks, children)
 
 # TODO: Match default priors used by brms. (An improper uniform is
 # used for `b`. A Half Student-t here is used for priors on standard
@@ -105,12 +105,12 @@ def default_prior(formula, design_metadata, family):
     # TODO: Consider adding a check that ensures the support of the
     # prior matches any constraint on the parameter. (Would require
     # families extending with additional info.)
-    resp_children = [Node(p, get_response_prior(family.name, p), [], []) for p in nonlocparams(family)]
+    resp_children = [Node(p, PriorEdit(('resp', p), get_response_prior(family.name, p)), [], []) for p in nonlocparams(family)]
     return Node('root', None, [], [
-        Node('b',    prior('Cauchy', [0., 1.]), [], b_children),
-        Node('sd',   prior('HalfCauchy', [3.]), [chk_pos_support], sd_children),
-        Node('cor',  prior('LKJ', [1.]),        [chk_lkj], cor_children),
-        Node('resp', None,                      [], resp_children)])
+        Node('b',    PriorEdit(('b',),   prior('Cauchy', [0., 1.])), [],                b_children),
+        Node('sd',   PriorEdit(('sd',),  prior('HalfCauchy', [3.])), [chk_pos_support], sd_children),
+        Node('cor',  PriorEdit(('cor',), prior('LKJ', [1.])),        [chk_lkj],         cor_children),
+        Node('resp', None,                                           [],                resp_children)])
 
 # TODO: This ought to warn/error when an element of `priors` has a
 # path that doesn't correspond to a node in the tree.
@@ -123,9 +123,9 @@ def customize_prior(tree, prior_edits):
     assert type(tree) == Node
     assert type(prior_edits) == list
     assert all(type(p) == PriorEdit for p in prior_edits)
-    for p in prior_edits:
-        tree = edit(tree, p.path,
-                    lambda n: Node(n.name, p.prior, n.checks, n.children))
+    for prior_edit in prior_edits:
+        tree = edit(tree, prior_edit.path,
+                    lambda n: Node(n.name, prior_edit, n.checks, n.children))
     return tree
 
 # It's important that trees maintain the order of their children,
@@ -134,24 +134,33 @@ def customize_prior(tree, prior_edits):
 def build_prior_tree(formula, design_metadata, family, prior_edits):
     return fill(customize_prior(default_prior(formula, design_metadata, family), prior_edits))
 
+# `fill` populates the `prior_edit` and `checks` properties of all
+# nodes in a tree. Each node uses its own `prior_edit` value if set,
+# otherwise the first `prior_edit` value encountered when walking up
+# the tree from the node is used. The final values of `checks` comes
+# from concatenating all of the lists of checks encountered when
+# walking from the node to the root. (This is the behaviour, not the
+# implementation.)
+def fill(node, default=None, upstream_checks=[]):
+    prior = node.prior_edit if not node.prior_edit is None else default
+    checks = upstream_checks + node.checks
+    return Node(node.name, prior, checks, [fill(n, prior, checks) for n in node.children])
 
-# `fill` populates the `prior` property of all nodes in a tree. Each
-# node uses its own `prior` value if set, otherwise the first `prior`
-# value encountered when walking up the tree from the node is used.
-# (This is the behaviour, not the implementation.)
-def fill(node, default=None):
-    prior = node.prior if not node.prior is None else default
-    return Node(node.name, prior, node.checks, [fill(n, prior) for n in node.children])
-
-
-def leaves(node, path=[]):
-    if len(node.children) == 0:
-        # Return `node.prior` rather than the entire `node`, since the
-        # other properties are recoverable from path and fact that
-        # node is a leaf.
-        return [(path, node.prior)]
+def desc_at_depth(tree, d, path=tuple()):
+    if d == 0:
+        return [(n, path + (n.name,)) for n in tree.children]
     else:
-        return join(leaves(n, path + [n.name]) for n in node.children)
+        return join(desc_at_depth(n, d-1, path+(n.name,)) for n in tree.children)
+
+def leaves(tree):
+    def help(path, depth):
+        return [(n,path+p) for (n,p) in desc_at_depth(select(tree, path), depth)]
+    return join([
+        help(('b',), 0),
+        help(('sd',), 1),
+        help(('cor',), 0),
+        help(('resp',), 0),
+    ])
 
 # e.g.
 # contig(list('abb')) == [('a', 1), ('b', 2)]
@@ -174,6 +183,11 @@ def contig(xs):
 # that share a family and differ only in parameters can be handled
 # with a single `sample` statement with suitable parameters.
 
+# TODO: Notice that both `leaves` (used by `check`) and `get_priors`
+# both make use of similar information about which nodes we're
+# ultimately interested in. (i.e. Which nodes correspond to parameters
+# in the model.)
+
 def get_priors(formula, design_metadata, family, prior_edits, chk=True):
     assert type(formula) == Formula
     assert type(design_metadata) == DesignMeta
@@ -181,38 +195,47 @@ def get_priors(formula, design_metadata, family, prior_edits, chk=True):
     assert type(prior_edits) == list
     tree = build_prior_tree(formula, design_metadata, family, prior_edits)
     if chk:
-        check_prior_edits(tree, prior_edits)
+        errors = check(tree)
+        if errors:
+            raise Exception(format_errors(errors))
     def get(path):
-        return contig([n.prior for n in select(tree, path).children])
+        return contig([n.prior_edit.prior for n in select(tree, path).children])
     return dict(
-        b=get(['b']),
-        sd=dict((group_meta.name, get(['sd', group_meta.name]))
+        b=get(('b',)),
+        sd=dict((group_meta.name, get(('sd', group_meta.name)))
                 for group_meta in design_metadata.groups),
-        cor=dict((n.name, n.prior) for n in select(tree, ['cor']).children),
-        resp=dict((n.name, n.prior) for n in select(tree, ['resp']).children))
+        cor=dict((n.name, n.prior_edit.prior) for n in select(tree, ('cor',)).children),
+        resp=dict((n.name, n.prior_edit.prior) for n in select(tree, ('resp',)).children))
 
 # Sanity checks
 
-def chk(error):
+class Chk():
+    def __init__(self, predicate, name):
+        self.predicate = predicate
+        self.name = name
+
+    def __call__(self, prior):
+        assert type(prior) == Prior
+        return self.predicate(prior)
+
+    def __repr__(self):
+        return 'Chk("{}")'.format(self.name)
+
+def chk(name):
     def decorate(predicate):
-        def f(prior):
-            assert type(prior) == Prior
-            retval = predicate(prior)
-            assert type(retval) == bool
-            return None if retval else error
-        f.predicate = predicate
-        return f
+        return Chk(predicate, name)
     return decorate
+
 
 # TODO: Replace this Pyro specific check with something backend
 # agnostic. (By extending the info we keep about families to include
 # information about their support.)
-@chk('A distribution with support on only the positive reals expected here.')
+@chk('has +ve support')
 def chk_pos_support(prior):
     dist = dists.__getattribute__(prior.family.name)
     return dist.support == constraints.positive
 
-@chk('Only the LKJ(...) family is supported here.')
+@chk('is LKJ')
 def chk_lkj(prior):
     return prior.family.name == 'LKJ'
 
@@ -221,24 +244,19 @@ def chk_lkj(prior):
 # require special casing, since that ends up as `LKJCorrCholesky` in
 # code.
 
-def getchecks(node, path):
-    return join(n.checks for n in walk(node, path))
+def check(tree):
+    errors = defaultdict(lambda: defaultdict(list))
+    for (node, path) in leaves(tree):
+        for chk in node.checks:
+            if not chk(node.prior_edit.prior):
+                errors[node.prior_edit.path][chk].append(path)
+    return errors
 
-def check_prior_edit(tree, edit):
-    assert type(tree) == Node
-    assert type(edit) == PriorEdit
-    for chk in getchecks(tree, edit.path):
-        maybe_error = chk(edit.prior)
-        if not maybe_error is None:
-            return maybe_error
-
-def check_prior_edits(tree, edits):
-    assert type(tree) == Node
-    assert type(edits) == list
-    for edit in edits:
-        maybe_error = check_prior_edit(tree, edit)
-        if not maybe_error is None:
-            raise Exception(maybe_error)
+# TODO: There's info in `errors` which we're not making use of here.
+def format_errors(errors):
+    paths = ', '.join('"{}"'.format('/'.join(path))
+                      for path in errors.keys())
+    return 'Invalid prior specified at {}.'.format(paths)
 
 def main():
     formula = parse('y ~ 1 + x1 + x2 + (1 || grp1) + (1 + z | grp2) + (1 | grp3)')
@@ -246,18 +264,17 @@ def main():
         formula,
         make_metadata_lookup([]))
     prior_edits = [
-        PriorEdit(['b'], 'b'),
-        PriorEdit(['sd'], 'a'),
-        PriorEdit(['sd', 'grp2'], 'c'),
-        PriorEdit(['sd', 'grp2', 'z'], 'd'),
-        PriorEdit(['cor'], 'e'),
-        PriorEdit(['cor', 'grp3'], 'f'),
-        PriorEdit(['resp', 'sigma'], 'g'),
+        PriorEdit(('b',), 'b'),
+        PriorEdit(('sd',), 'a'),
+        PriorEdit(('sd', 'grp2',), 'c'),
+        PriorEdit(('sd', 'grp2', 'z',), 'd'),
+        PriorEdit(('cor',), 'e'),
+        PriorEdit(('cor', 'grp3',), 'f'),
+        PriorEdit(('resp', 'sigma',), 'g'),
     ]
 
     tree = build_prior_tree(formula, design_metadata, getfamily('Normal'), prior_edits)
-    pp([('/'.join(path), prior) for path, prior in leaves(tree)])
-
+    pp([('/'.join(path), node.prior_edit.prior) for node, path in leaves(tree)])
     # [('b/intercept', 'b'),
     #  ('b/x1', 'b'),
     #  ('b/x2', 'b'),
@@ -269,58 +286,22 @@ def main():
     #  ('cor/grp3', 'f'),
     #  ('resp/sigma', 'g')]
 
-    priors = get_priors(formula, design_metadata, getfamily('Normal'), prior_edits, chk=False)
-    pp(priors)
+    pp(get_priors(formula, design_metadata, getfamily('Normal'), prior_edits, chk=False))
     # {'b': [('b', 3)],
     #  'cor': {'grp2': 'e', 'grp3': 'f'},
     #  'resp': {'sigma': 'g'},
     #  'sd': {'grp1': [('a', 1)], 'grp2': [('c', 1), ('d', 1)], 'grp3': [('a', 1)]}}
 
-    print(check_prior_edit(tree, PriorEdit(['cor', 'grp2'], Prior(getfamily('Normal'), []))))
-    # Only LKJ ...
-
-
-
-    # BUG:
-
-    tree = Node('parent',
-                None,
-                [],
-                [Node('child', None, [chk_pos_support], [])])
-    edit = PriorEdit([], Prior(getfamily('Normal'), [0., 1.]))
-    tree = customize_prior(tree, [edit])
-    tree = fill(tree)
-    # print(tree)
-
-    # check_prior_edit says this edit is OK:
-    assert check_prior_edit(tree, edit) is None
-
-    # However, if we manually check the prior on the child node
-    # against the check for that node (as returned by `getchecks`),
-    # then we find there's an error.
-    child_check = getchecks(tree, ['child'])[0]
-    child_prior = select(tree, ['child']).prior
-    #print(child_check(child_prior))
-    assert child_check(child_prior) is not None
-
-    # The problem is that by only collecting checks from the root to
-    # the node at which we're setting the prior, we're not ensure that
-    # nodes lower down in the tree that inherit the new prior, don't
-    # have more local checks that prohibit the prior. Here, the +ve
-    # check on child ought to prevent setting a `Normal` at the root,
-    # since it would be inherited by the child, leading to a prior
-    # that violates the checks.
-
-    # I guess the correct thing to do is to explore the whole sub-tree
-    # starting from the node at which the prior is set. This would
-    # start with the checks collected while walking from the root to
-    # that node, and accumulate checks as the exploration progresses.
-    # The prior at each node would be checked along the way. (It
-    # probably makes sense to do this once fill has happened.)
-
-    # It may be that this situation won't arise with the default prior
-    # tree currently in use, but it makes sense to fix this to avoid
-    # running in to hard to debug problems in the future.
+    tree = build_prior_tree(formula, design_metadata, getfamily('Normal'), [
+        # This edit will fail the +ve support check at all the grand
+        # children of the sd node.
+        PriorEdit(('sd',), prior('Normal', [0., 1.])),
+    ])
+    pp(dict((k, dict(v)) for k, v in check(tree).items()))
+    # {('sd',): {Chk("has +ve support"): [('sd', 'grp1', 'intercept'),
+    #                                     ('sd', 'grp2', 'intercept'),
+    #                                     ('sd', 'grp2', 'z'),
+    #                                     ('sd', 'grp3', 'intercept')]}}
 
 if __name__ == '__main__':
     main()

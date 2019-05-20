@@ -172,10 +172,10 @@ df1a = pd.DataFrame(dict(y=[0., 1., 2.],
 priors3 = [
     # All population-level coefficients should use a `Normal(0, 10)`
     # prior.
-    PriorEdit(['b'], prior('Normal', [0., 10.])),
+    PriorEdit(('b',), prior('Normal', [0., 10.])),
     # The intercept coefficient should use a `Cauchy(0, 100)` prior.
     # This takes precedence over the less specific request above.
-    PriorEdit(['b', 'intercept'], prior('Cauchy', [0., 100.])),
+    PriorEdit(('b', 'intercept'), prior('Cauchy', [0., 100.])),
 ]
 
 # Here's the code this generates:
