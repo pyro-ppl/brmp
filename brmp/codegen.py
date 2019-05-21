@@ -79,7 +79,7 @@ def gengroup(i, group, metadata, design_metadata, priors):
     assert type(metadata) == dict
     assert type(design_metadata) == GroupMeta
     assert design_metadata.name == group.column
-    assert type(priors) == dict
+    assert callable(priors)
     # The column on which we group must be a factor.
     assert group.column in metadata, 'group column must be a factor'
     groupfactor = metadata[group.column]
@@ -104,7 +104,7 @@ def gengroup(i, group, metadata, design_metadata, priors):
     code.append('assert J_{}.shape == (N,)'.format(i))
 
     # Prior over coefficient scales.
-    code.extend(genprior('sd_{}'.format(i), priors['sd'][group.column]))
+    code.extend(genprior('sd_{}'.format(i), priors(('sd', group.column))))
     code.append('assert sd_{}.shape == (M_{},) # {}'.format(i, i, M_i))
 
     # Prior over a matrix of unscaled/uncorrelated coefficients. This
@@ -119,7 +119,7 @@ def gengroup(i, group, metadata, design_metadata, priors):
         # Model correlations between the coefficients.
 
         # Prior over correlations.
-        prior = priors['cor'][group.column]
+        prior = priors(('cor', group.column))
         assert len(prior.arguments) == 1
         code.append(sample('L_{}'.format(i), lkj_corr_cholesky(M_i, shape=prior.arguments[0])))
         code.append('assert L_{}.shape == (M_{}, M_{}) # {} x {}'.format(i, i, i, M_i, M_i))
@@ -205,7 +205,7 @@ def genmodel(formula, metadata, family, prior_edits):
     # --------------------------------------------------
 
     # Prior over b. (The population level coefficients.)
-    body.extend(genprior('b', priors['b']))
+    body.extend(genprior('b', priors(('b',))))
     body.append('assert b.shape == (M,)')
 
     # Compute mu.
@@ -221,12 +221,10 @@ def genmodel(formula, metadata, family, prior_edits):
     # Response
     # --------------------------------------------------
 
-    assert set(nonlocparams(family)) == set(priors['resp'].keys())
-
     # Sample from priors over the response distribution parameters
     # that aren't predicted from the data.
     for param in nonlocparams(family):
-        param_prior = priors['resp'][param]
+        param_prior = priors(('resp', param))
         body.append(sample(param, gendist(param_prior.family, param_prior.arguments, [1], False)))
 
     # TODO: Optimisations (for numerical stability/perf.) are

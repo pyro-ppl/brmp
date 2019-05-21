@@ -10,10 +10,14 @@ from pyro.contrib.brm.formula import Formula, parse
 from pyro.contrib.brm.design import designmatrices_metadata, DesignMeta, PopulationMeta, GroupMeta, make_metadata_lookup
 from pyro.contrib.brm.family import getfamily, Family, nonlocparams
 
-Node = namedtuple('Node', 'name prior_edit checks children')
+# `is_param` indicates whether a node corresponds to a parameter in
+# the model. (Nodes without this flag set exist only to add structure
+# to the parameters.) This infomation is used when extracting
+# information from the tree.
+Node = namedtuple('Node', 'name prior_edit is_param checks children')
 
-def leaf(name):
-    return Node(name, None, [], [])
+def leaf(name, prior_edit=None):
+    return Node(name, prior_edit, True, [], [])
 
 # TODO: This currently requires `parameters` to be a list of floats.
 # This ought to be checked.
@@ -70,7 +74,7 @@ def edit(node, path, f):
         name = path[0]
         children = [edit(n, path[1:], f) if n.name == name else n
                     for n in node.children]
-        return Node(node.name, node.prior_edit, node.checks, children)
+        return Node(node.name, node.prior_edit, node.is_param, node.checks, children)
 
 # TODO: Match default priors used by brms. (An improper uniform is
 # used for `b`. A Half Student-t here is used for priors on standard
@@ -100,17 +104,17 @@ def default_prior(formula, design_metadata, family):
                for (meta, group)
                in zip(design_metadata.groups, formula.groups))
     b_children = [leaf(name) for name in design_metadata.population.coefs]
-    cor_children = [Node(group.column, None, [], []) for group in formula.groups if group.corr]
-    sd_children = [Node(gm.name, None, [], [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
+    cor_children = [leaf(group.column) for group in formula.groups if group.corr]
+    sd_children = [Node(gm.name, None, False, [], [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
     # TODO: Consider adding a check that ensures the support of the
     # prior matches any constraint on the parameter. (Would require
     # families extending with additional info.)
-    resp_children = [Node(p, PriorEdit(('resp', p), get_response_prior(family.name, p)), [], []) for p in nonlocparams(family)]
-    return Node('root', None, [], [
-        Node('b',    PriorEdit(('b',),   prior('Cauchy', [0., 1.])), [],                b_children),
-        Node('sd',   PriorEdit(('sd',),  prior('HalfCauchy', [3.])), [chk_pos_support], sd_children),
-        Node('cor',  PriorEdit(('cor',), prior('LKJ', [1.])),        [chk_lkj],         cor_children),
-        Node('resp', None,                                           [],                resp_children)])
+    resp_children = [leaf(p, PriorEdit(('resp', p), get_response_prior(family.name, p))) for p in nonlocparams(family)]
+    return Node('root', None, False, [], [
+        Node('b',    PriorEdit(('b',),   prior('Cauchy', [0., 1.])), False, [],                b_children),
+        Node('sd',   PriorEdit(('sd',),  prior('HalfCauchy', [3.])), False, [chk_pos_support], sd_children),
+        Node('cor',  PriorEdit(('cor',), prior('LKJ', [1.])),        False, [chk_lkj],         cor_children),
+        Node('resp', None,                                           False, [],                resp_children)])
 
 # TODO: This ought to warn/error when an element of `priors` has a
 # path that doesn't correspond to a node in the tree.
@@ -125,7 +129,7 @@ def customize_prior(tree, prior_edits):
     assert all(type(p) == PriorEdit for p in prior_edits)
     for prior_edit in prior_edits:
         tree = edit(tree, prior_edit.path,
-                    lambda n: Node(n.name, prior_edit, n.checks, n.children))
+                    lambda n: Node(n.name, prior_edit, n.is_param, n.checks, n.children))
     return tree
 
 # It's important that trees maintain the order of their children,
@@ -144,23 +148,12 @@ def build_prior_tree(formula, design_metadata, family, prior_edits):
 def fill(node, default=None, upstream_checks=[]):
     prior = node.prior_edit if not node.prior_edit is None else default
     checks = upstream_checks + node.checks
-    return Node(node.name, prior, checks, [fill(n, prior, checks) for n in node.children])
+    return Node(node.name, prior, node.is_param, checks, [fill(n, prior, checks) for n in node.children])
 
-def desc_at_depth(tree, d, path=tuple()):
-    if d == 0:
-        return [(n, path + (n.name,)) for n in tree.children]
-    else:
-        return join(desc_at_depth(n, d-1, path+(n.name,)) for n in tree.children)
-
-def leaves(tree):
-    def help(path, depth):
-        return [(n,path+p) for (n,p) in desc_at_depth(select(tree, path), depth)]
-    return join([
-        help(('b',), 0),
-        help(('sd',), 1),
-        help(('cor',), 0),
-        help(('resp',), 0),
-    ])
+def leaves(node, path=[]):
+    this = [(node, path)] if node.is_param else []
+    rest = join(leaves(n, path + [n.name]) for n in node.children)
+    return this + rest
 
 # e.g.
 # contig(list('abb')) == [('a', 1), ('b', 2)]
@@ -183,11 +176,19 @@ def contig(xs):
 # that share a family and differ only in parameters can be handled
 # with a single `sample` statement with suitable parameters.
 
-# TODO: Notice that both `leaves` (used by `check`) and `get_priors`
-# both make use of similar information about which nodes we're
-# ultimately interested in. (i.e. Which nodes correspond to parameters
-# in the model.)
+def get_prior(tree, path):
+    # Either fetch the prior from the leaf/parameter node (described
+    # by path) directly. Or, if given a path to an internal node,
+    # fetch a vectorized prior over all of the nodes children. (In the
+    # case, the children are expected to be leaves/parameters.)
+    node = select(tree, path)
+    if node.is_param:
+        return node.prior_edit.prior
+    else:
+        assert all(n.is_param for n in node.children)
+        return contig([n.prior_edit.prior for n in node.children])
 
+# Main entry into priors used by code generation.
 def get_priors(formula, design_metadata, family, prior_edits, chk=True):
     assert type(formula) == Formula
     assert type(design_metadata) == DesignMeta
@@ -198,14 +199,9 @@ def get_priors(formula, design_metadata, family, prior_edits, chk=True):
         errors = check(tree)
         if errors:
             raise Exception(format_errors(errors))
-    def get(path):
-        return contig([n.prior_edit.prior for n in select(tree, path).children])
-    return dict(
-        b=get(('b',)),
-        sd=dict((group_meta.name, get(('sd', group_meta.name)))
-                for group_meta in design_metadata.groups),
-        cor=dict((n.name, n.prior_edit.prior) for n in select(tree, ('cor',)).children),
-        resp=dict((n.name, n.prior_edit.prior) for n in select(tree, ('resp',)).children))
+    # Return a function that can be used to query for priors for
+    # particular parameters.
+    return lambda path: get_prior(tree, path)
 
 # Sanity checks
 
@@ -286,11 +282,23 @@ def main():
     #  ('cor/grp3', 'f'),
     #  ('resp/sigma', 'g')]
 
-    pp(get_priors(formula, design_metadata, getfamily('Normal'), prior_edits, chk=False))
-    # {'b': [('b', 3)],
-    #  'cor': {'grp2': 'e', 'grp3': 'f'},
-    #  'resp': {'sigma': 'g'},
-    #  'sd': {'grp1': [('a', 1)], 'grp2': [('c', 1), ('d', 1)], 'grp3': [('a', 1)]}}
+    # Vectorized:
+    pp(get_prior(tree, ('b',)))
+    # [('b', 3)]
+    pp(get_prior(tree, ('sd', 'grp1')))
+    # [('a', 1)]
+    pp(get_prior(tree, ('sd', 'grp2')))
+    # [('c', 1), ('d', 1)]
+    pp(get_prior(tree, ('sd', 'grp3')))
+    # [('a', 1)]
+
+    # Not vectorized:
+    pp(get_prior(tree, ('cor', 'grp2')))
+    # 'e'
+    pp(get_prior(tree, ('cor', 'grp3')))
+    # 'f'
+    pp(get_prior(tree, ('resp', 'sigma')))
+    # 'g'
 
     tree = build_prior_tree(formula, design_metadata, getfamily('Normal'), [
         # This edit will fail the +ve support check at all the grand
