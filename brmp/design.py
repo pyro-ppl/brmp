@@ -133,9 +133,6 @@ def width(terms, metadata):
     assert type(metadata) == dict
     return sum(widthC(c) for c in coding(terms, metadata))
 
-# TODO: brms keeps track of the meaning of each column, and uses that
-# when e.g. presenting summaries. Collect that information here?
-
 # Build a simple design matrix (as a torch tensor) from columns of a
 # pandas data frame.
 
