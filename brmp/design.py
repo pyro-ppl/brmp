@@ -225,8 +225,18 @@ def responsevector(column, df):
     assert type(column) == str
     assert type(df) == pd.DataFrame
     assert column in df
-    assert is_numeric_dtype(df[column])
-    return torch.from_numpy(df[column].to_numpy(np.float32))
+    dfcol = df[column]
+    if is_numeric_dtype(dfcol):
+        coded = codenumeric(dfcol)
+    elif is_categorical_dtype(dfcol) and len(dfcol.cat.categories) == 2:
+        # TODO: How does a user know how this was coded? For design
+        # matrices this is revealed by the column names in the design
+        # metadata, but we don't have the here.
+        coded = codefactor(dfcol, reduced=True)
+    else:
+        raise Exception('Don\'t know how to code a response of this type.')
+    assert len(coded) == 1
+    return col2torch(coded[0])
 
 def makedata(formula, df):
     assert type(formula) == Formula

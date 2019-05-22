@@ -269,6 +269,15 @@ def unwrapfn(fn):
           Z_1=torch.tensor([[1., 0.],
                             [1., 0.],
                             [1., 1.]]))),
+
+    ('y ~ x',
+     pd.DataFrame(dict(y=pd.Categorical(list('AAB')),
+                       x=[1, 2, 3])),
+     dict(X=torch.tensor([[1.],
+                          [2.],
+                          [3.]]),
+          y_obs=torch.tensor([0, 0, 1]))),
+
 ])
 def test_designmatrix(formula_str, df, expected):
     data = makedata(parse(formula_str), df)
