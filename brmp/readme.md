@@ -19,11 +19,11 @@ See [`ex0.py`](./ex0.py) for an example of this.
 * Interaction between terms in not supported. e.g. `y ~ x1*x2`
 * The syntax for removing columns is not supported. e.g. `y ~ x - 1`
 * The response is always scalar.
-* The response is Gaussian or Bernoulli distributed.
+* The response is Gaussian or Bernoulli distributed. In particular
+  Categorical responses (beyond the binary case) are not supported.
 * Some priors used in the generated code don't match those generated
   by brms. e.g. There's no Half Student-t distribution, setting prior
   parameters based on the data isn't supported.
-* Not all priors can be customised.
 * The centering data transform, performed by brms to improve sampling
   efficiency, is not implemented.
 * This doesn't include any of the fancy stuff brms does, such as its
