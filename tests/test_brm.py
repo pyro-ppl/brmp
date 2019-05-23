@@ -180,6 +180,9 @@ def test_codegen(formula_str, metadata, family, prior_edits, expected):
 def unwrapfn(fn):
     return unwrapfn(fn.base_dist) if type(fn) == Independent else fn
 
+# We have to ask for float32 tensors here because the default tensor
+# type is changed to float64 in conftest.py.
+
 @pytest.mark.parametrize('formula_str, df, expected', [
     # (Formula('y', [], []),
     #  pd.DataFrame(dict(y=[1, 2, 3])),
@@ -191,60 +194,60 @@ def unwrapfn(fn):
      pd.DataFrame(dict(y=[1, 2, 3])),
      dict(X=torch.tensor([[1.],
                           [1.],
-                          [1.]]),
-          y_obs=torch.tensor([1., 2., 3.]))),
+                          [1.]], dtype=torch.float32),
+          y_obs=torch.tensor([1., 2., 3.], dtype=torch.float32))),
     ('y ~ x',
      pd.DataFrame(dict(y=[1, 2, 3],
                        x=[4, 5, 6])),
      dict(X=torch.tensor([[4.],
                           [5.],
-                          [6.]]),
-          y_obs=torch.tensor([1., 2., 3.]))),
+                          [6.]], dtype=torch.float32),
+          y_obs=torch.tensor([1., 2., 3.], dtype=torch.float32))),
     ('y ~ 1 + x',
      pd.DataFrame(dict(y=[1, 2, 3],
                        x=[4, 5, 6])),
      dict(X=torch.tensor([[1., 4.],
                           [1., 5.],
-                          [1., 6.]]),
-          y_obs=torch.tensor([1., 2., 3.]))),
+                          [1., 6.]], dtype=torch.float32),
+          y_obs=torch.tensor([1., 2., 3.], dtype=torch.float32))),
     ('y ~ x + 1',
      pd.DataFrame(dict(y=[1, 2, 3],
                        x=[4, 5, 6])),
      dict(X=torch.tensor([[1., 4.],
                           [1., 5.],
-                          [1., 6.]]),
-          y_obs=torch.tensor([1., 2., 3.]))),
+                          [1., 6.]], dtype=torch.float32),
+          y_obs=torch.tensor([1., 2., 3.], dtype=torch.float32))),
 
     ('y ~ x',
      pd.DataFrame(dict(y=[1, 2, 3],
                        x=pd.Categorical(list('AAB')))),
      dict(X=torch.tensor([[1., 0.],
                           [1., 0.],
-                          [0., 1.]]),
-          y_obs=torch.tensor([1., 2., 3.]))),
+                          [0., 1.]], dtype=torch.float32),
+          y_obs=torch.tensor([1., 2., 3.], dtype=torch.float32))),
     ('y ~ 1 + x',
      pd.DataFrame(dict(y=[1, 2, 3],
                        x=pd.Categorical(list('AAB')))),
      dict(X=torch.tensor([[1., 0.],
                           [1., 0.],
-                          [1., 1.]]),
-          y_obs=torch.tensor([1., 2., 3.]))),
+                          [1., 1.]], dtype=torch.float32),
+          y_obs=torch.tensor([1., 2., 3.], dtype=torch.float32))),
     ('y ~ x1 + x2',
      pd.DataFrame(dict(y=[1, 2, 3],
                        x1=pd.Categorical(list('AAB')),
                        x2=pd.Categorical(list('ABC')))),
      dict(X=torch.tensor([[1., 0., 0., 0.],
                           [1., 0., 1., 0.],
-                          [0., 1., 0., 1.]]),
-          y_obs=torch.tensor([1., 2., 3.]))),
+                          [0., 1., 0., 1.]], dtype=torch.float32),
+          y_obs=torch.tensor([1., 2., 3.], dtype=torch.float32))),
 
     ('y ~ 1 + x',
      pd.DataFrame(dict(y=[1, 2, 3],
                        x=pd.Categorical(list('ABC')))),
      dict(X=torch.tensor([[1., 0., 0.],
                           [1., 1., 0.],
-                          [1., 0., 1.]]),
-          y_obs=torch.tensor([1., 2., 3.]))),
+                          [1., 0., 1.]], dtype=torch.float32),
+          y_obs=torch.tensor([1., 2., 3.], dtype=torch.float32))),
 
     # (Formula('y', [], [Group([], 'x', True)]),
     #  pd.DataFrame(dict(y=[1, 2, 3],
@@ -263,26 +266,27 @@ def unwrapfn(fn):
                        x2=pd.Categorical(list('ABC')))),
      dict(X=torch.tensor([[1.],
                           [1.],
-                          [1.]]),
-          y_obs=torch.tensor([1., 2., 3.]),
+                          [1.]], dtype=torch.float32),
+          y_obs=torch.tensor([1., 2., 3.], dtype=torch.float32),
           J_1=torch.tensor([0, 1, 2]),
           Z_1=torch.tensor([[1., 0.],
                             [1., 0.],
-                            [1., 1.]]))),
+                            [1., 1.]], dtype=torch.float32))),
 
     ('y ~ x',
      pd.DataFrame(dict(y=pd.Categorical(list('AAB')),
                        x=[1, 2, 3])),
      dict(X=torch.tensor([[1.],
                           [2.],
-                          [3.]]),
-          y_obs=torch.tensor([0, 0, 1]))),
+                          [3.]], dtype=torch.float32),
+          y_obs=torch.tensor([0, 0, 1], dtype=torch.float32))),
 
 ])
 def test_designmatrix(formula_str, df, expected):
     data = makedata(parse(formula_str), df)
     assert set(data.keys()) == set(expected.keys())
     for k in expected.keys():
+        assert data[k].dtype == expected[k].dtype
         assert_equal(data[k], expected[k])
 
 def test_response_priors_is_complete():
