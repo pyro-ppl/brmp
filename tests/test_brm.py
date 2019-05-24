@@ -194,6 +194,10 @@ def test_family_and_response_type_checks(formula_str, metadata, family):
 
 
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits', [
+    ('y ~ x',
+     [],
+     getfamily('Normal'),
+     [PriorEdit(('resp', 'sigma'), prior('Normal', [0., 1.]))]),
     ('y ~ x1 | x2',
      [Factor('x2', list('ab'))],
      getfamily('Normal'),

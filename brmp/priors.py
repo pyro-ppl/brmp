@@ -14,8 +14,8 @@ from pyro.contrib.brm.family import getfamily, Family, nonlocparams, Type
 # information from the tree.
 Node = namedtuple('Node', 'name prior_edit is_param checks children')
 
-def leaf(name, prior_edit=None):
-    return Node(name, prior_edit, True, [], [])
+def leaf(name, prior_edit=None, checks=[]):
+    return Node(name, prior_edit, True, checks, [])
 
 # TODO: This currently requires `parameters` to be a list of floats.
 # This ought to be checked.
@@ -104,10 +104,10 @@ def default_prior(formula, design_metadata, family):
     b_children = [leaf(name) for name in design_metadata.population.coefs]
     cor_children = [leaf(group.column) for group in formula.groups if group.corr]
     sd_children = [Node(gm.name, None, False, [], [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
-    # TODO: Consider adding a check that ensures the support of the
-    # prior matches any constraint on the parameter. (Would require
-    # families extending with additional info.)
-    resp_children = [leaf(p.name, PriorEdit(('resp', p.name), get_response_prior(family.name, p.name))) for p in nonlocparams(family)]
+    resp_children = [leaf(p.name,
+                          PriorEdit(('resp', p.name), get_response_prior(family.name, p.name)),
+                          [chk_support(p.type)])
+                     for p in nonlocparams(family)]
     return Node('root', None, False, [], [
         Node('b',    PriorEdit(('b',),   prior('Cauchy', [0., 1.])), False, [chk_real_support], b_children),
         Node('sd',   PriorEdit(('sd',),  prior('HalfCauchy', [3.])), False, [chk_pos_support],  sd_children),
@@ -220,6 +220,10 @@ def chk(name):
         return Chk(predicate, name)
     return decorate
 
+def chk_support(typ):
+    def pred(prior):
+        return prior.family.support == typ
+    return Chk(pred, 'has support of {}'.format(typ.name))
 
 @chk('has support on reals')
 def chk_real_support(prior):
