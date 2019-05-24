@@ -152,7 +152,7 @@ default_params = dict(
 
     # Custom response family.
     ('y ~ x',
-     [],
+     [Factor('y', list('AB'))],
      getfamily('Bernoulli'),
      [],
      [('b_0', Cauchy, {})]),
@@ -179,6 +179,19 @@ def test_codegen(formula_str, metadata, family, prior_edits, expected):
 
 def unwrapfn(fn):
     return unwrapfn(fn.base_dist) if type(fn) == Independent else fn
+
+
+@pytest.mark.parametrize('formula_str, metadata, family', [
+    ('y ~ x', [], getfamily('Bernoulli')),
+    ('y ~ x', [Factor('y', list('abc'))], getfamily('Bernoulli')),
+    ('y ~ x', [Factor('y', list('ab'))], getfamily('Normal')),
+])
+def test_family_and_response_type_checks(formula_str, metadata, family):
+    formula = parse(formula_str)
+    metadata = make_metadata_lookup(metadata)
+    with pytest.raises(Exception, match='not compatible'):
+        genmodel(formula, metadata, family, [])
+
 
 # We have to ask for float32 tensors here because the default tensor
 # type is changed to float64 in conftest.py.

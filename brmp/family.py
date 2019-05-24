@@ -4,9 +4,10 @@ from enum import Enum
 # This is intended to be independent of Pyro, with a view to
 # supporting multiple code gen back-ends eventually.
 
-# This will likely need to record whether the support is continuous or
-# discrete, at least.
-Family = namedtuple('Family', 'name params response')
+# TODO: Ensure that response families always have a support specified.
+Family = namedtuple('Family', 'name params support response')
+
+Support = Enum('Support', 'real pos_real boolean corr_cholesky')
 
 # Inverse might also be called recip(rocal).
 LinkFn = Enum('LinkFn', 'identity logit inverse')
@@ -23,11 +24,11 @@ Response = namedtuple('Response', 'param linkfn')
 # TODO: Add more response families.
 
 FAMILIES = [
-    Family('Normal', ['mu', 'sigma'], Response('mu', LinkFn.identity)),
-    Family('Bernoulli', ['probs'], Response('probs', LinkFn.logit)),
-    Family('Cauchy', ['loc', 'scale'], None),
-    Family('HalfCauchy', ['scale'], None),
-    Family('LKJ', ['eta'], None),
+    Family('Normal', ['mu', 'sigma'], Support.real, Response('mu', LinkFn.identity)),
+    Family('Bernoulli', ['probs'], Support.boolean, Response('probs', LinkFn.logit)),
+    Family('Cauchy', ['loc', 'scale'], None, None),
+    Family('HalfCauchy', ['scale'], None, None),
+    Family('LKJ', ['eta'], None, None),
 ]
 
 def lookup(items, name):

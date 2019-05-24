@@ -2,6 +2,7 @@ from .formula import Formula, Group
 from .design import width, designmatrices_metadata, GroupMeta
 from .priors import Prior, get_priors
 from .family import Family, nonlocparams, LinkFn, getfamily
+from .model import check_family_matches_response
 
 def gendist(family, args, shape, batch):
     assert type(family) == Family
@@ -176,6 +177,8 @@ def genmodel(formula, metadata, family, prior_edits):
     assert type(family) == Family
     assert type(prior_edits) == list
     num_groups = len(formula.groups)
+
+    check_family_matches_response(formula, metadata, family)
 
     # TODO: Eventually `design_metadata` will be passed in as an
     # argument, since it will be useful outside of `genmodel` (e.g.
