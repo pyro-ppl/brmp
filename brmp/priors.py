@@ -2,13 +2,11 @@ from collections import namedtuple, defaultdict
 from pprint import pprint as pp
 
 import pandas as pd
-import torch.distributions.constraints as constraints
-import pyro.distributions as dists
 
 from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula, parse
 from pyro.contrib.brm.design import designmatrices_metadata, DesignMeta, PopulationMeta, GroupMeta, make_metadata_lookup
-from pyro.contrib.brm.family import getfamily, Family, nonlocparams
+from pyro.contrib.brm.family import getfamily, Family, nonlocparams, Support
 
 # `is_param` indicates whether a node corresponds to a parameter in
 # the model. (Nodes without this flag set exist only to add structure
@@ -223,13 +221,9 @@ def chk(name):
     return decorate
 
 
-# TODO: Replace this Pyro specific check with something backend
-# agnostic. (By extending the info we keep about families to include
-# information about their support.)
 @chk('has +ve support')
 def chk_pos_support(prior):
-    dist = dists.__getattribute__(prior.family.name)
-    return dist.support == constraints.positive
+    return prior.family.support == Support.pos_real
 
 @chk('is LKJ')
 def chk_lkj(prior):

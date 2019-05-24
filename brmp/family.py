@@ -4,7 +4,7 @@ from enum import Enum
 # This is intended to be independent of Pyro, with a view to
 # supporting multiple code gen back-ends eventually.
 
-# TODO: Ensure that response families always have a support specified.
+# TODO: Ensure that families always have a support specified.
 Family = namedtuple('Family', 'name params support response')
 
 Support = Enum('Support', 'real pos_real boolean corr_cholesky')
@@ -26,9 +26,9 @@ Response = namedtuple('Response', 'param linkfn')
 FAMILIES = [
     Family('Normal', ['mu', 'sigma'], Support.real, Response('mu', LinkFn.identity)),
     Family('Bernoulli', ['probs'], Support.boolean, Response('probs', LinkFn.logit)),
-    Family('Cauchy', ['loc', 'scale'], None, None),
-    Family('HalfCauchy', ['scale'], None, None),
-    Family('LKJ', ['eta'], None, None),
+    Family('Cauchy', ['loc', 'scale'], Support.real, None),
+    Family('HalfCauchy', ['scale'], Support.pos_real, None),
+    Family('LKJ', ['eta'], Support.corr_cholesky, None),
 ]
 
 def lookup(items, name):
