@@ -327,5 +327,5 @@ def test_response_priors_is_complete():
     for family in FAMILIES:
         if family.response is not None:
             for param in family.params:
-                if not param == family.response.param:
-                    assert type(get_response_prior(family.name, param)) == Prior
+                if not param.name == family.response.param:
+                    assert type(get_response_prior(family.name, param.name)) == Prior

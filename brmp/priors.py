@@ -6,7 +6,7 @@ import pandas as pd
 from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula, parse
 from pyro.contrib.brm.design import designmatrices_metadata, DesignMeta, PopulationMeta, GroupMeta, make_metadata_lookup
-from pyro.contrib.brm.family import getfamily, Family, nonlocparams, Support
+from pyro.contrib.brm.family import getfamily, Family, nonlocparams, Type
 
 # `is_param` indicates whether a node corresponds to a parameter in
 # the model. (Nodes without this flag set exist only to add structure
@@ -107,7 +107,7 @@ def default_prior(formula, design_metadata, family):
     # TODO: Consider adding a check that ensures the support of the
     # prior matches any constraint on the parameter. (Would require
     # families extending with additional info.)
-    resp_children = [leaf(p, PriorEdit(('resp', p), get_response_prior(family.name, p))) for p in nonlocparams(family)]
+    resp_children = [leaf(p.name, PriorEdit(('resp', p.name), get_response_prior(family.name, p.name))) for p in nonlocparams(family)]
     return Node('root', None, False, [], [
         Node('b',    PriorEdit(('b',),   prior('Cauchy', [0., 1.])), False, [chk_real_support], b_children),
         Node('sd',   PriorEdit(('sd',),  prior('HalfCauchy', [3.])), False, [chk_pos_support],  sd_children),
@@ -223,11 +223,11 @@ def chk(name):
 
 @chk('has support on reals')
 def chk_real_support(prior):
-    return prior.family.support == Support.real
+    return prior.family.support == Type.real
 
 @chk('has +ve support')
 def chk_pos_support(prior):
-    return prior.family.support == Support.pos_real
+    return prior.family.support == Type.pos_real
 
 @chk('is LKJ')
 def chk_lkj(prior):

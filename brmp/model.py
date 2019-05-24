@@ -1,5 +1,5 @@
 from .formula import Formula
-from .family import Family, Support
+from .family import Family, Type
 
 # This could be the place where an abstract model description is
 # built. (Having performed any high-level checks required to ensure
@@ -11,12 +11,12 @@ def family_matches_response(formula, metadata, family):
     assert type(family) == Family
     if not formula.response in metadata:
         # Response column is numeric.
-        return family.support == Support.real
+        return family.support == Type.real
     else:
         # Response column is a factor.
         factor = metadata[formula.response]
         if len(factor.levels) == 2:
-            return family.support == Support.boolean
+            return family.support == Type.boolean
         else:
             return False
 

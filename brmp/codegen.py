@@ -227,8 +227,8 @@ def genmodel(formula, metadata, family, prior_edits):
     # Sample from priors over the response distribution parameters
     # that aren't predicted from the data.
     for param in nonlocparams(family):
-        param_prior = priors(('resp', param))
-        body.append(sample(param, gendist(param_prior.family, param_prior.arguments, [1], False)))
+        param_prior = priors(('resp', param.name))
+        body.append(sample(param.name, gendist(param_prior.family, param_prior.arguments, [1], False)))
 
     # TODO: Optimisations (for numerical stability/perf.) are
     # available for some response family/link function pairs. (Though
@@ -238,12 +238,12 @@ def genmodel(formula, metadata, family, prior_edits):
 
     # TODO: This relies on the parameters defined in each Family
     # appearing in the same order as Pyro expects.
-    def response_arg(param):
-        if param == family.response.param:
+    def response_arg(param_name):
+        if param_name == family.response.param:
             return geninvlinkfn(family.response.linkfn, 'mu')
         else:
-            return '{}.expand(N)'.format(param)
-    response_args = [response_arg(p) for p in family.params]
+            return '{}.expand(N)'.format(param_name)
+    response_args = [response_arg(p.name) for p in family.params]
 
     body.append('with pyro.plate("obs", N):')
     body.append(indent(sample('y', gendist(family, response_args, shape=['N'], batch=True), 'y_obs')))

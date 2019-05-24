@@ -7,7 +7,8 @@ from enum import Enum
 # TODO: Ensure that families always have a support specified.
 Family = namedtuple('Family', 'name params support response')
 
-Support = Enum('Support', 'real pos_real boolean corr_cholesky')
+Param = namedtuple('Param', 'name type')
+Type = Enum('Type', 'real pos_real boolean unit_interval corr_cholesky')
 
 # Inverse might also be called recip(rocal).
 LinkFn = Enum('LinkFn', 'identity logit inverse')
@@ -24,11 +25,23 @@ Response = namedtuple('Response', 'param linkfn')
 # TODO: Add more response families.
 
 FAMILIES = [
-    Family('Normal', ['mu', 'sigma'], Support.real, Response('mu', LinkFn.identity)),
-    Family('Bernoulli', ['probs'], Support.boolean, Response('probs', LinkFn.logit)),
-    Family('Cauchy', ['loc', 'scale'], Support.real, None),
-    Family('HalfCauchy', ['scale'], Support.pos_real, None),
-    Family('LKJ', ['eta'], Support.corr_cholesky, None),
+    Family('Normal',
+           [Param('mu', Type.real), Param('sigma', Type.pos_real)],
+           Type.real,
+           Response('mu', LinkFn.identity)),
+    Family('Bernoulli',
+           [Param('probs', Type.unit_interval)],
+           Type.boolean,
+           Response('probs', LinkFn.logit)),
+    Family('Cauchy',
+           [Param('loc', Type.real), Param('scale', Type.pos_real)],
+           Type.real, None),
+    Family('HalfCauchy',
+           [Param('scale', Type.pos_real)],
+           Type.pos_real, None),
+    Family('LKJ',
+           [Param('eta', Type.pos_real)],
+           Type.corr_cholesky, None),
 ]
 
 def lookup(items, name):
@@ -43,7 +56,7 @@ def getfamily(name):
 def nonlocparams(family):
     assert type(family) == Family
     assert family.response is not None
-    return list(set(family.params) - {family.response.param})
+    return [param for param in family.params if not param.name == family.response.param]
 
 def main():
     pass
