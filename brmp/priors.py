@@ -109,10 +109,10 @@ def default_prior(formula, design_metadata, family):
                           [chk_support(p.type)])
                      for p in nonlocparams(family)]
     return Node('root', None, False, [], [
-        Node('b',    PriorEdit(('b',),   prior('Cauchy', [0., 1.])), False, [chk_real_support], b_children),
-        Node('sd',   PriorEdit(('sd',),  prior('HalfCauchy', [3.])), False, [chk_pos_support],  sd_children),
-        Node('cor',  PriorEdit(('cor',), prior('LKJ', [1.])),        False, [chk_lkj],          cor_children),
-        Node('resp', None,                                           False, [],                 resp_children)])
+        Node('b',    PriorEdit(('b',),   prior('Cauchy', [0., 1.])), False, [chk_support(Type.real)],     b_children),
+        Node('sd',   PriorEdit(('sd',),  prior('HalfCauchy', [3.])), False, [chk_support(Type.pos_real)], sd_children),
+        Node('cor',  PriorEdit(('cor',), prior('LKJ', [1.])),        False, [chk_lkj],                    cor_children),
+        Node('resp', None,                                           False, [],                           resp_children)])
 
 # TODO: This ought to warn/error when an element of `priors` has a
 # path that doesn't correspond to a node in the tree.
@@ -224,14 +224,6 @@ def chk_support(typ):
     def pred(prior):
         return prior.family.support == typ
     return Chk(pred, 'has support of {}'.format(typ.name))
-
-@chk('has support on reals')
-def chk_real_support(prior):
-    return prior.family.support == Type.real
-
-@chk('has +ve support')
-def chk_pos_support(prior):
-    return prior.family.support == Type.pos_real
 
 @chk('is LKJ')
 def chk_lkj(prior):
