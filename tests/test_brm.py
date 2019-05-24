@@ -202,6 +202,10 @@ def test_family_and_response_type_checks(formula_str, metadata, family):
      [Factor('x2', list('ab'))],
      getfamily('Normal'),
      [PriorEdit(('cor', 'x2'), prior('Normal', [0., 1.]))]),
+    ('y ~ x',
+     [],
+     getfamily('Normal'),
+     [PriorEdit(('b',), prior('Bernoulli', [.5]))]),
 ])
 def test_prior_checks(formula_str, metadata, family, prior_edits):
     formula = parse(formula_str)
