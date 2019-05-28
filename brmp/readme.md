@@ -9,7 +9,9 @@ examples.
 
 In addition, a thin wrapper around this functionality aims to
 eventually provide a brms-like interface for fitting models.
-See [`ex0.py`](./ex0.py) for an example of this.
+See
+[this notebook](https://nbviewer.jupyter.org/github/null-a/pyro/blob/brmp/pyro/contrib/brm/examples/Example1.ipynb) for
+an example of this.
 
 ## Limitations
 
@@ -18,7 +20,7 @@ See [`ex0.py`](./ex0.py) for an example of this.
 * The group syntax `g1:g2` and `g1/g2` is not supported.
 * Interaction between terms in not supported. e.g. `y ~ x1*x2`
 * The syntax for removing columns is not supported. e.g. `y ~ x - 1`
-* The response is always scalar.
+* The response is always uni-variate.
 * The response is Gaussian or Bernoulli distributed. In particular
   Categorical responses (beyond the binary case) are not supported.
 * Some priors used in the generated code don't match those generated
