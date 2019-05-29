@@ -141,24 +141,6 @@ print(makedata(parse(f2), df2))
 # Ex 3. Custom priors
 # --------------------------------------------------
 
-# Users can specify custom priors for population-level coefficients
-# and group-level standard deviations, at several level of
-# granularity. For example it is possible to specify:
-
-# - A prior to be used for all columns of the standard deviation
-#   vector in every group.
-
-# - A prior to be used for all columns of the standard deviation
-#   vector in a particular group.
-
-# - A prior to be used for a particular coefficient of the standard
-#   deviation vector in a particular group.
-
-# A user can combine multiple such specification to describe their
-# desired priors. The system is aware of the coding used for factors
-# in the data frame, allowing prior to be assigned to the coefficient
-# corresponding to a particular level of the factor if necessary.
-
 # Here's a simple example in which we specify custom priors for the
 # population-level coefficients.
 
