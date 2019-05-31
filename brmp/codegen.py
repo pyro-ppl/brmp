@@ -75,7 +75,7 @@ def genprior(varname, prior_desc):
 # groups contribution to mu.
 def gengroup(i, group):#, metadata, design_metadata, priors):
     assert type(i) == int # A unique int assigned to each group.
-    assert type(group) == Group # TODO: Disambig. Formula vs. Model groups? (This is the latter.)
+    assert type(group) == Group
 
     code = ['']
     code.append(comment('[{}] {}'.format(i, group.factor)))
@@ -112,7 +112,6 @@ def gengroup(i, group):#, metadata, design_metadata, priors):
 
         # Prior over correlations.
         prior = group.corr_prior
-        # TODO: Is this check now redundant?
         assert len(prior.arguments) == 1
         code.append(sample('L_{}'.format(i), lkj_corr_cholesky(M_i, shape=prior.arguments[0])))
         code.append('assert L_{}.shape == (M_{}, M_{}) # {} x {}'.format(i, i, i, M_i, M_i))

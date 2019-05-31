@@ -24,6 +24,12 @@ Node = namedtuple('Node', 'op l r')
 # TODO: We need to remove duplicate terms and add intercepts by
 # default. That probably ought to happen somewhere around here.
 
+# TODO: Check for (and disallow) multiple groups using the same
+# grouping column. I assume that this is the case elsewhere in the
+# package. (e.g. Specifying priors for a particular group is done
+# using the name of the grouping column, which would be ambiguous
+# without the assumption. brms does this too.
+
 Formula = namedtuple('Formula',
                      ['response',   # response column name
                       'pterms',     # list of population level columns

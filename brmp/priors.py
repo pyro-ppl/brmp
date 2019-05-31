@@ -130,10 +130,6 @@ def default_prior(formula, design_metadata, family):
 # TODO: This ought to warn/error when an element of `priors` has a
 # path that doesn't correspond to a node in the tree.
 
-# TODO: We need to check (somehow, somewhere) that users specified
-# priors have the correct support. e.g. R for population level
-# effects, R+ for standard deviations.
-
 def customize_prior(tree, prior_edits):
     assert type(tree) == Node
     assert type(prior_edits) == list
@@ -198,11 +194,6 @@ def chk_support(typ):
 @chk('is LKJ')
 def chk_lkj(prior):
     return prior.family.name == 'LKJ'
-
-# TODO: We could have a further check that attempt to instantiate the
-# distribution as a way of validating parameters? LKJ would again
-# require special casing, since that ends up as `LKJCorrCholesky` in
-# code.
 
 def check(tree):
     errors = defaultdict(lambda: defaultdict(list))
