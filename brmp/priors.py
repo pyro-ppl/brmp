@@ -18,7 +18,14 @@ def leaf(name, prior_edit=None, checks=[]):
     return Node(name, prior_edit, True, checks, [])
 
 # TODO: This currently requires `parameters` to be a list of floats.
-# This ought to be checked.
+# (Actually, the family gives us more info than this, e.g. that a
+# parameter is constrained to take only positive reals.) This ought to
+# be checked.
+
+# TODO: Can also check that the number of args matches the number of
+# params. (Having done this, is would be safe to remove the assertion
+# that LKJ has a single param that's currently in `codgen.py`.)
+
 Prior = namedtuple('Prior', 'family arguments')
 
 # e.g. Prior('Normal', [0., 1.])
