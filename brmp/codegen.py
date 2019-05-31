@@ -1,8 +1,7 @@
-from .formula import Formula, Group
-from .design import width, designmatrices_metadata, GroupMeta
-from .priors import Prior, get_priors
-from .family import Family, nonlocparams, LinkFn, getfamily
-from .model import check_family_matches_response
+from .formula import Formula
+from .priors import Prior
+from .family import Family, LinkFn, getfamily
+from .model import Model, Group
 
 def gendist(family, args, shape, batch):
     assert type(family) == Family
@@ -74,26 +73,18 @@ def genprior(varname, prior_desc):
 # Generates model code for a single group. More specifically, this
 # generates code to sample group level priors and to accumulate the
 # groups contribution to mu.
-def gengroup(i, group, metadata, design_metadata, priors):
+def gengroup(i, group):#, metadata, design_metadata, priors):
     assert type(i) == int # A unique int assigned to each group.
-    assert type(group) == Group
-    assert type(metadata) == dict
-    assert type(design_metadata) == GroupMeta
-    assert design_metadata.name == group.column
-    assert callable(priors)
-    # The column on which we group must be a factor.
-    assert group.column in metadata, 'group column must be a factor'
-    groupfactor = metadata[group.column]
+    assert type(group) == Group # TODO: Disambig. Formula vs. Model groups? (This is the latter.)
 
     code = ['']
-    code.append(comment('[{}] {}'.format(i, group)))
+    code.append(comment('[{}] {}'.format(i, group.factor)))
 
-    # TODO: Get this from `design_metadata`.
     # The number of coefficients per level.
-    M_i = width(group.gterms, metadata)
+    M_i = len(group.coefs)
 
     # The number of levels.
-    N_i = len(groupfactor.levels)
+    N_i = len(group.factor.levels)
 
     # This follows the names used in brms.
     code.append('M_{} = {} # Number of coeffs'.format(i, M_i))
@@ -105,7 +96,7 @@ def gengroup(i, group, metadata, design_metadata, priors):
     code.append('assert J_{}.shape == (N,)'.format(i))
 
     # Prior over coefficient scales.
-    code.extend(genprior('sd_{}'.format(i), priors(('sd', group.column))))
+    code.extend(genprior('sd_{}'.format(i), contig(group.sd_priors)))
     code.append('assert sd_{}.shape == (M_{},) # {}'.format(i, i, M_i))
 
     # Prior over a matrix of unscaled/uncorrelated coefficients. This
@@ -116,11 +107,12 @@ def gengroup(i, group, metadata, design_metadata, priors):
     code.append(sample('z_{}'.format(i), gendist(getfamily('Normal'), [0., 1.], [M_i, N_i], batch=False)))
     code.append('assert z_{}.shape == (M_{}, N_{}) # {} x {}'.format(i, i, i, M_i, N_i))
 
-    if group.corr and M_i > 1:
+    if group.corr_prior and M_i > 1:
         # Model correlations between the coefficients.
 
         # Prior over correlations.
-        prior = priors(('cor', group.column))
+        prior = group.corr_prior
+        # TODO: Is this check now redundant?
         assert len(prior.arguments) == 1
         code.append(sample('L_{}'.format(i), lkj_corr_cholesky(M_i, shape=prior.arguments[0])))
         code.append('assert L_{}.shape == (M_{}, M_{}) # {} x {}'.format(i, i, i, M_i, M_i))
@@ -171,21 +163,32 @@ def geninvlinkfn(linkfn, code):
     else:
         raise NotImplementedError('code generation for link function {} not implemented'.format(linkfn))
 
-def genmodel(formula, metadata, family, prior_edits):
-    assert type(formula) == Formula
-    assert type(metadata) == dict
-    assert type(family) == Family
-    assert type(prior_edits) == list
-    num_groups = len(formula.groups)
 
-    check_family_matches_response(formula, metadata, family)
+# TODO: I'm missing opportunities to vectorise here. Adjacent segments
+# that share a family and differ only in parameters can be handled
+# with a single `sample` statement with suitable parameters.
 
-    # TODO: Eventually `design_metadata` will be passed in as an
-    # argument, since it will be useful outside of `genmodel` (e.g.
-    # for including readable column name when printing design
-    # matrices) and we'll want to avoid computing it multiple times.
-    design_metadata = designmatrices_metadata(formula, metadata)
-    priors = get_priors(formula, design_metadata, family, prior_edits)
+# e.g.
+# contig(list('abb')) == [('a', 1), ('b', 2)]
+def contig(xs):
+    assert type(xs) == list or type(xs) == tuple # Though really more general than this.
+    assert all(x is not None for x in xs) # Since None used as initial value of `cur`.
+    cur = None
+    segments = []
+    for i, x in enumerate(xs):
+        if x == cur:
+            segments[-1][1].append(i) # Extend segment.
+        else:
+            cur = x
+            segments.append((cur, [i])) # New segment.
+    # Post-process.
+    segments = [(x, len(ix)) for (x, ix) in segments]
+    return segments
+
+
+def genmodel(model):
+    assert type(model) == Model
+    num_groups = len(model.groups)
 
     body = []
 
@@ -193,13 +196,7 @@ def genmodel(formula, metadata, family, prior_edits):
     body.append('N = X.shape[0]')
 
     # The number of columns in the design matrix.
-    M = len(design_metadata.population.coefs)
-
-    # TODO: Once I happy `design_metadata` is here to stay, remove
-    # this check that the old method of computing the width returns
-    # the same result as the new method. (The new method avoids
-    # recomputing the design matrix coding in `width`.)
-    assert M == width(formula.pterms, metadata)
+    M = len(model.population.coefs)
 
     body.append('M = {}'.format(M))
     body.append('assert X.shape == (N, M)')
@@ -208,7 +205,7 @@ def genmodel(formula, metadata, family, prior_edits):
     # --------------------------------------------------
 
     # Prior over b. (The population level coefficients.)
-    body.extend(genprior('b', priors(('b',))))
+    body.extend(genprior('b', contig(model.population.priors)))
     body.append('assert b.shape == (M,)')
 
     # Compute mu.
@@ -216,19 +213,19 @@ def genmodel(formula, metadata, family, prior_edits):
 
     # Group level
     # --------------------------------------------------
-    for i, (group, design_metadata) in enumerate(zip(formula.groups, design_metadata.groups)):
+    for i, group in enumerate(model.groups):
         # Use 1 indexed groups to ease comparison of generate code
         # with code generated by brms.
-        body.extend(gengroup(i+1, group, metadata, design_metadata, priors))
+        body.extend(gengroup(i+1, group))
 
     # Response
     # --------------------------------------------------
 
     # Sample from priors over the response distribution parameters
     # that aren't predicted from the data.
-    for param in nonlocparams(family):
-        param_prior = priors(('resp', param.name))
+    for param, param_prior in zip(model.response.nonlocparams, model.response.priors):
         body.append(sample(param.name, gendist(param_prior.family, param_prior.arguments, [1], False)))
+
 
     # TODO: Optimisations (for numerical stability/perf.) are
     # available for some response family/link function pairs. (Though
@@ -236,17 +233,18 @@ def genmodel(formula, metadata, family, prior_edits):
     # has a `logits` param, so it's possible to pass `mu` directly as
     # that.
 
+
     # TODO: This relies on the parameters defined in each Family
     # appearing in the same order as Pyro expects.
     def response_arg(param_name):
-        if param_name == family.response.param:
-            return geninvlinkfn(family.response.linkfn, 'mu')
+        if param_name == model.response.family.response.param:
+            return geninvlinkfn(model.response.family.response.linkfn, 'mu')
         else:
             return '{}.expand(N)'.format(param_name)
-    response_args = [response_arg(p.name) for p in family.params]
+    response_args = [response_arg(p.name) for p in model.response.family.params]
 
     body.append('with pyro.plate("obs", N):')
-    body.append(indent(sample('y', gendist(family, response_args, shape=['N'], batch=True), 'y_obs')))
+    body.append(indent(sample('y', gendist(model.response.family, response_args, shape=['N'], batch=True), 'y_obs')))
 
     params = (['X'] +
               ['Z_{}'.format(i+1) for i in range(num_groups)] +

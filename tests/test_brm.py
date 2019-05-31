@@ -9,8 +9,10 @@ from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, LKJCorrC
 from pyro.contrib.brm.formula import parse
 from pyro.contrib.brm.codegen import genmodel, eval_model
 from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrices_metadata
-from pyro.contrib.brm.priors import prior, Prior, PriorEdit, get_response_prior
+from pyro.contrib.brm.priors import prior, Prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import getfamily, FAMILIES
+from pyro.contrib.brm.model import build_model
+
 
 from tests.common import assert_equal
 
@@ -161,7 +163,10 @@ default_params = dict(
 def test_codegen(formula_str, metadata, family, prior_edits, expected):
     formula = parse(formula_str)
     metadata = make_metadata_lookup(metadata)
-    code = genmodel(formula, metadata, family, prior_edits)
+    design_metadata = designmatrices_metadata(formula, metadata)
+    prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
+    model = build_model(formula, prior_tree, family, metadata)
+    code = genmodel(model)
     #print(code)
     model = eval_model(code)
     data = dummydata(formula, metadata, 5)
@@ -189,8 +194,10 @@ def unwrapfn(fn):
 def test_family_and_response_type_checks(formula_str, metadata, family):
     formula = parse(formula_str)
     metadata = make_metadata_lookup(metadata)
+    design_metadata = designmatrices_metadata(formula, metadata)
+    prior_tree = build_prior_tree(formula, design_metadata, family, [])
     with pytest.raises(Exception, match='not compatible'):
-        genmodel(formula, metadata, family, [])
+        model = build_model(formula, prior_tree, family, metadata)
 
 
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits', [
@@ -214,8 +221,9 @@ def test_family_and_response_type_checks(formula_str, metadata, family):
 def test_prior_checks(formula_str, metadata, family, prior_edits):
     formula = parse(formula_str)
     metadata = make_metadata_lookup(metadata)
+    design_metadata = designmatrices_metadata(formula, metadata)
     with pytest.raises(Exception, match=r'(?i)invalid prior'):
-        genmodel(formula, metadata, family, prior_edits)
+        build_prior_tree(formula, design_metadata, family, prior_edits)
 
 
 # We have to ask for float32 tensors here because the default tensor

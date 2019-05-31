@@ -4,8 +4,8 @@ from pprint import pprint as pp
 import pandas as pd
 
 from pyro.contrib.brm.utils import join
-from pyro.contrib.brm.formula import Formula, parse
-from pyro.contrib.brm.design import designmatrices_metadata, DesignMeta, PopulationMeta, GroupMeta, make_metadata_lookup
+from pyro.contrib.brm.formula import Formula
+from pyro.contrib.brm.design import DesignMeta, PopulationMeta, GroupMeta
 from pyro.contrib.brm.family import getfamily, Family, nonlocparams, Type
 
 # `is_param` indicates whether a node corresponds to a parameter in
@@ -58,11 +58,17 @@ def walk(node, path):
         name = path[0]
         selected_node = next((n for n in node.children if n.name == name), None)
         if selected_node is None:
-            raise Exception('Invalid path')
+            raise ValueError('Invalid path')
         return [node] + walk(selected_node, path[1:])
 
 def select(node, path):
     return walk(node, path)[-1]
+
+def tryselect(node, path, default=None):
+    try:
+        return select(node, path)
+    except ValueError:
+        return default
 
 def edit(node, path, f):
     assert type(node) == Node
@@ -137,11 +143,16 @@ def customize_prior(tree, prior_edits):
                     lambda n: Node(n.name, prior_edit, n.is_param, n.checks, n.children))
     return tree
 
-# It's important that trees maintain the order of their children,
-# otherwise the output of `get_priors` will silently fail to line-up
-# with the column ordering in the data.
-def build_prior_tree(formula, design_metadata, family, prior_edits):
-    return fill(customize_prior(default_prior(formula, design_metadata, family), prior_edits))
+# It's important that trees maintain the order of their children, so
+# that coefficients in the prior tree continue to line up with columns
+# in the design matrix.
+def build_prior_tree(formula, design_metadata, family, prior_edits, chk=True):
+    tree = fill(customize_prior(default_prior(formula, design_metadata, family), prior_edits))
+    if chk:
+        errors = check(tree)
+        if errors:
+            raise Exception(format_errors(errors))
+    return tree
 
 # `fill` populates the `prior_edit` and `checks` properties of all
 # nodes in a tree. Each node uses its own `prior_edit` value if set,
@@ -159,54 +170,6 @@ def leaves(node, path=[]):
     this = [(node, path)] if node.is_param else []
     rest = join(leaves(n, path + [n.name]) for n in node.children)
     return this + rest
-
-# e.g.
-# contig(list('abb')) == [('a', 1), ('b', 2)]
-def contig(xs):
-    assert type(xs) == list # Though really more general than this.
-    assert all(x is not None for x in xs) # Since None used as initial value of `cur`.
-    cur = None
-    segments = []
-    for i, x in enumerate(xs):
-        if x == cur:
-            segments[-1][1].append(i) # Extend segment.
-        else:
-            cur = x
-            segments.append((cur, [i])) # New segment.
-    # Post-process.
-    segments = [(x, len(ix)) for (x, ix) in segments]
-    return segments
-
-# TODO: I'm missing opportunities to vectorise here. Adjacent segments
-# that share a family and differ only in parameters can be handled
-# with a single `sample` statement with suitable parameters.
-
-def get_prior(tree, path):
-    # Either fetch the prior from the leaf/parameter node (described
-    # by path) directly. Or, if given a path to an internal node,
-    # fetch a vectorized prior over all of the nodes children. (In the
-    # case, the children are expected to be leaves/parameters.)
-    node = select(tree, path)
-    if node.is_param:
-        return node.prior_edit.prior
-    else:
-        assert all(n.is_param for n in node.children)
-        return contig([n.prior_edit.prior for n in node.children])
-
-# Main entry into priors used by code generation.
-def get_priors(formula, design_metadata, family, prior_edits, chk=True):
-    assert type(formula) == Formula
-    assert type(design_metadata) == DesignMeta
-    assert type(family) == Family
-    assert type(prior_edits) == list
-    tree = build_prior_tree(formula, design_metadata, family, prior_edits)
-    if chk:
-        errors = check(tree)
-        if errors:
-            raise Exception(format_errors(errors))
-    # Return a function that can be used to query for priors for
-    # particular parameters.
-    return lambda path: get_prior(tree, path)
 
 # Sanity checks
 
@@ -256,6 +219,9 @@ def format_errors(errors):
     return 'Invalid prior specified at {}.'.format(paths)
 
 def main():
+    from pyro.contrib.brm.formula import parse
+    from pyro.contrib.brm.design import designmatrices_metadata, make_metadata_lookup
+
     formula = parse('y ~ 1 + x1 + x2 + (1 || grp1) + (1 + z | grp2) + (1 | grp3)')
     design_metadata = designmatrices_metadata(
         formula,
@@ -270,7 +236,7 @@ def main():
         PriorEdit(('resp', 'sigma',), 'g'),
     ]
 
-    tree = build_prior_tree(formula, design_metadata, getfamily('Normal'), prior_edits)
+    tree = build_prior_tree(formula, design_metadata, getfamily('Normal'), prior_edits, chk=False)
     pp([('/'.join(path), node.prior_edit.prior) for node, path in leaves(tree)])
     # [('b/intercept', 'b'),
     #  ('b/x1', 'b'),
@@ -283,29 +249,11 @@ def main():
     #  ('cor/grp3', 'f'),
     #  ('resp/sigma', 'g')]
 
-    # Vectorized:
-    pp(get_prior(tree, ('b',)))
-    # [('b', 3)]
-    pp(get_prior(tree, ('sd', 'grp1')))
-    # [('a', 1)]
-    pp(get_prior(tree, ('sd', 'grp2')))
-    # [('c', 1), ('d', 1)]
-    pp(get_prior(tree, ('sd', 'grp3')))
-    # [('a', 1)]
-
-    # Not vectorized:
-    pp(get_prior(tree, ('cor', 'grp2')))
-    # 'e'
-    pp(get_prior(tree, ('cor', 'grp3')))
-    # 'f'
-    pp(get_prior(tree, ('resp', 'sigma')))
-    # 'g'
-
     tree = build_prior_tree(formula, design_metadata, getfamily('Normal'), [
         # This edit will fail the +ve support check at all the grand
         # children of the sd node.
         PriorEdit(('sd',), prior('Normal', [0., 1.])),
-    ])
+    ], chk=False)
     pp(dict((k, dict(v)) for k, v in check(tree).items()))
     # {('sd',): {Chk("has +ve support"): [('sd', 'grp1', 'intercept'),
     #                                     ('sd', 'grp2', 'intercept'),
