@@ -107,8 +107,11 @@ def gengroup(i, group):#, metadata, design_metadata, priors):
     code.append(sample('z_{}'.format(i), gendist(getfamily('Normal'), [0., 1.], [M_i, N_i], batch=False)))
     code.append('assert z_{}.shape == (M_{}, N_{}) # {} x {}'.format(i, i, i, M_i, N_i))
 
-    if group.corr_prior and M_i > 1:
+    if group.corr_prior:
         # Model correlations between the coefficients.
+
+        # This is guaranteed by the way the prior tree is built.
+        assert M_i > 1
 
         # Prior over correlations.
         prior = group.corr_prior

@@ -209,7 +209,7 @@ def test_family_and_response_type_checks(formula_str, metadata, family):
      [Factor('x2', list('ab'))],
      getfamily('Normal'),
      [PriorEdit(('sd', 'x2'), prior('Normal', [0., 1.]))]),
-    ('y ~ x1 | x2',
+    ('y ~ 1 + x1 | x2',
      [Factor('x2', list('ab'))],
      getfamily('Normal'),
      [PriorEdit(('cor', 'x2'), prior('Normal', [0., 1.]))]),

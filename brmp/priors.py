@@ -115,7 +115,7 @@ def default_prior(formula, design_metadata, family):
                for (meta, group)
                in zip(design_metadata.groups, formula.groups))
     b_children = [leaf(name) for name in design_metadata.population.coefs]
-    cor_children = [leaf(group.column) for group in formula.groups if group.corr]
+    cor_children = [leaf(group.column) for group in formula.groups if group.corr and len(group.gterms) > 1]
     sd_children = [Node(gm.name, None, False, [], [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
     resp_children = [leaf(p.name,
                           PriorEdit(('resp', p.name), get_response_prior(family.name, p.name)),
@@ -237,7 +237,6 @@ def main():
     #  ('sd/grp2/z', 'd'),
     #  ('sd/grp3/intercept', 'a'),
     #  ('cor/grp2', 'e'),
-    #  ('cor/grp3', 'f'),
     #  ('resp/sigma', 'g')]
 
     tree = build_prior_tree(formula, design_metadata, getfamily('Normal'), [

@@ -66,15 +66,6 @@ def build_model(formula, prior_tree, family, dfmetadata):
 
         sd_coefs, sd_priors = unzip([(n.name, n.prior_edit.prior) for n in node.children])
 
-        # TODO: The logic that says don't bother with L (even when
-        # asked for) when a group has only a single coef can be moved
-        # here? (from `codegen.py`.) Or, maybe we ought to never add a
-        # node to the prior tree in this case? (The difference would
-        # be that in the latter case, attempting to edit a prior over
-        # an L which will eventually not be used could generate a
-        # useful error, which might be more helpful than allowing it
-        # to be editted, and then silently dropping it.)
-
         corr_node = tryselect(prior_tree, ('cor', node.name))
         corr_prior = None if corr_node is None else corr_node.prior_edit.prior
 
