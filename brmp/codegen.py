@@ -245,6 +245,15 @@ def genmodel(model):
     body.append('with pyro.plate("obs", N):')
     body.append(indent(sample('y', gendist(model.response.family, response_args, shape=['N'], batch=True), 'y_obs')))
 
+    # Values of interest that are not generated directly by sample
+    # statements (such as the `b` vector) are returned from the model
+    # so that they can be retrieved from the execution trace later.
+    returned_params = (['b'] +
+                       ['sd_{}'.format(i+1) for i in range(num_groups)] +
+                       ['r_{}'.format(i+1) for i in range(num_groups)])
+    retval =  '{{{}}}'.format(', '.join('\'{}\': {}'.format(p, p) for p in returned_params))
+    body.append('return {}'.format(retval))
+
     params = (['X'] +
               ['Z_{}'.format(i+1) for i in range(num_groups)] +
               ['J_{}'.format(i+1) for i in range(num_groups)] +

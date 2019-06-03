@@ -128,3 +128,20 @@ def model_repr(model):
         write('{:<15} | {}'.format(param.name, prior_repr(prior)))
     write('=' * 40)
     return '\n'.join(out)
+
+
+# TODO: The choice to use 1-based indexing is made in many places.
+# Consolidate?
+
+# TODO: Are these really best called parameters, or is there something
+# better?
+
+def parameter_names(model):
+    return (
+        ['b'] +
+        ['r_{}'.format(i+1) for i, group in enumerate(model.groups)] +
+        ['sd_{}'.format(i+1) for i, group in enumerate(model.groups)] +
+        ['L_{}'.format(i+1) for i, group in enumerate(model.groups)
+         if not group.corr_prior is None] +
+        [param.name for param in model.response.nonlocparams]
+    )
