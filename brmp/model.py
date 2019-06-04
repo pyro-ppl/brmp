@@ -127,12 +127,21 @@ def model_repr(model):
 # TODO: Are these really best called parameters, or is there something
 # better?
 
+Parameter = namedtuple('Parameter', ['name', 'shape'])
+
 def parameter_names(model):
-    return (
-        ['b'] +
-        ['r_{}'.format(i+1) for i, group in enumerate(model.groups)] +
-        ['sd_{}'.format(i+1) for i, group in enumerate(model.groups)] +
-        ['L_{}'.format(i+1) for i, group in enumerate(model.groups)
-         if not group.corr_prior is None] +
-        [param.name for param in model.response.nonlocparams]
-    )
+    return [parameter.name for parameter in parameters(model)]
+
+# This describes the set of parameters implied by a particular model.
+# Any backend is expected to produce models the make this set of
+# parameters available (with the described shapes) via its `get_param`
+# function. (See fit.py.)
+def parameters(model):
+    return ([Parameter('b', (len(model.population.coefs),))] +
+            [Parameter('r_{}'.format(i+1), (len(group.factor.levels), len(group.coefs)))
+             for i, group in enumerate(model.groups)] +
+            [Parameter('sd_{}'.format(i+1), (len(group.coefs),))
+             for i, group in enumerate(model.groups)] +
+            [Parameter('L_{}'.format(i+1), (len(group.coefs), len(group.coefs)))
+             for i, group in enumerate(model.groups) if not group.corr_prior is None] +
+            [Parameter(param.name, (1,)) for param in model.response.nonlocparams])

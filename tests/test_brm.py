@@ -11,7 +11,8 @@ from pyro.contrib.brm.codegen import genmodel, eval_model
 from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrices_metadata
 from pyro.contrib.brm.priors import prior, Prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import getfamily, FAMILIES
-from pyro.contrib.brm.model import build_model
+from pyro.contrib.brm.model import build_model, parameters
+from pyro.contrib.brm.fit import pyro_get_param
 
 
 from tests.common import assert_equal
@@ -23,9 +24,7 @@ default_params = dict(
     LKJCorrCholesky = dict(eta=1.),
 )
 
-# TODO: Extend this. Could check shapes of sampled values? (Although
-# there are already asserting in the generated code to do that.) Check
-# response is observed.
+# TODO: Extend this. Could check that the response is observed?
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', [
     # TODO: This (and similar examples below) can't be expressed with
     # the current parser. Is it useful to fix this (`y ~ -1`?), or can
@@ -165,8 +164,8 @@ def test_codegen(formula_str, metadata, family, prior_edits, expected):
     metadata = make_metadata_lookup(metadata)
     design_metadata = designmatrices_metadata(formula, metadata)
     prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
-    model = build_model(formula, prior_tree, family, metadata)
-    code = genmodel(model)
+    model_desc = build_model(formula, prior_tree, family, metadata)
+    code = genmodel(model_desc)
     #print(code)
     model = eval_model(code)
     data = dummydata(formula, metadata, 5)
@@ -180,7 +179,10 @@ def test_codegen(formula_str, metadata, family, prior_edits, expected):
         for (name, expected_val) in params.items():
             val = fn.__getattribute__(name)
             assert_equal(val, torch.tensor(expected_val).expand(val.shape))
-
+    for parameter in parameters(model_desc):
+        shape = pyro_get_param(trace, parameter.name).shape
+        expected_shape = parameter.shape
+        assert shape == expected_shape
 
 def unwrapfn(fn):
     return unwrapfn(fn.base_dist) if type(fn) == Independent else fn

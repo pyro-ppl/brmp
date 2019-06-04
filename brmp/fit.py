@@ -68,6 +68,10 @@ def print_marginals_simple(fit):
         print('-- stddev ----------------------------------------')
         print(sd)
 
+# This relies on the assumption that all models make available the
+# parameters described by the `parameters` function in model.py, and
+# that each of these is a tensor/multi-dimensional array of the
+# expected size.
 def print_marginals(fit):
     # TODO: More robust table formatting. (This will currently break
     # when a mean or sd is > 10, for example.)
