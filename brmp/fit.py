@@ -73,26 +73,39 @@ def print_marginals_simple(fit):
 # that each of these is a tensor/multi-dimensional array of the
 # expected size.
 def print_marginals(fit):
-    # TODO: More robust table formatting. (This will currently break
-    # when a mean or sd is > 10, for example.)
-    row = '{:<15} {: .2f} {: .2f}'
-    header = '{:<15} {:>5.5s} {:>5.5s}'.format('', 'mean', 'sd')
+    # Format a float.
+    def f(x):
+        return '{: .2f}'.format(x)
+    rows = [['', 'mean', 'sd']]
     mean_and_sd = marginals(fit)
-    print(header)
     b_mean, b_sd = mean_and_sd['b']
     for coef, mean, sd in zip(fit.model.population.coefs, b_mean, b_sd):
         readable_name = 'b_{}'.format(coef)
-        print(row.format(readable_name, mean, sd))
+        rows.append([readable_name, f(mean), f(sd)])
     for ix, group in enumerate(fit.model.groups):
         r_mean, r_sd = mean_and_sd['r_{}'.format(ix)]
         for i, level in enumerate(group.factor.levels):
             for j, coef in enumerate(group.coefs):
                 readable_name = 'r_{}[{},{}]'.format(group.factor.name, level, coef)
-                print(row.format(readable_name, r_mean[i, j], r_sd[i, j]))
+                rows.append([readable_name, f(r_mean[i, j]), f(r_sd[i, j])])
 
     for param in fit.model.response.nonlocparams:
         param_mean, param_sd = mean_and_sd[param.name]
-        print(row.format(param.name, param_mean[0], param_sd[0]))
+        rows.append([param.name, f(param_mean[0]), f(param_sd[0])])
+    print_table(rows)
+
+def print_table(rows):
+    num_rows = len(rows)
+    assert num_rows > 0
+    num_cols = len(rows[0])
+    assert all(len(row) == num_cols for row in rows)
+    max_widths = [0] * num_cols
+    for row in rows:
+        for i, cell in enumerate(row):
+            max_widths[i] = max(max_widths[i], len(cell))
+    fmt = ' '.join('{{:>{}}}'.format(mw) for mw in max_widths)
+    for row in rows:
+        print(fmt.format(*row))
 
 def print_model(fit):
     print(model_repr(fit.model))
