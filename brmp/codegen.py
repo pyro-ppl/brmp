@@ -73,7 +73,7 @@ def genprior(varname, prior_desc):
 # Generates model code for a single group. More specifically, this
 # generates code to sample group level priors and to accumulate the
 # groups contribution to mu.
-def gengroup(i, group):#, metadata, design_metadata, priors):
+def gengroup(i, group):
     assert type(i) == int # A unique int assigned to each group.
     assert type(group) == Group
 
