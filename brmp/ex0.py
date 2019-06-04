@@ -36,8 +36,8 @@ print(fit.code)
 #     mu = torch.mv(X, b)
 #     sigma = pyro.sample("sigma", dist.HalfCauchy(torch.tensor(3.0).expand([1])).to_event(1))
 #     with pyro.plate("obs", N):
-#         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)), obs=y_obs)
-#     return dict(b=b, sigma=sigma, y=y)
+#         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)).to_event(0), obs=y_obs)
+#     return {'b': b}
 
 print(fit.data)
 # {'X': tensor([[1.0000, 0.6350],

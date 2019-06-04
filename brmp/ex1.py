@@ -32,14 +32,13 @@ print(makecode(parse(f1), df1a, getfamily('Normal'), []))
 #     mu = torch.mv(X, b)
 #     sigma = pyro.sample("sigma", dist.HalfCauchy(torch.tensor(3.0).expand([1])).to_event(1))
 #     with pyro.plate("obs", N):
-#         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)), obs=y_obs)
-#     return dict(b=b, sigma=sigma, y=y)
+#         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)).to_event(0), obs=y_obs)
+#     return {'b': b}
 
 print(makedata(parse(f1), df1a))
 # {'X': tensor([[ 1., 10.],
-#               [ 1., 20.],
-#               [ 1., 30.]]),
-#  'y_obs': tensor([0., 1., 2.])}
+#         [ 1., 20.],
+#         [ 1., 30.]]), 'y_obs': tensor([0., 1., 2.])}
 
 # Here we use the same formula (`y ~ 1 + x`), but this time we use a
 # data frame in which the `x` column is a factor. This factor is
@@ -62,14 +61,13 @@ print(makecode(parse(f1), df1b, getfamily('Normal'), []))
 #     mu = torch.mv(X, b)
 #     sigma = pyro.sample("sigma", dist.HalfCauchy(torch.tensor(3.0).expand([1])).to_event(1))
 #     with pyro.plate("obs", N):
-#         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)), obs=y_obs)
-#     return dict(b=b, sigma=sigma, y=y)
+#         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)).to_event(0), obs=y_obs)
+#     return {'b': b}
 
 print(makedata(parse(f1), df1b))
 # {'X': tensor([[1., 0., 0.],
-#               [1., 1., 0.],
-#               [1., 0., 1.]]),
-#  'y_obs': tensor([0., 0., 0.])}
+#         [1., 1., 0.],
+#         [1., 0., 1.]]), 'y_obs': tensor([0., 0., 0.])}
 
 # --------------------------------------------------
 # Ex 2. Population and group-level effects
@@ -87,7 +85,7 @@ df2 = pd.DataFrame(dict(y=[0., 1., 2.],
 # And the generated model code and design matrices etc.:
 
 print(makecode(parse(f2), df2, getfamily('Normal'), []))
-# def model(X, Z_1, J_1, y_obs=None):
+# def model(X, Z_0, J_0, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
 #     M = 1
@@ -96,43 +94,45 @@ print(makecode(parse(f2), df2, getfamily('Normal'), []))
 #     b = torch.cat([b_0])
 #     assert b.shape == (M,)
 #     mu = torch.mv(X, b)
-#
-#     # [1] Group(gterms=[Intercept(), 'x2'], column='x3', corr=True)
-#     M_1 = 2 # Number of coeffs
-#     N_1 = 3 # Number of levels
-#     assert type(Z_1) == torch.Tensor
-#     assert Z_1.shape == (N, M_1) # N x 2
-#     assert type(J_1) == torch.Tensor
-#     assert J_1.shape == (N,)
-#     sd_1_0 = pyro.sample("sd_1_0", dist.HalfCauchy(torch.tensor(3.0).expand([2])).to_event(1))
-#     sd_1 = torch.cat([sd_1_0])
-#     assert sd_1.shape == (M_1,) # 2
-#     z_1 = pyro.sample("z_1", dist.Normal(torch.zeros([2, 3]), torch.ones([2, 3])).to_event(2))
-#     assert z_1.shape == (M_1, N_1) # 2 x 3
-#     L_1 = pyro.sample("L_1", dist.LKJCorrCholesky(2, torch.tensor(1.0)))
-#     assert L_1.shape == (M_1, M_1) # 2 x 2
-#     r_1 = torch.mm(torch.mm(torch.diag(sd_1), L_1), z_1).transpose(0, 1)
-#     assert r_1.shape == (N_1, M_1) # 3 x 2
-#     r_1_1 = r_1[:, 0]
-#     r_1_2 = r_1[:, 1]
-#     Z_1_1 = Z_1[:, 0]
-#     Z_1_2 = Z_1[:, 1]
-#     mu = mu + r_1_1[J_1] * Z_1_1
-#     mu = mu + r_1_2[J_1] * Z_1_2
+
+#     # [0] Factor(name='x3', levels=['a', 'b', 'c'])
+#     M_0 = 2 # Number of coeffs
+#     N_0 = 3 # Number of levels
+#     assert type(Z_0) == torch.Tensor
+#     assert Z_0.shape == (N, M_0) # N x 2
+#     assert type(J_0) == torch.Tensor
+#     assert J_0.shape == (N,)
+#     sd_0_0 = pyro.sample("sd_0_0", dist.HalfCauchy(torch.tensor(3.0).expand([2])).to_event(1))
+#     sd_0 = torch.cat([sd_0_0])
+#     assert sd_0.shape == (M_0,) # 2
+#     z_0 = pyro.sample("z_0", dist.Normal(torch.tensor(0.0).expand([2, 3]), torch.tensor(1.0).expand([2, 3])).to_event(2))
+#     assert z_0.shape == (M_0, N_0) # 2 x 3
+#     L_0 = pyro.sample("L_0", dist.LKJCorrCholesky(2, torch.tensor(1.0)))
+#     assert L_0.shape == (M_0, M_0) # 2 x 2
+#     r_0 = torch.mm(torch.mm(torch.diag(sd_0), L_0), z_0).transpose(0, 1)
+#     assert r_0.shape == (N_0, M_0) # 3 x 2
+#     r_0_1 = r_0[:, 0]
+#     r_0_2 = r_0[:, 1]
+#     Z_0_1 = Z_0[:, 0]
+#     Z_0_2 = Z_0[:, 1]
+#     mu = mu + r_0_1[J_0] * Z_0_1
+#     mu = mu + r_0_2[J_0] * Z_0_2
 #     sigma = pyro.sample("sigma", dist.HalfCauchy(torch.tensor(3.0).expand([1])).to_event(1))
 #     with pyro.plate("obs", N):
-#         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)), obs=y_obs)
-#     return dict(b=b, sigma=sigma, y=y)
+#         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)).to_event(0), obs=y_obs)
+#     return {'b': b, 'sd_0': sd_0, 'r_0': r_0}
+
+
+
 
 print(makedata(parse(f2), df2))
 # {'X': tensor([[1.],
-#               [2.],
-#               [3.]]),
-#  'y_obs': tensor([0., 1., 2.]),
-#  'Z_1': tensor([[ 1., 10.],
-#                 [ 1., 20.],
-#                 [ 1., 30.]]),
-#  'J_1': tensor([0, 1, 2])}
+#         [2.],
+#         [3.]]), 'y_obs': tensor([0., 1., 2.]), 'Z_0': tensor([[ 1., 10.],
+#         [ 1., 20.],
+#         [ 1., 30.]]), 'J_0': tensor([0, 1, 2])}
+
+
 
 # (Note that modelling of correlations between group-level coefficient
 # can be turned of using the `(gterms || col)` syntax.)
@@ -175,5 +175,5 @@ print(makecode(parse(f3), df1a, getfamily('Normal'), priors3))
 #     mu = torch.mv(X, b)
 #     sigma = pyro.sample("sigma", dist.HalfCauchy(torch.tensor(3.0).expand([1])).to_event(1))
 #     with pyro.plate("obs", N):
-#         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)), obs=y_obs)
-#     return dict(b=b, sigma=sigma, y=y)
+#         y = pyro.sample("y", dist.Normal(mu, sigma.expand(N)).to_event(0), obs=y_obs)
+#     return {'b': b}
