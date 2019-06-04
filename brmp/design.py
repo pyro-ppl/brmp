@@ -51,9 +51,9 @@ def dummydata(formula, metadata, N):
     for i, group in enumerate(formula.groups):
         M_i = width(group.gterms, metadata)
         num_levels = len(metadata[group.column].levels)
-        data['Z_{}'.format(i+1)] = torch.rand(N, M_i)
+        data['Z_{}'.format(i)] = torch.rand(N, M_i)
         # Maps (indices of) data points to (indices of) levels.
-        data['J_{}'.format(i+1)] = torch.randint(0, num_levels, size=[N])
+        data['J_{}'.format(i)] = torch.randint(0, num_levels, size=[N])
     data['y_obs'] = torch.rand(N)
     return data
 
@@ -254,6 +254,6 @@ def makedata(formula, df):
     data['X'] = designmatrix(formula.pterms, df)
     data['y_obs'] = responsevector(formula.response, df)
     for i, group in enumerate(formula.groups):
-        data['Z_{}'.format(i+1)] = designmatrix(group.gterms, df)
-        data['J_{}'.format(i+1)] = lookupvector(group.column, df)
+        data['Z_{}'.format(i)] = designmatrix(group.gterms, df)
+        data['J_{}'.format(i)] = lookupvector(group.column, df)
     return data

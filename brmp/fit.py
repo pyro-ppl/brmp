@@ -20,7 +20,7 @@ Posterior = namedtuple('Posterior', ['samples', 'get_param'])
 def pyro_posterior(run):
     return Posterior(run.exec_traces, pyro_get_param)
 
-# Extracts a value of interest (e.g. 'b', 'r_1', 'L_2', 'sigma') from
+# Extracts a value of interest (e.g. 'b', 'r_0', 'L_1', 'sigma') from
 # a single sample.
 
 # It's expected that this should support all parameter names returned
@@ -84,7 +84,7 @@ def print_marginals(fit):
         readable_name = 'b_{}'.format(coef)
         print(row.format(readable_name, mean, sd))
     for ix, group in enumerate(fit.model.groups):
-        r_mean, r_sd = mean_and_sd['r_{}'.format(ix+1)]
+        r_mean, r_sd = mean_and_sd['r_{}'.format(ix)]
         for i, level in enumerate(group.factor.levels):
             for j, coef in enumerate(group.coefs):
                 readable_name = 'r_{}[{},{}]'.format(group.factor.name, level, coef)

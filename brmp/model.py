@@ -138,10 +138,10 @@ def parameter_names(model):
 # function. (See fit.py.)
 def parameters(model):
     return ([Parameter('b', (len(model.population.coefs),))] +
-            [Parameter('r_{}'.format(i+1), (len(group.factor.levels), len(group.coefs)))
+            [Parameter('r_{}'.format(i), (len(group.factor.levels), len(group.coefs)))
              for i, group in enumerate(model.groups)] +
-            [Parameter('sd_{}'.format(i+1), (len(group.coefs),))
+            [Parameter('sd_{}'.format(i), (len(group.coefs),))
              for i, group in enumerate(model.groups)] +
-            [Parameter('L_{}'.format(i+1), (len(group.coefs), len(group.coefs)))
+            [Parameter('L_{}'.format(i), (len(group.coefs), len(group.coefs)))
              for i, group in enumerate(model.groups) if not group.corr_prior is None] +
             [Parameter(param.name, (1,)) for param in model.response.nonlocparams])
