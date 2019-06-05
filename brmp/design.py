@@ -19,13 +19,15 @@ def make_metadata_lookup(metadata):
     return dict((factor.name, factor) for factor in metadata)
 
 
-# TODO: Leves of pandas categorical columns can be any hashable type I
-# think. Is our implementation flexible enough to handle the same? If
-# not, we ought to check the type here and throw an error when it's
+# TODO: Levels of pandas categorical columns can be any hashable type
+# I think. Is our implementation flexible enough to handle the same?
+# If not, we ought to check the type here and throw an error when it's
 # something we can't handle. Two areas to consider are whether it's
 # possible to specify priors on coefs arising from levels of a factor
 # (I think this works if the user knows how the types values are
-# turned into strings), and whether posterior summaries look OK.)
+# turned into strings), and whether posterior summaries look OK. (Both
+# of which have to do with whether instances of the type can be
+# converted to strings in a sensible way.)
 
 Factor = namedtuple('Factor',
                     ['name',    # column name
