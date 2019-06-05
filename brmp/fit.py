@@ -5,8 +5,8 @@ from pyro.contrib.brm.model import model_repr, parameter_names
 Fit = namedtuple('Fit', ['run', 'code', 'data', 'model', 'posterior'])
 Posterior = namedtuple('Posterior', ['samples', 'get_param'])
 
-# The idea  is that `pyro_posterior` and  `pyro_get_param` capture the
-# backend specific part of  processing posterior samples. Alternatives
+# The idea is that `pyro_posterior` and `pyro_get_param` capture the
+# backend specific part of processing posterior samples. Alternatives
 # to this approach include:
 
 # 1. Have each back end return an iterable of samples, where each
