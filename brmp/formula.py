@@ -1,6 +1,47 @@
 import re
 from enum import Enum
 from collections import namedtuple
+import itertools
+
+# Maintains order.
+def unique(xs):
+    seen = set()
+    out = []
+    for x in xs:
+        if x not in seen:
+            out.append(x)
+            seen.add(x)
+    return out
+
+class OrderedSet():
+    def __init__(self, *items, items_are_unique=False):
+        # For most methods on this class `items` could be an arbitrary
+        # iterable. However, for `union`, we need any two ordered sets
+        # to have `items` be of the same type, in order to
+        # straight-forwardly concatenate them with `+`. I'll use a
+        # tuple, since it also has the benefit of been immutable, but
+        # list would work too.
+        self.items = tuple(items if items_are_unique else unique(items))
+        self.fset = frozenset(self.items)
+        assert len(self.fset) == len(self.items) # `unique` ensures nodups
+    def __hash__(self):
+        return hash((OrderedSet, self.fset))
+    def __eq__(self, other):
+        return self.fset == other.fset
+    def __iter__(self):
+        return self.items.__iter__()
+    def __next__(self):
+        return self.items.__next__()
+    def __len__(self):
+        return len(self.items)
+    def __getitem__(self, i):
+        return self.items[i]
+    def __repr__(self):
+        return '<{}>'.format(','.join(str(item) for item in self.items))
+    def union(self, other):
+        items = self.items + tuple(x for x in other.items if not x in self.fset)
+        return OrderedSet(*items, items_are_unique=True)
+
 
 # Tokens
 Paren = Enum('Paren', 'L R')
@@ -9,6 +50,7 @@ Op = namedtuple('Op', 'name assoc precedence')
 Var = namedtuple('Var', 'name')
 
 OPS = {
+    ':':  Op(':',  Assoc.L, 5),
     '+':  Op('+',  Assoc.L, 4),
     '||': Op('||', Assoc.L, 3),
     '|':  Op('|',  Assoc.L, 3),
@@ -21,8 +63,8 @@ Node = namedtuple('Node', 'op l r')
 
 # TODO: Make into classes. Add validation. Add repr.
 
-# TODO: We need to remove duplicate terms and add intercepts by
-# default. That probably ought to happen somewhere around here.
+# TODO: Add intercepts by default. That probably ought to happen
+# somewhere around here.
 
 # TODO: Check for (and disallow) multiple groups using the same
 # grouping column. I assume that this is the case elsewhere in the
@@ -32,19 +74,23 @@ Node = namedtuple('Node', 'op l r')
 
 Formula = namedtuple('Formula',
                      ['response',   # response column name
-                      'pterms',     # list of population level columns
+                      'pterms',     # an OrderedSet of population level terms
                       'groups'])    # list of groups
 
 Group = namedtuple('Group',
-                   ['gterms',       # list of group level columns
+                   ['gterms',       # an OrderedSet of group-level terms
                     'column',       # name of grouping column
                     'corr'])        # model correlation between coeffs?
 
-Intercept = namedtuple('Intercept', [])
-_1 = Intercept()
+
+# TODO: Make it possible to union terms directly? (Could use in the
+# `:` case of eval.)
+Term = namedtuple('Term',
+                  ['factors']) # Factors in the Patsy sense. An OrderedSet.
+_1 = Term(OrderedSet()) # Intercept
 
 def tokenize(inp):
-    return [str2token(s) for s in re.findall(r'\b\w+\b|[()~+]|\|\|?', inp)]
+    return [str2token(s) for s in re.findall(r'\b\w+\b|[()~+:]|\|\|?', inp)]
 
 def str2token(s):
     if s in OPS:
@@ -101,29 +147,42 @@ def rpn2ast(tokens):
     assert len(out) == 1
     return out[0]
 
-# Evaluate the rhs of a formula, by mapping a bunch of terms joined
-# with `+` to a list. Returns a pair of lists -- one of
-# population-level terms and the other of `Group`s.
-
-# The formula y ~ x + x ought to be equal to y ~ x. Interpreting `+`
-# here as set union (rather than list concat) is probably a good way
-# to implement that.
-
-def evalsum(ast, allow_groups=True):
+# Returns an ordered set of population-level terms and a list of
+# groups.
+def eval_rhs(ast, allow_groups=True):
     if type(ast) == Leaf:
-        return [ast.value], []
+        if ast.value == "1":
+            return OrderedSet(_1), []
+        else:
+            return OrderedSet(Term(OrderedSet(ast.value))), []
     elif type(ast) == Node and ast.op == '+':
-        tl, gl = evalsum(ast.l, allow_groups)
-        tr, gr = evalsum(ast.r, allow_groups)
-        return tl + tr, gl + gr
+        termsl, groupsl = eval_rhs(ast.l, allow_groups)
+        termsr, groupsr = eval_rhs(ast.r, allow_groups)
+        return termsl.union(termsr), groupsl + groupsr
+    elif type(ast) == Node and ast.op == ':':
+        # lme4/brms say a formula has the general form:
+        # response ~ pterms + (gterms | group) + ...
+        # This suggests the interaction between groups is not
+        # possible. (Which is good, because I don't know what the
+        # semantics would be.) However, neither packages complains if
+        # you write something like `y ~ (a | b) : (b | a)`, which is
+        # odd. Here we don't allow interactions between groups.
+        termsl, groupsl = eval_rhs(ast.l, allow_groups=False)
+        termsr, groupsr = eval_rhs(ast.r, allow_groups=False)
+        assert len(groupsl) == 0
+        assert len(groupsr) == 0
+        terms = [Term(tl.factors.union(tr.factors))
+                 for tl, tr in itertools.product(termsl, termsr)]
+        return OrderedSet(*terms), []
     elif type(ast) == Node and ast.op in ['|', '||'] and allow_groups:
         # This fails when the rhs is not a single variable/term.
+        # TODO: This can fail in regular use. Turn into friendly error msg.
         assert type(ast.r) == Leaf
         group_factor = ast.r.value
         # Nesting of groups is not allowed.
-        terms, groups = evalsum(ast.l, allow_groups=False)
+        terms, groups = eval_rhs(ast.l, allow_groups=False)
         assert len(groups) == 0
-        return [], [Group(terms, group_factor, ast.op == '|')]
+        return OrderedSet(), [Group(terms, group_factor, ast.op == '|')]
     else:
         # This if/else is not exhaustive, this can occur in regular
         # use. e.g. When nested groups are present.
@@ -135,21 +194,14 @@ def evalf(ast):
     assert type(ast) == Node and ast.op == '~'
     # The lhs is expected to be a (response) variable
     assert type(ast.l) == Leaf
-    pterms, groups = evalsum(ast.r)
-    return Formula(ast.l.value, pterms, groups)
-
-def handle_intercept(f):
-    def handle(terms):
-        return [_1 if t == '1' else t for t in terms]
-    return Formula(f.response,
-                   handle(f.pterms),
-                   [Group(handle(g.gterms), g.column, g.corr) for g in f.groups])
+    terms, groups = eval_rhs(ast.r)
+    return Formula(ast.l.value, terms, groups)
 
 def parse(s):
-    return handle_intercept(evalf(rpn2ast(shunt(tokenize(s)))))
+    return evalf(rpn2ast(shunt(tokenize(s))))
 
 def main():
-    print(parse('y ~ x1 + x2 + (1 + x3 | x4)'))
+    print(parse('y ~ x1 + x2 + (1 + x3 | x4) + x5:x6'))
 
 if __name__ == '__main__':
     main()

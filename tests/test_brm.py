@@ -6,7 +6,7 @@ import pandas as pd
 import pyro.poutine as poutine
 from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, LKJCorrCholesky
 
-from pyro.contrib.brm.formula import parse
+from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet
 from pyro.contrib.brm.codegen import genmodel, eval_model
 from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrices_metadata
 from pyro.contrib.brm.priors import prior, Prior, PriorEdit, get_response_prior, build_prior_tree
@@ -343,3 +343,18 @@ def test_response_priors_is_complete():
             for param in family.params:
                 if not param.name == family.response.param:
                     assert type(get_response_prior(family.name, param.name)) == Prior
+
+@pytest.mark.parametrize('formula_str, expected_formula', [
+    ('y ~ 1', Formula('y', OrderedSet(_1), [])),
+    ('y ~ 1 + x', Formula('y', OrderedSet(_1, Term(OrderedSet('x'))), [])),
+    ('y ~ x + x', Formula('y', OrderedSet(Term(OrderedSet('x'))), [])),
+    ('y ~ x1 : x2', Formula('y', OrderedSet(Term(OrderedSet('x1', 'x2'))), [])),
+    ('y ~ (x1 + x2) : x3',
+     Formula('y',
+             OrderedSet(Term(OrderedSet('x1', 'x3')),
+                        Term(OrderedSet('x2', 'x3'))),
+             [])),
+])
+def test_parser(formula_str, expected_formula):
+    formula = parse(formula_str)
+    assert formula == expected_formula

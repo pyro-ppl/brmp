@@ -7,7 +7,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype, is_categorical_dtype
 
 from pyro.contrib.brm.utils import join
-from .formula import Formula, Intercept
+from pyro.contrib.brm.formula import Formula, OrderedSet, Term, _1
 
 
 # TODO: Refer to dataframe metadata as 'schema' in order to avoid
@@ -104,8 +104,8 @@ def col2torch(col):
         return torch.from_numpy(col.to_numpy(np.float32))
 
 def term_order(term):
-    return 0 if type(term) == Intercept else 1
-
+    assert type(term) == Term
+    return len(term.factors)
 
 InterceptC = namedtuple('InterceptC', [])
 CategoricalC = namedtuple('CategoricalC', ['factor', 'reduced'])
@@ -126,17 +126,21 @@ def widthC(c):
 # Generates a description of how the given terms ought to be coded
 # into a design matrix.
 def coding(terms, metadata):
-    assert type(terms) == list
+    assert type(terms) == OrderedSet
     assert type(metadata) == dict
     def code(i, term):
-        assert type(term) in [str, Intercept]
-        if type(term) == Intercept:
+        assert type(term) == Term
+        # We only know how to code the intercept and singleton terms
+        # at present.
+        assert len(term.factors) in [0, 1]
+        if term == _1:
+            assert len(term.factors) == 0
             return InterceptC()
-        elif term in metadata:
-            factor = metadata[term]
+        elif term.factors[0] in metadata:
+            factor = metadata[term.factors[0]]
             return CategoricalC(factor, reduced=i>0)
         else:
-            return NumericC(term)
+            return NumericC(term.factors[0])
     sorted_terms = sorted(terms, key=term_order)
     return [code(i, term) for i, term in enumerate(sorted_terms)]
 
@@ -157,7 +161,7 @@ def width(terms, metadata):
 # levels.
 
 def designmatrix(terms, df):
-    assert type(terms) == list
+    assert type(terms) == OrderedSet
     N = len(df)
     def dispatch(code):
         if type(code) == InterceptC:
@@ -200,7 +204,7 @@ def categorical_metadata(code):
             for cat in code.factor.levels[start:]]
 
 def designmatrix_metadata(terms, metadata):
-    assert type(terms) == list
+    assert type(terms) == OrderedSet
     def dispatch(code):
         if type(code) == InterceptC:
             return ['intercept']
