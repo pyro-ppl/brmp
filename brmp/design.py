@@ -1,4 +1,5 @@
 from collections import namedtuple
+import itertools
 
 import torch
 import numpy as np
@@ -143,6 +144,93 @@ def coding(terms, metadata):
             return NumericC(term.factors[0])
     sorted_terms = sorted(terms, key=term_order)
     return [code(i, term) for i, term in enumerate(sorted_terms)]
+
+
+CodedFactor = namedtuple('CodedFactor', 'factor reduced')
+CodedFactor.__repr__ = lambda self: '{}{}'.format(self.factor, '-' if self.reduced else '')
+
+# Taken from the itertools documentation.
+def powerset(iterable):
+    s = list(iterable)
+    return itertools.chain.from_iterable(itertools.combinations(s, r) for r in range(len(s)+1))
+
+# A Term represents the interaction between zero or more factors. This
+# function describes how the coding for such a term can be performed
+# by coding multiple interactions, each using a reduced rank coding.
+# For example:
+#
+# Term(<'a'>) can be coded as [Intercept, a (reduced)].
+# Term(<'a','b'>) can be coded as [Intercept, a (reduced), b (reduced), a:b (reduced)].
+
+def decompose(term):
+    assert type(term) == Term
+    return [tuple(CodedFactor(factor, True) for factor in subset) for subset in powerset(term.factors)]
+
+
+# Attempt to absorb t2 into t1. If this is possible the result of
+# doing so is returned. Otherwise None is returned. This rule explains
+# when absorbtion is possible.
+
+#  t2    t1                  result
+# { X , X U {x-} , ...} == { X U {x+} , ...}
+
+def absorb(t1, t2):
+    assert type(t1) == tuple
+    assert all(type(p) == CodedFactor for p in t1)
+    assert type(t2) == tuple
+    assert all(type(p) == CodedFactor for p in t2)
+    s1 = set(t1)
+    s2 = set(t2)
+    if s2.issubset(s1) and len(s1) - len(s2) == 1:
+        diff = s1.difference(s2)
+        assert len(diff) == 1
+        extra_factor = list(diff)[0]
+        if extra_factor.reduced:
+            factor = CodedFactor(extra_factor.factor, False)
+            # TODO: Is this acceptable or should we be maintaining the
+            # ordering from t1? ('y ~ 1 + a + a:b' is an example where
+            # that produces different results based on this choice.)
+            return t2 + (factor,)
+
+def simplify_one(termcoding):
+    assert type(termcoding) == list
+    assert all(type(t) == tuple and all(type(p) == CodedFactor for p in t) for t in termcoding)
+    for i, j in itertools.permutations(range(len(termcoding)), 2):
+        newterm = absorb(termcoding[i], termcoding[j])
+        if newterm:
+            out = termcoding[:]
+            out[i] = newterm # Replace with absorbing interaction.
+            del out[j]       # Remove absorbed interaction.
+            return out
+
+def simplify(termcoding):
+    assert type(termcoding) == list
+    assert all(type(t) == tuple and all(type(p) == CodedFactor for p in t) for t in termcoding)
+    while True:
+        maybe_termcoding = simplify_one(termcoding)
+        if maybe_termcoding is None:
+            return termcoding # We're done.
+        termcoding = maybe_termcoding
+
+# all_previous([['a'], ['b','c'], ['d']])
+# ==           [{},    {'a'},     {'a','b','c'}]
+def all_previous(xss):
+    if len(xss) == 0:
+        return []
+    else:
+        return [set()] + [set(xss[0]).union(xs) for xs in all_previous(xss[1:])]
+
+
+# This is an attempt to implement the algorithm described here:
+# https://patsy.readthedocs.io/en/latest/formulas.html#technical-details
+def coding2(terms, metadata):
+    assert type(terms) == OrderedSet
+    assert type(metadata) == dict
+    decomposed = [decompose(t) for t in terms]
+    non_redundant = [[t for t in term if not t in previous]
+                     for term, previous in zip(decomposed, all_previous(decomposed))]
+    return join(simplify(t) for t in non_redundant)
+
 
 def width(terms, metadata):
     assert type(metadata) == dict

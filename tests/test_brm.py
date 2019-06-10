@@ -8,7 +8,7 @@ from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, LKJCorrC
 
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet
 from pyro.contrib.brm.codegen import genmodel, eval_model
-from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrices_metadata
+from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, coding2
 from pyro.contrib.brm.priors import prior, Prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import getfamily, FAMILIES
 from pyro.contrib.brm.model import build_model, parameters
@@ -358,3 +358,12 @@ def test_response_priors_is_complete():
 def test_parser(formula_str, expected_formula):
     formula = parse(formula_str)
     assert formula == expected_formula
+
+@pytest.mark.parametrize('formula_str, expected_coding', [
+    ('y ~ 1', [tuple()]),
+    ('y ~ x', [(CodedFactor('x', False),)]),
+    ('y ~ 1 + x', [tuple(), (CodedFactor('x', True),)]),
+])
+def test_coding(formula_str, expected_coding):
+    formula = parse(formula_str)
+    assert coding2(formula.pterms, {}) == expected_coding
