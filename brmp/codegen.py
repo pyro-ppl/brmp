@@ -1,4 +1,3 @@
-from .formula import Formula
 from .priors import Prior
 from .family import Family, LinkFn, getfamily
 from .model import Model, Group
