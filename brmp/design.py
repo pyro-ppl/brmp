@@ -251,9 +251,11 @@ def all_previous(xss):
 
 # This is an attempt to implement the algorithm described here:
 # https://patsy.readthedocs.io/en/latest/formulas.html#technical-details
-def coding2(terms, metadata):
+
+def categorical_coding(terms):
+    # It is assumed that each element of `terms` describes an
+    # interaction between zero or more categorical factors.
     assert type(terms) == OrderedSet
-    assert type(metadata) == dict
     decomposed = [decompose(t) for t in terms]
     non_redundant = [[t for t in term if not t in previous]
                      for term, previous in zip(decomposed, all_previous(decomposed))]
