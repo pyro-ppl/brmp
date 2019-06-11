@@ -363,6 +363,34 @@ def test_parser(formula_str, expected_formula):
     ('y ~ 1', [tuple()]),
     ('y ~ x', [(CodedFactor('x', False),)]),
     ('y ~ 1 + x', [tuple(), (CodedFactor('x', True),)]),
+    ('y ~ a:b', [
+        (CodedFactor('a', False), CodedFactor('b', False)) # a:b
+    ]),
+    ('y ~ 1 + a:b', [
+        tuple(),                                          # Intercept
+        (CodedFactor('b', True),),                        # b-
+        (CodedFactor('a', True), CodedFactor('b', False)) # a-:b
+    ]),
+    ('y ~ 1 + a + a:b', [
+        tuple(),                                          # Intercept
+        (CodedFactor('a', True),),                        # a-
+        (CodedFactor('a', False), CodedFactor('b', True)) # a:b-
+    ]),
+    ('y ~ 1 + b + a:b', [
+        tuple(),                                          # Intercept
+        (CodedFactor('b', True),),                        # b-
+        (CodedFactor('a', True), CodedFactor('b', False)) # a-:b
+    ]),
+    ('y ~ 1 + a + b + a:b', [
+        tuple(),                                          # Intercept
+        (CodedFactor('a', True),),                        # a-
+        (CodedFactor('b', True),),                        # b-
+        (CodedFactor('a', True), CodedFactor('b', True))  # a-:b-
+    ]),
+    ('y ~ a:b + a:b:c', [
+        (CodedFactor('a', False), CodedFactor('b', False)),                         # a:b
+        (CodedFactor('a', False), CodedFactor('b', False), CodedFactor('c', True)), # a:b:c-
+    ]),
 ])
 def test_coding(formula_str, expected_coding):
     formula = parse(formula_str)

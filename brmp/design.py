@@ -174,6 +174,37 @@ def decompose(term):
 #  t2    t1                  result
 # { X , X U {x-} , ...} == { X U {x+} , ...}
 
+# I'm maintaining the original order here, even though Patsy doesn't.
+# The reason I am doing so (by keeping tuples rather than sets) is
+# that when we come it add columns to the design matrix, it makes a
+# difference whether we code {a+,b+} as:
+#
+# a[a1]:b[b1]  a[a2]:b[b1]  a[a1]:b[b2]  a[a2]:b[b2]
+#
+# or:
+#
+# b[b1]:a[a1]  b[b2]:a[a1]  b[b1]:a[a2]  b[b2]:a[a2]
+#
+# These are the same columns but they appear in a different order. If
+# we treat the interactions as sets (not maintaining the order given
+# by the formula) then it seems that the order in which the columns
+# appear is going to be determined by whatever the set implementation
+# gives us when eventually turn it into a list. This seems
+# problematic, since the design matrix would not be invariant under
+# renaming of the factors (i.e. variables) in the formula. (Or worse,
+# it might even be non-deterministic.)
+#
+# Note that I haven't observed this undesirable behaviour in Patsy.
+# However, I have noticed that some order information *is* tracked, as
+# can be seen when printing a design matrix. Doing so might show
+# something like "'a:b' (columns 0:4), 'a:b:c' (columns 4:8)" for
+# example. So, even though `_Subterm` (the analogue of one of my
+# tuples of CodedFactors) is set based, it's possible that this is
+# used to recover the original order.
+
+# TODO: Would it be clearer or more efficient to use OrderedSet rather
+# than tuple here? I'm not sure.
+
 def absorb(t1, t2):
     assert type(t1) == tuple
     assert all(type(p) == CodedFactor for p in t1)
@@ -187,10 +218,7 @@ def absorb(t1, t2):
         extra_factor = list(diff)[0]
         if extra_factor.reduced:
             factor = CodedFactor(extra_factor.factor, False)
-            # TODO: Is this acceptable or should we be maintaining the
-            # ordering from t1? ('y ~ 1 + a + a:b' is an example where
-            # that produces different results based on this choice.)
-            return t2 + (factor,)
+            return tuple((factor if f == extra_factor else f) for f in t1)
 
 def simplify_one(termcoding):
     assert type(termcoding) == list
