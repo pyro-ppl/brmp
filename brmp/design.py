@@ -1,5 +1,6 @@
 from collections import namedtuple
 import itertools
+from functools import reduce
 
 import torch
 import numpy as np
@@ -95,10 +96,49 @@ def codefactor(dfcol, reduced):
     start = 1 if reduced else 0
     return [dfcol == factors[i] for i in range(start, num_levels)]
 
+
+
+# A version of product in which earlier elements of the returned tuple
+# vary more rapidly than later ones. This matches the way interactions
+# are coded in R.
+def product(iterables):
+    return [tuple(reversed(t)) for t in itertools.product(*reversed(iterables))]
+
+def codeindicator(dfcols, values):
+    assert len(dfcols) == len(values)
+    return reduce(lambda a, b: a * b, # effectively logical and
+                  ((dfcol == value).to_numpy(int)
+                   for (dfcol, value) in zip(dfcols, values)))
+
+
+def codeinteraction(dfcols, reduced_flags):
+    assert type(dfcols) == list
+    assert type(reduced_flags) == list
+    assert len(dfcols) == len(reduced_flags)
+    assert all(is_categorical_dtype(dfcol) for dfcol in dfcols)
+    assert all(type(reduced) == bool for reduced in reduced_flags)
+
+    # e.g. [('a1', 'b1'), ('a2', 'b1'), ...]
+    #
+    # where the first element of a tuple is a level from dfcol[0],
+    # etc.
+    cols = product([dfcol.cat.categories[1:] if reduced else dfcol.cat.categories
+                    for dfcol, reduced in zip(dfcols, reduced_flags)])
+
+    return [codeindicator(dfcols, values) for values in cols]
+
+
+
+
 def col2torch(col):
     if type(col) == torch.Tensor:
         assert col.dtype == torch.float32
         return col
+    elif type(col) == np.ndarray and col.dtype == np.int64:
+        # TODO: Make this more efficient. (This is used to get from an
+        # array of numpy int64 to a torch tensor as required for
+        # stacking.)
+        return torch.from_numpy(col.astype(np.float32))
     else:
         # TODO: It's possible to do torch.tensor(col) here. What does
         # that do? Is it preferable to this?
@@ -301,8 +341,8 @@ def designmatrix(terms, df):
         if type(code) == InterceptC:
             return [torch.ones(N, dtype=torch.float32)]
         elif type(code) == InteractionC:
-            assert len(code.codes) == 1, "only know how to code trivial interactions"
-            return codefactor(df[code.codes[0].factor.name], code.codes[0].reduced)
+            return codeinteraction([df[c.factor.name] for c in code.codes],
+                                   [c.reduced for c in code.codes])
         elif type(code) == NumericC:
             return codenumeric(df[code.name])
         else:
