@@ -105,6 +105,7 @@ def col2torch(col):
         return torch.from_numpy(col.to_numpy(np.float32))
 
 InterceptC = namedtuple('InterceptC', [])
+InteractionC = namedtuple('InteractionC', ['codes']) # codes is a list of CategoricalCs
 CategoricalC = namedtuple('CategoricalC', ['factor', 'reduced'])
 NumericC = namedtuple('NumericC', ['name'])
 
@@ -115,8 +116,9 @@ NumericC = namedtuple('NumericC', ['name'])
 def widthC(c):
     if type(c) in [InterceptC, NumericC]:
         return 1
-    elif type(c) == CategoricalC:
-        return len(c.factor.levels) - (1 if c.reduced else 0)
+    elif type(c) == InteractionC:
+        assert len(c.codes) == 1, "only know how to code trivial interactions"
+        return len(c.codes[0].factor.levels) - (1 if c.codes[0].reduced else 0)
     else:
         raise Exception('Unknown coding type.')
 
@@ -243,12 +245,12 @@ def partition(pred, iterable):
 # into a design matrix.
 def coding(terms, metadata):
     assert type(terms) == OrderedSet
+    assert all(type(term) == Term for term in terms)
     assert type(metadata) == dict
 
-    # TODO: Generalise to handle interactions. The condition to check
-    # will then be that terms with more than one factor ought to
-    # contain only categorical factors.
-    assert all(type(term) == Term and len(term.factors) in (0, 1) for term in terms)
+    if not all(len(term.factors) < 2 or
+               all(factor in metadata for factor in term.factors) for term in terms):
+        raise Exception('Interactions supported between categorical factors only.')
 
     def is_numeric_term(term):
         return len(term.factors) == 1 and term.factors[0] not in metadata
@@ -258,13 +260,17 @@ def coding(terms, metadata):
 
     def coded_factor_to_coding(tup):
         assert type(tup) == tuple
+        # This is guaranteed by the check made on `terms` when
+        # entering `coding`.
+        assert all(type(cf) == CodedFactor and cf.factor in metadata for cf in tup)
         if len(tup) == 0:
             return InterceptC()
         else:
-            assert len(tup) == 1
-            cf = tup[0]
-            assert type(cf) == CodedFactor
-            return CategoricalC(metadata[cf.factor], reduced=cf.reduced)
+            # If there is more that one CodedFactor in tup, then this
+            # represents the interaction between one or more
+            # categorical facts. The coding of this is described by
+            # `InteractionC`.
+            return InteractionC([CategoricalC(metadata[cf.factor], cf.reduced) for cf in tup])
 
     c_coded = [coded_factor_to_coding(tup) for tup in categorical_coding(c_terms)]
     n_coded = [NumericC(term.factors[0]) for term in n_terms]
@@ -294,8 +300,9 @@ def designmatrix(terms, df):
     def dispatch(code):
         if type(code) == InterceptC:
             return [torch.ones(N, dtype=torch.float32)]
-        elif type(code) == CategoricalC:
-            return codefactor(df[code.factor.name], code.reduced)
+        elif type(code) == InteractionC:
+            assert len(code.codes) == 1, "only know how to code trivial interactions"
+            return codefactor(df[code.codes[0].factor.name], code.codes[0].reduced)
         elif type(code) == NumericC:
             return codenumeric(df[code.name])
         else:
@@ -336,8 +343,9 @@ def designmatrix_metadata(terms, metadata):
     def dispatch(code):
         if type(code) == InterceptC:
             return ['intercept']
-        elif type(code) == CategoricalC:
-            return categorical_metadata(code)
+        elif type(code) == InteractionC:
+            assert len(code.codes) == 1, "only know how to code trivial interactions"
+            return categorical_metadata(code.codes[0])
         elif type(code) == NumericC:
             return numeric_metadata(code)
         else:
