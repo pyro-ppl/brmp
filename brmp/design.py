@@ -8,7 +8,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype, is_categorical_dtype
 
 from pyro.contrib.brm.utils import join
-from pyro.contrib.brm.formula import Formula, OrderedSet, Term, _1
+from pyro.contrib.brm.formula import Formula, OrderedSet, Term
 
 
 # TODO: Refer to dataframe metadata as 'schema' in order to avoid
@@ -104,10 +104,6 @@ def col2torch(col):
         # that do? Is it preferable to this?
         return torch.from_numpy(col.to_numpy(np.float32))
 
-def term_order(term):
-    assert type(term) == Term
-    return len(term.factors)
-
 InterceptC = namedtuple('InterceptC', [])
 CategoricalC = namedtuple('CategoricalC', ['factor', 'reduced'])
 NumericC = namedtuple('NumericC', ['name'])
@@ -123,28 +119,6 @@ def widthC(c):
         return len(c.factor.levels) - (1 if c.reduced else 0)
     else:
         raise Exception('Unknown coding type.')
-
-# Generates a description of how the given terms ought to be coded
-# into a design matrix.
-def coding(terms, metadata):
-    assert type(terms) == OrderedSet
-    assert type(metadata) == dict
-    def code(i, term):
-        assert type(term) == Term
-        # We only know how to code the intercept and singleton terms
-        # at present.
-        assert len(term.factors) in [0, 1]
-        if term == _1:
-            assert len(term.factors) == 0
-            return InterceptC()
-        elif term.factors[0] in metadata:
-            factor = metadata[term.factors[0]]
-            return CategoricalC(factor, reduced=i>0)
-        else:
-            return NumericC(term.factors[0])
-    sorted_terms = sorted(terms, key=term_order)
-    return [code(i, term) for i, term in enumerate(sorted_terms)]
-
 
 CodedFactor = namedtuple('CodedFactor', 'factor reduced')
 CodedFactor.__repr__ = lambda self: '{}{}'.format(self.factor, '-' if self.reduced else '')
@@ -255,12 +229,48 @@ def all_previous(xss):
 def categorical_coding(terms):
     # It is assumed that each element of `terms` describes an
     # interaction between zero or more categorical factors.
-    assert type(terms) == OrderedSet
     decomposed = [decompose(t) for t in terms]
     non_redundant = [[t for t in term if not t in previous]
                      for term, previous in zip(decomposed, all_previous(decomposed))]
     return join(simplify(t) for t in non_redundant)
 
+
+def partition(pred, iterable):
+    t1, t2 = itertools.tee(iterable)
+    return itertools.filterfalse(pred, t1), filter(pred, t2)
+
+# Generates a description of how the given terms ought to be coded
+# into a design matrix.
+def coding(terms, metadata):
+    assert type(terms) == OrderedSet
+    assert type(metadata) == dict
+
+    # TODO: Generalise to handle interactions. The condition to check
+    # will then be that terms with more than one factor ought to
+    # contain only categorical factors.
+    assert all(type(term) == Term and len(term.factors) in (0, 1) for term in terms)
+
+    def is_numeric_term(term):
+        return len(term.factors) == 1 and term.factors[0] not in metadata
+    c_terms, n_terms = partition(is_numeric_term, terms)
+
+    c_terms = sorted(c_terms, key=lambda term: len(term.factors))
+
+    def coded_factor_to_coding(tup):
+        assert type(tup) == tuple
+        if len(tup) == 0:
+            return InterceptC()
+        else:
+            assert len(tup) == 1
+            cf = tup[0]
+            assert type(cf) == CodedFactor
+            return CategoricalC(metadata[cf.factor], reduced=cf.reduced)
+
+    c_coded = [coded_factor_to_coding(tup) for tup in categorical_coding(c_terms)]
+    n_coded = [NumericC(term.factors[0]) for term in n_terms]
+    # Following Patsy numeric terms come after categorical terms. This
+    # is not what happens in R.
+    return c_coded + n_coded
 
 def width(terms, metadata):
     assert type(metadata) == dict
