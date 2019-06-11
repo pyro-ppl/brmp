@@ -22,6 +22,12 @@ def brm(formula_str, df, family=getfamily('Normal'), prior_edits=[]):
     model_desc = makedesc(formula, df, family, prior_edits)
     code = genmodel(model_desc)
     model = eval_model(code)
+    # TODO: Both `makedata` and `designmatrices_metadata` call
+    # `coding` (from design.py) interally. Instead we ought to call
+    # this once and share the result. (Perhaps by having the process
+    # of generating design matrices always return the metadata, while
+    # retaining the ability to generate the metadata without a
+    # concrete dataset.)
     data = makedata(formula, df)
     nuts_kernel = NUTS(model, jit_compile=False, adapt_step_size=True)
     run = MCMC(nuts_kernel, num_samples=500, warmup_steps=100).run(**data)
