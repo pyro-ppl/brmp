@@ -13,6 +13,7 @@ system can handle:
 |----|----|
 | `y ~ x`                                   | Population-level effects |
 | `y ~ 1 + x`                               ||
+| `y ~ x1:x2` | Interaction between categorical variables |
 | `y ~ 1 + x0 + (x1 \| z)`                   | Group-level effects |
 | `y ~ 1 + x0 + (1 + x1 \| z)`               ||
 | `y ~ 1 + x0 + (1 + x1 \|\| z)`              | No correlation between group coefficients |
@@ -55,10 +56,12 @@ an example of using the system to fit a simple model
 
 ## Limitations
 
+* Interactions between numeric variables are not supported.
 * All formula terms must be column names. Expressions such as
   `sin(x1)` or `I(x1*x2)` are not supported.
 * The group syntax `g1:g2` and `g1/g2` is not supported.
-* Interaction between terms in not supported. e.g. `y ~ x1*x2`
+* The `*` operator is not supported. (Though the model `y ~ 1 + x1*x2`
+  can be specified with the formula `y ~ 1 + x1 + x2 + x1:x2`.)
 * The syntax for removing columns is not supported. e.g. `y ~ x - 1`
 * The response is always uni-variate.
 * The response is Gaussian or Bernoulli distributed. In particular
