@@ -350,10 +350,17 @@ def designmatrix(terms, df):
 def numeric_metadata(code):
     return [code.name]
 
-def categorical_metadata(code):
-    start = 1 if code.reduced else 0
-    return ['{}[{}]'.format(code.factor.name, cat)
-            for cat in code.factor.levels[start:]]
+def interaction_metadata(code):
+    assert type(code) == InteractionC
+    assert all(type(c) == CategoricalC for c in code.codes)
+    def coded_levels(c):
+        return c.factor.levels[1:] if c.reduced else c.factor.levels
+    interactions = product([tuple((c.factor.name, l)
+                                  for l in coded_levels(c)) for c in code.codes])
+    return [':'.join('{}[{}]'.format(factor, val)
+                     for factor, val in interaction)
+            for interaction in interactions]
+
 
 def designmatrix_metadata(terms, metadata):
     assert type(terms) == OrderedSet
@@ -361,8 +368,7 @@ def designmatrix_metadata(terms, metadata):
         if type(code) == InterceptC:
             return ['intercept']
         elif type(code) == InteractionC:
-            assert len(code.codes) == 1, "only know how to code trivial interactions"
-            return categorical_metadata(code.codes[0])
+            return interaction_metadata(code)
         elif type(code) == NumericC:
             return numeric_metadata(code)
         else:
