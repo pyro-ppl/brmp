@@ -98,9 +98,9 @@ def codefactor(dfcol, reduced):
 
 
 
-# A version of product in which earlier elements of the returned tuple
-# vary more rapidly than later ones. This matches the way interactions
-# are coded in R.
+# A version of product in which earlier elements of the returned
+# tuples vary more rapidly than later ones. This matches the way
+# interactions are coded in R.
 def product(iterables):
     return [tuple(reversed(t)) for t in itertools.product(*reversed(iterables))]
 
