@@ -135,7 +135,7 @@ print(makedata(parse(f2), df2))
 
 
 # (Note that modelling of correlations between group-level coefficient
-# can be turned of using the `(terms || col)` syntax.)
+# can be turned off using the `(terms || col)` syntax.)
 
 # --------------------------------------------------
 # Ex 3. Custom priors

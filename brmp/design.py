@@ -283,7 +283,7 @@ def coding(terms, metadata):
         if len(tup) == 0:
             return InterceptC()
         else:
-            # If there is more that one CodedFactor in tup, then this
+            # If there is more than one CodedFactor in tup, then this
             # represents the interaction between one or more
             # categorical facts. The coding of this is described by
             # `InteractionC`.
