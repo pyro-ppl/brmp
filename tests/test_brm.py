@@ -321,6 +321,43 @@ def test_prior_checks(formula_str, metadata, family, prior_edits):
                             [1., 0.],
                             [1., 1.]], dtype=torch.float32))),
 
+    # Interactions
+    # --------------------------------------------------
+    ('y ~ x1:x2',
+     pd.DataFrame(dict(y=[1, 2, 3, 4],
+                       x1=pd.Categorical(list('ABAB')),
+                       x2=pd.Categorical(list('CCDD')))),
+     #                     AC  BC  AD  BD
+     dict(X=torch.tensor([[1., 0., 0., 0.],
+                          [0., 1., 0., 0.],
+                          [0., 0., 1., 0.],
+                          [0., 0., 0., 1.]], dtype=torch.float32),
+          y_obs=torch.tensor([1., 2., 3., 4.], dtype=torch.float32))),
+
+    ('y ~ 1 + x1:x2',
+     pd.DataFrame(dict(y=[1, 2, 3, 4],
+                       x1=pd.Categorical(list('ABAB')),
+                       x2=pd.Categorical(list('CCDD')))),
+     #                     1   D   BC  BD
+     dict(X=torch.tensor([[1., 0., 0., 0.],
+                          [1., 0., 1., 0.],
+                          [1., 1., 0., 0.],
+                          [1., 1., 0., 1.]], dtype=torch.float32),
+          y_obs=torch.tensor([1., 2., 3., 4.], dtype=torch.float32))),
+
+    ('y ~ 1 + x1 + x2 + x1:x2',
+     pd.DataFrame(dict(y=[1, 2, 3, 4],
+                       x1=pd.Categorical(list('ABAB')),
+                       x2=pd.Categorical(list('CCDD')))),
+     #                     1   B   D   BD
+     dict(X=torch.tensor([[1., 0., 0., 0.],
+                          [1., 1., 0., 0.],
+                          [1., 0., 1., 0.],
+                          [1., 1., 1., 1.]], dtype=torch.float32),
+          y_obs=torch.tensor([1., 2., 3., 4.], dtype=torch.float32))),
+
+    # Categorical Response
+    # --------------------------------------------------
     ('y ~ x',
      pd.DataFrame(dict(y=pd.Categorical(list('AAB')),
                        x=[1, 2, 3])),
