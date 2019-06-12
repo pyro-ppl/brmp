@@ -39,6 +39,12 @@ default_params = dict(
      [('b_0', Cauchy, {}),
       ('sigma', HalfCauchy, {})]),
 
+    ('y ~ x1:x2',
+     [Factor('x1', list('abab')), Factor('x2', list('ccdd'))],
+     getfamily('Normal'), [],
+     [('b_0', Cauchy, {}),
+      ('sigma', HalfCauchy, {})]),
+
     #(Formula('y', [], [Group([], 'z', True)]), [Factor('z', list('ab'))], [], ['sigma', 'z_1']),
     # Groups with fewer than two terms don't sample the (Cholesky
     # decomp. of the) correlation matrix.
@@ -111,6 +117,16 @@ default_params = dict(
      [PriorEdit(('b', 'x[b]'), prior('Normal', [0., 100.]))],
      [('b_0', Cauchy, {}),
       ('b_1', Normal, {'loc': 0., 'scale': 100.}),
+      ('sigma', HalfCauchy, {})]),
+
+    # Prior on coef of an interaction.
+    ('y ~ x1:x2',
+     [Factor('x1', list('ab')), Factor('x2', list('cd'))],
+     getfamily('Normal'),
+     [PriorEdit(('b', 'x1[b]:x2[c]'), prior('Normal', [0., 100.]))],
+     [('b_0', Cauchy, {}),
+      ('b_1', Normal, {'loc': 0., 'scale': 100.}),
+      ('b_2', Cauchy, {}),
       ('sigma', HalfCauchy, {})]),
 
     # Prior on group level `sd` choice.
