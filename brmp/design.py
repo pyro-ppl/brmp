@@ -1,6 +1,7 @@
 from collections import namedtuple
 import itertools
 from functools import reduce
+import operator as op
 
 import torch
 import numpy as np
@@ -131,8 +132,10 @@ def widthC(c):
     if type(c) in [InterceptC, NumericC]:
         return 1
     elif type(c) == InteractionC:
-        assert len(c.codes) == 1, "only know how to code trivial interactions"
-        return len(c.codes[0].factor.levels) - (1 if c.codes[0].reduced else 0)
+        return reduce(
+            op.mul,
+            (len(code.factor.levels) - (1 if code.reduced else 0)
+             for code in c.codes))
     else:
         raise Exception('Unknown coding type.')
 
