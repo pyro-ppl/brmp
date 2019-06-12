@@ -69,34 +69,6 @@ def codenumeric(dfcol):
     assert is_numeric_dtype(dfcol)
     return [dfcol]
 
-# Codes a categorical column/factor. When reduced==False the column is
-# dummy/one-of-K coded.
-
-# x = [A, B, C, A]
-
-# x0 x1 x2
-#  1  0  0
-#  0  1  0
-#  0  0  1
-#  1  0  0
-
-# When reduced==True the same coding is used, but the first column is
-# dropped.
-
-# x1 x2
-#  0  0
-#  1  0
-#  0  1
-#  0  0
-
-def codefactor(dfcol, reduced):
-    assert is_categorical_dtype(dfcol)
-    factors = dfcol.cat.categories
-    num_levels = len(factors)
-    start = 1 if reduced else 0
-    return [dfcol == factors[i] for i in range(start, num_levels)]
-
-
 
 # A version of product in which earlier elements of the returned
 # tuples vary more rapidly than later ones. This matches the way
@@ -127,6 +99,8 @@ def codeinteraction(dfcols, reduced_flags):
 
     return [codeindicator(dfcols, values) for values in cols]
 
+def codefactor(dfcol, reduced):
+    return codeinteraction([dfcol], [reduced])
 
 
 
