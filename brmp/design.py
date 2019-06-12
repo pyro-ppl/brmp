@@ -79,8 +79,8 @@ def product(iterables):
 
 def codeindicator(dfcols, values):
     assert len(dfcols) == len(values)
-    return reduce(lambda a, b: a * b, # effectively logical and
-                  ((dfcol == value).to_numpy(int)
+    return reduce(op.and_,
+                  (dfcol == value
                    for (dfcol, value) in zip(dfcols, values)))
 
 
@@ -109,11 +109,6 @@ def col2torch(col):
     if type(col) == torch.Tensor:
         assert col.dtype == torch.float32
         return col
-    elif type(col) == np.ndarray and col.dtype == np.int64:
-        # TODO: Make this more efficient. (This is used to get from an
-        # array of numpy int64 to a torch tensor as required for
-        # stacking.)
-        return torch.from_numpy(col.astype(np.float32))
     else:
         # TODO: It's possible to do torch.tensor(col) here. What does
         # that do? Is it preferable to this?
