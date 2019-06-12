@@ -323,6 +323,9 @@ def designmatrix(terms, df):
     coding_desc = coding(terms, metadata)
     coded_cols = join([dispatch(c) for c in coding_desc])
     X = torch.stack([col2torch(col) for col in coded_cols], dim=1) if coded_cols else torch.empty(N, 0)
+    # TODO: Internally this calls repeats the call to `coding`.
+    # Perhaps refactor `width` to take `coding_desc`, or just drop the
+    # assertion.
     assert X.shape == (N, width(terms, metadata))
     #print(designmatrix_metadata(terms, df))
     return X
