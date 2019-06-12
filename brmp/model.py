@@ -121,9 +121,6 @@ def model_repr(model):
     return '\n'.join(out)
 
 
-# TODO: The choice to use 1-based indexing is made in many places.
-# Consolidate?
-
 # TODO: Are these really best called parameters, or is there something
 # better?
 
