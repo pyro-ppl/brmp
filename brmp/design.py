@@ -51,10 +51,10 @@ def dummydata(formula, metadata, N):
     import torch
     assert type(metadata) == dict
     data = {}
-    M = width(formula.pterms, metadata)
+    M = width(formula.terms, metadata)
     data['X'] = torch.rand(N, M)
     for i, group in enumerate(formula.groups):
-        M_i = width(group.gterms, metadata)
+        M_i = width(group.terms, metadata)
         num_levels = len(metadata[group.column].levels)
         data['Z_{}'.format(i)] = torch.rand(N, M_i)
         # Maps (indices of) data points to (indices of) levels.
@@ -381,8 +381,8 @@ PopulationMeta = namedtuple('PopulationMeta', 'coefs')
 GroupMeta = namedtuple('GroupMeta', 'name coefs')
 
 def designmatrices_metadata(formula, metadata):
-    p = PopulationMeta(designmatrix_metadata(formula.pterms, metadata))
-    gs = [GroupMeta(group.column, designmatrix_metadata(group.gterms, metadata))
+    p = PopulationMeta(designmatrix_metadata(formula.terms, metadata))
+    gs = [GroupMeta(group.column, designmatrix_metadata(group.terms, metadata))
           for group in formula.groups]
     return DesignMeta(p, gs)
 
@@ -416,9 +416,9 @@ def makedata(formula, df):
     assert type(formula) == Formula
     assert type(df) == pd.DataFrame
     data = {}
-    data['X'] = designmatrix(formula.pterms, df)
+    data['X'] = designmatrix(formula.terms, df)
     data['y_obs'] = responsevector(formula.response, df)
     for i, group in enumerate(formula.groups):
-        data['Z_{}'.format(i)] = designmatrix(group.gterms, df)
+        data['Z_{}'.format(i)] = designmatrix(group.terms, df)
         data['J_{}'.format(i)] = lookupvector(group.column, df)
     return data

@@ -74,11 +74,11 @@ Node = namedtuple('Node', 'op l r')
 
 Formula = namedtuple('Formula',
                      ['response',   # response column name
-                      'pterms',     # an OrderedSet of population level terms
+                      'terms',      # an OrderedSet of population level terms
                       'groups'])    # list of groups
 
 Group = namedtuple('Group',
-                   ['gterms',       # an OrderedSet of group-level terms
+                   ['terms',        # an OrderedSet of group-level terms
                     'column',       # name of grouping column
                     'corr'])        # model correlation between coeffs?
 

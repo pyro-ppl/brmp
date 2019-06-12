@@ -447,4 +447,4 @@ def test_parser(formula_str, expected_formula):
 ])
 def test_coding(formula_str, expected_coding):
     formula = parse(formula_str)
-    assert categorical_coding(formula.pterms) == expected_coding
+    assert categorical_coding(formula.terms) == expected_coding
