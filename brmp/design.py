@@ -303,9 +303,8 @@ def coding(terms, metadata):
     # is not what happens in R.
     return c_coded + n_coded
 
-def width(terms, metadata):
-    assert type(metadata) == dict
-    return sum(widthC(c) for c in coding(terms, metadata))
+def width(coding):
+    return sum(widthC(c) for c in coding)
 
 # Build a simple design matrix (as a torch tensor) from columns of a
 # pandas data frame.
@@ -336,10 +335,7 @@ def designmatrix(terms, df):
     coding_desc = coding(terms, metadata)
     coded_cols = join([dispatch(c) for c in coding_desc])
     X = torch.stack([col2torch(col) for col in coded_cols], dim=1) if coded_cols else torch.empty(N, 0)
-    # TODO: Internally this calls repeats the call to `coding`.
-    # Perhaps refactor `width` to take `coding_desc`, or just drop the
-    # assertion.
-    assert X.shape == (N, width(terms, metadata))
+    assert X.shape == (N, width(coding_desc))
     #print(designmatrix_metadata(terms, df))
     return X
 
