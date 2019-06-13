@@ -2,6 +2,7 @@ from collections import namedtuple
 import itertools
 from functools import reduce
 import operator as op
+import random
 
 import torch
 import numpy as np
@@ -43,24 +44,24 @@ def dfmetadata(df):
             for c in df
             if is_categorical_dtype(df[c])]
 
-# TODO: Use the result of `coding` to generate more realistic dummy
-# data. i.e. Rather than just having X & Z matrices of the correct
-# size, intercepts can be all ones, and categorical columns can be
-# appropriately coded (width `codefactor`) random data.
 def dummydata(formula, metadata, N):
-    import torch
+    assert type(formula) == Formula
     assert type(metadata) == dict
-    data = {}
-    M = width(formula.terms, metadata)
-    data['X'] = torch.rand(N, M)
-    for i, group in enumerate(formula.groups):
-        M_i = width(group.terms, metadata)
-        num_levels = len(metadata[group.column].levels)
-        data['Z_{}'.format(i)] = torch.rand(N, M_i)
-        # Maps (indices of) data points to (indices of) levels.
-        data['J_{}'.format(i)] = torch.randint(0, num_levels, size=[N])
-    data['y_obs'] = torch.rand(N)
-    return data
+    def allfactors(terms):
+        return join(list(term.factors) for term in terms)
+    def gen_numeric_col():
+        return np.random.rand(N)
+    def gen_categorical_col(levels):
+        return pd.Categorical(random.choices(levels, k=N))
+    # Sample columns for all factors mentioned in the formula.
+    factors = ([formula.response] +
+               allfactors(formula.terms) +
+               join(allfactors(group.terms) + [group.column] for group in formula.groups))
+    cols = {factor: gen_categorical_col(metadata[factor].levels) if factor in metadata else gen_numeric_col()
+            for factor in factors}
+    # Generate design matrix.
+    df=pd.DataFrame(cols)
+    return makedata(formula, df)
 
 # --------------------
 # Design matrix coding
@@ -106,13 +107,25 @@ def codefactor(dfcol, reduced):
 
 
 def col2torch(col):
+    default_dtype = torch.get_default_dtype()
     if type(col) == torch.Tensor:
-        assert col.dtype == torch.float32
+        # Rely on caller generating columns with the default dtype.
+        assert col.dtype == default_dtype
         return col
     else:
-        # TODO: It's possible to do torch.tensor(col) here. What does
-        # that do? Is it preferable to this?
-        return torch.from_numpy(col.to_numpy(np.float32))
+        # TODO: It's possible to do torch.tensor(col) directly rather
+        # than going to_numpy and then from_numpy. What does that do?
+        # Is it preferable?
+        npcol = col.to_numpy()
+        # `torch.from_numpy` doesn't handle bools, so convert those to
+        # something it does handle.
+        if npcol.dtype == np.bool_:
+            npcol = npcol.astype(np.uint8)
+        out = torch.from_numpy(npcol)
+        # Convert to default dtype if necessary.
+        if not out.dtype == default_dtype:
+            out = out.to(default_dtype)
+        return out
 
 InterceptC = namedtuple('InterceptC', [])
 InteractionC = namedtuple('InteractionC', ['codes']) # codes is a list of CategoricalCs
@@ -311,7 +324,7 @@ def designmatrix(terms, df):
     N = len(df)
     def dispatch(code):
         if type(code) == InterceptC:
-            return [torch.ones(N, dtype=torch.float32)]
+            return [torch.ones(N)]
         elif type(code) == InteractionC:
             return codeinteraction([df[c.factor.name] for c in code.codes],
                                    [c.reduced for c in code.codes])
