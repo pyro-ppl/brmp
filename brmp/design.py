@@ -342,7 +342,8 @@ def designmatrix(terms, df):
     coded_cols = join([dispatch(c) for c in coding_desc])
     X = torch.stack([col2torch(col) for col in coded_cols], dim=1) if coded_cols else torch.empty(N, 0)
     assert X.shape == (N, width(coding_desc))
-    #print(designmatrix_metadata(terms, df))
+    if X.shape[1] > 0 and torch.matrix_rank(X) != X.shape[1]:
+        print('WARNING: Design matrix may not be full rank.')
     return X
 
 # --------------------------------------------------
