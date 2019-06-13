@@ -44,23 +44,29 @@ def dfmetadata(df):
             for c in df
             if is_categorical_dtype(df[c])]
 
-def dummydata(formula, metadata, N):
-    assert type(formula) == Formula
+def dummy_df(factors, metadata, N):
+    assert type(factors) == list
+    assert all(type(factor) == str for factor in factors)
     assert type(metadata) == dict
-    def allfactors(terms):
-        return join(list(term.factors) for term in terms)
     def gen_numeric_col():
         return np.random.rand(N)
     def gen_categorical_col(levels):
         return pd.Categorical(random.choices(levels, k=N))
+    cols = {factor: gen_categorical_col(metadata[factor].levels) if factor in metadata else gen_numeric_col()
+            for factor in factors}
+    return pd.DataFrame(cols)
+
+def dummy_design(formula, metadata, N):
+    assert type(formula) == Formula
+    assert type(metadata) == dict
+    def allfactors(terms):
+        return join(list(term.factors) for term in terms)
     # Sample columns for all factors mentioned in the formula.
     factors = ([formula.response] +
                allfactors(formula.terms) +
                join(allfactors(group.terms) + [group.column] for group in formula.groups))
-    cols = {factor: gen_categorical_col(metadata[factor].levels) if factor in metadata else gen_numeric_col()
-            for factor in factors}
-    # Generate design matrix.
-    df=pd.DataFrame(cols)
+    df = dummy_df(factors, metadata, N)
+    # Generate design matrices.
     return makedata(formula, df)
 
 # --------------------

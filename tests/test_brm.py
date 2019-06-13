@@ -8,7 +8,7 @@ from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, LKJCorrC
 
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet
 from pyro.contrib.brm.codegen import genmodel, eval_model
-from pyro.contrib.brm.design import dummydata, Factor, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding
+from pyro.contrib.brm.design import dummy_design, Factor, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding
 from pyro.contrib.brm.priors import prior, Prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import getfamily, FAMILIES
 from pyro.contrib.brm.model import build_model, parameters
@@ -184,7 +184,7 @@ def test_codegen(formula_str, metadata, family, prior_edits, expected):
     code = genmodel(model_desc)
     #print(code)
     model = eval_model(code)
-    data = dummydata(formula, metadata, 5)
+    data = dummy_design(formula, metadata, 5)
     trace = poutine.trace(model).get_trace(**data)
     expected_sites = [site for (site, _, _) in expected]
     assert set(trace.stochastic_nodes) - {'obs'} == set(expected_sites)
