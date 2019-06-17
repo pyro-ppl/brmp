@@ -2,6 +2,7 @@ from collections import namedtuple
 
 from pyro.contrib.brm.utils import unzip
 from .formula import Formula
+from .design import RealValued, Categorical
 from .family import Family, Type, nonlocparams
 from .priors import select, tryselect, Prior, Node
 
@@ -9,16 +10,16 @@ def family_matches_response(formula, metadata, family):
     assert type(formula) == Formula
     assert type(metadata) == dict
     assert type(family) == Family
-    if not formula.response in metadata:
-        # Response column is numeric.
+    if type(metadata[formula.response]) == RealValued:
         return family.support == Type.real
-    else:
-        # Response column is a factor.
+    elif type(metadata[formula.response]) == Categorical:
         factor = metadata[formula.response]
         if len(factor.levels) == 2:
             return family.support == Type.boolean
         else:
             return False
+    else:
+        return False
 
 def check_family_matches_response(formula, metadata, family):
     if not family_matches_response(formula, metadata, family):

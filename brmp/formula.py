@@ -3,6 +3,8 @@ from enum import Enum
 from collections import namedtuple
 import itertools
 
+from pyro.contrib.brm.utils import join
+
 # Maintains order.
 def unique(xs):
     seen = set()
@@ -88,6 +90,14 @@ Group = namedtuple('Group',
 Term = namedtuple('Term',
                   ['factors']) # Factors in the Patsy sense. An OrderedSet.
 _1 = Term(OrderedSet()) # Intercept
+
+def allfactors(formula):
+    assert type(formula) == Formula
+    def all_from_terms(terms):
+        return join(list(term.factors) for term in terms)
+    return ([formula.response] +
+            all_from_terms(formula.terms) +
+            join(all_from_terms(group.terms) + [group.column] for group in formula.groups))
 
 def tokenize(inp):
     return [str2token(s) for s in re.findall(r'\b\w+\b|[()~+:]|\|\|?', inp)]

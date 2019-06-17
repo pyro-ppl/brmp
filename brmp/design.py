@@ -8,17 +8,17 @@ import torch
 import numpy as np
 import pandas as pd
 # http://pandas.pydata.org/pandas-docs/stable/reference/general_utility_functions.html#dtype-introspection
-from pandas.api.types import is_numeric_dtype, is_categorical_dtype
+from pandas.api.types import is_categorical_dtype, is_integer_dtype, is_float_dtype
 
 from pyro.contrib.brm.utils import join
-from pyro.contrib.brm.formula import Formula, OrderedSet, Term
+from pyro.contrib.brm.formula import Formula, OrderedSet, Term, allfactors
 
 
 # TODO: Refer to dataframe metadata as 'schema' in order to avoid
 # confusion with the similarly named design matrix metadata?
 def make_metadata_lookup(metadata):
     assert type(metadata) == list
-    assert all(type(factor) == Categorical for factor in metadata)
+    assert all(type(factor) in [Categorical, Integral, RealValued] for factor in metadata)
     # Turn a list of factors into a dictionary keyed by column name.
     return dict((factor.name, factor) for factor in metadata)
 
@@ -37,43 +37,55 @@ Categorical = namedtuple('Categorical',
                          ['name',    # column name
                           'levels']) # list of level names
 
+Integral = namedtuple('Integral',
+                      ['name',
+                       'min',
+                       'max'])
+
+RealValued = namedtuple('RealValued', ['name'])
+
 # Extract metadata from a pandas dataframe.
 def dfmetadata(df):
-    return [Categorical(c, list(df[c].dtype.categories))
-            for c in df
-            if is_categorical_dtype(df[c])]
+    def dfcol2meta(dfcol):
+        if is_categorical_dtype(dfcol):
+            return Categorical(dfcol.name, list(dfcol.dtype.categories))
+        elif is_integer_dtype(dfcol):
+            return Integral(dfcol.name, min(dfcol), max(dfcol))
+        elif is_float_dtype(dfcol):
+            return RealValued(dfcol.name)
+        else:
+            raise Exception('unhandled column type encountered')
+    return [dfcol2meta(df[c]) for c in df]
 
-def dummy_df(factors, metadata, N):
-    assert type(factors) == list
-    assert all(type(factor) == str for factor in factors)
+def dummy_df(metadata, N):
     assert type(metadata) == dict
     def gen_numeric_col():
         return np.random.rand(N)
     def gen_categorical_col(levels):
         return pd.Categorical(random.choices(levels, k=N))
-    cols = {factor: gen_categorical_col(metadata[factor].levels) if factor in metadata else gen_numeric_col()
-            for factor in factors}
+    def dispatch(factor):
+        if type(metadata[factor]) == RealValued:
+            return gen_numeric_col()
+        elif type(metadata[factor]) == Categorical:
+            return gen_categorical_col(metadata[factor].levels)
+        else:
+            # TODO: Support integral columns.
+            raise Exception('don\'t know how to generate dummy data of this type')
+    cols = {factor: dispatch(factor) for factor in metadata}
     return pd.DataFrame(cols)
 
 def dummy_design(formula, metadata, N):
     assert type(formula) == Formula
     assert type(metadata) == dict
-    def allfactors(terms):
-        return join(list(term.factors) for term in terms)
-    # Sample columns for all factors mentioned in the formula.
-    factors = ([formula.response] +
-               allfactors(formula.terms) +
-               join(allfactors(group.terms) + [group.column] for group in formula.groups))
-    df = dummy_df(factors, metadata, N)
-    # Generate design matrices.
-    return makedata(formula, df)
+    assert set(allfactors(formula)).issubset(metadata.keys())
+    return makedata(formula, dummy_df(metadata, N))
 
 # --------------------
 # Design matrix coding
 # --------------------
 
 def codenumeric(dfcol):
-    assert is_numeric_dtype(dfcol)
+    assert is_float_dtype(dfcol)
     return [dfcol]
 
 
@@ -282,11 +294,11 @@ def coding(terms, metadata):
     assert type(metadata) == dict
 
     if not all(len(term.factors) < 2 or
-               all(factor in metadata for factor in term.factors) for term in terms):
+               all(type(metadata[factor]) == Categorical for factor in term.factors) for term in terms):
         raise Exception('Interactions supported between categorical factors only.')
 
     def is_numeric_term(term):
-        return len(term.factors) == 1 and term.factors[0] not in metadata
+        return len(term.factors) == 1 and not type(metadata[term.factors[0]]) == Categorical
     c_terms, n_terms = partition(is_numeric_term, terms)
 
     c_terms = sorted(c_terms, key=lambda term: len(term.factors))
@@ -402,6 +414,9 @@ PopulationMeta = namedtuple('PopulationMeta', 'coefs')
 GroupMeta = namedtuple('GroupMeta', 'name coefs')
 
 def designmatrices_metadata(formula, metadata):
+    assert type(formula) == Formula
+    assert type(metadata) == dict
+    assert set(allfactors(formula)).issubset(set(metadata.keys()))
     p = PopulationMeta(designmatrix_metadata(formula.terms, metadata))
     gs = [GroupMeta(group.column, designmatrix_metadata(group.terms, metadata))
           for group in formula.groups]
@@ -421,7 +436,7 @@ def responsevector(column, df):
     assert type(df) == pd.DataFrame
     assert column in df
     dfcol = df[column]
-    if is_numeric_dtype(dfcol):
+    if is_float_dtype(dfcol):
         coded = codenumeric(dfcol)
     elif is_categorical_dtype(dfcol) and len(dfcol.cat.categories) == 2:
         # TODO: How does a user know how this was coded? For design

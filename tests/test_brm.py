@@ -6,9 +6,9 @@ import pandas as pd
 import pyro.poutine as poutine
 from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, LKJCorrCholesky
 
-from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet
+from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
 from pyro.contrib.brm.codegen import genmodel, eval_model
-from pyro.contrib.brm.design import dummy_design, Categorical, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding
+from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding
 from pyro.contrib.brm.priors import prior, Prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import getfamily, FAMILIES, Delta, Type
 from pyro.contrib.brm.model import build_model, parameters
@@ -23,6 +23,12 @@ default_params = dict(
     HalfCauchy      = dict(scale=3.),
     LKJCorrCholesky = dict(eta=1.),
 )
+
+def build_metadata(formula, metadata):
+    # Helper that assumes that any factors not mentioned in the
+    # metadata given with the test definition are real-valued.
+    default_metadata = make_metadata_lookup([RealValued(factor) for factor in allfactors(formula)])
+    return dict(default_metadata, **make_metadata_lookup(metadata))
 
 # TODO: Extend this. Could check that the response is observed?
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', [
@@ -183,7 +189,7 @@ default_params = dict(
 ])
 def test_codegen(formula_str, metadata, family, prior_edits, expected):
     formula = parse(formula_str)
-    metadata = make_metadata_lookup(metadata)
+    metadata = build_metadata(formula, metadata)
     design_metadata = designmatrices_metadata(formula, metadata)
     prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
     model_desc = build_model(formula, prior_tree, family, metadata)
@@ -217,7 +223,7 @@ def unwrapfn(fn):
 ])
 def test_family_and_response_type_checks(formula_str, metadata, family):
     formula = parse(formula_str)
-    metadata = make_metadata_lookup(metadata)
+    metadata = build_metadata(formula, metadata)
     design_metadata = designmatrices_metadata(formula, metadata)
     prior_tree = build_prior_tree(formula, design_metadata, family, [])
     with pytest.raises(Exception, match='not compatible'):
@@ -244,7 +250,7 @@ def test_family_and_response_type_checks(formula_str, metadata, family):
 ])
 def test_prior_checks(formula_str, metadata, family, prior_edits):
     formula = parse(formula_str)
-    metadata = make_metadata_lookup(metadata)
+    metadata = build_metadata(formula, metadata)
     design_metadata = designmatrices_metadata(formula, metadata)
     with pytest.raises(Exception, match=r'(?i)invalid prior'):
         build_prior_tree(formula, design_metadata, family, prior_edits)
@@ -261,49 +267,49 @@ def test_prior_checks(formula_str, metadata, family, prior_edits):
     #                       []]),
     #       y_obs=torch.tensor([1., 2., 3.]))),
     ('y ~ 1',
-     pd.DataFrame(dict(y=[1, 2, 3])),
+     pd.DataFrame(dict(y=[1., 2., 3.])),
      dict(X=torch.tensor([[1.],
                           [1.],
                           [1.]]),
           y_obs=torch.tensor([1., 2., 3.]))),
     ('y ~ x',
-     pd.DataFrame(dict(y=[1, 2, 3],
-                       x=[4, 5, 6])),
+     pd.DataFrame(dict(y=[1., 2., 3.],
+                       x=[4., 5., 6.])),
      dict(X=torch.tensor([[4.],
                           [5.],
                           [6.]]),
           y_obs=torch.tensor([1., 2., 3.]))),
     ('y ~ 1 + x',
-     pd.DataFrame(dict(y=[1, 2, 3],
-                       x=[4, 5, 6])),
+     pd.DataFrame(dict(y=[1., 2., 3.],
+                       x=[4., 5., 6.])),
      dict(X=torch.tensor([[1., 4.],
                           [1., 5.],
                           [1., 6.]]),
           y_obs=torch.tensor([1., 2., 3.]))),
     ('y ~ x + 1',
-     pd.DataFrame(dict(y=[1, 2, 3],
-                       x=[4, 5, 6])),
+     pd.DataFrame(dict(y=[1., 2., 3.],
+                       x=[4., 5., 6.])),
      dict(X=torch.tensor([[1., 4.],
                           [1., 5.],
                           [1., 6.]]),
           y_obs=torch.tensor([1., 2., 3.]))),
 
     ('y ~ x',
-     pd.DataFrame(dict(y=[1, 2, 3],
+     pd.DataFrame(dict(y=[1., 2., 3.],
                        x=pd.Categorical(list('AAB')))),
      dict(X=torch.tensor([[1., 0.],
                           [1., 0.],
                           [0., 1.]]),
           y_obs=torch.tensor([1., 2., 3.]))),
     ('y ~ 1 + x',
-     pd.DataFrame(dict(y=[1, 2, 3],
+     pd.DataFrame(dict(y=[1., 2., 3.],
                        x=pd.Categorical(list('AAB')))),
      dict(X=torch.tensor([[1., 0.],
                           [1., 0.],
                           [1., 1.]]),
           y_obs=torch.tensor([1., 2., 3.]))),
     ('y ~ x1 + x2',
-     pd.DataFrame(dict(y=[1, 2, 3],
+     pd.DataFrame(dict(y=[1., 2., 3.],
                        x1=pd.Categorical(list('AAB')),
                        x2=pd.Categorical(list('ABC')))),
      dict(X=torch.tensor([[1., 0., 0., 0.],
@@ -312,7 +318,7 @@ def test_prior_checks(formula_str, metadata, family, prior_edits):
           y_obs=torch.tensor([1., 2., 3.]))),
 
     ('y ~ 1 + x',
-     pd.DataFrame(dict(y=[1, 2, 3],
+     pd.DataFrame(dict(y=[1., 2., 3.],
                        x=pd.Categorical(list('ABC')))),
      dict(X=torch.tensor([[1., 0., 0.],
                           [1., 1., 0.],
@@ -331,7 +337,7 @@ def test_prior_checks(formula_str, metadata, family, prior_edits):
     #                         [],
     #                         []]))),
     ('y ~ 1 + (1 + x1 | x2)',
-     pd.DataFrame(dict(y=[1, 2, 3],
+     pd.DataFrame(dict(y=[1., 2., 3.],
                        x1=pd.Categorical(list('AAB')),
                        x2=pd.Categorical(list('ABC')))),
      dict(X=torch.tensor([[1.],
@@ -346,7 +352,7 @@ def test_prior_checks(formula_str, metadata, family, prior_edits):
     # Interactions
     # --------------------------------------------------
     ('y ~ x1:x2',
-     pd.DataFrame(dict(y=[1, 2, 3, 4],
+     pd.DataFrame(dict(y=[1., 2., 3., 4.],
                        x1=pd.Categorical(list('ABAB')),
                        x2=pd.Categorical(list('CCDD')))),
      #                     AC  BC  AD  BD
@@ -357,7 +363,7 @@ def test_prior_checks(formula_str, metadata, family, prior_edits):
           y_obs=torch.tensor([1., 2., 3., 4.]))),
 
     ('y ~ 1 + x1:x2',
-     pd.DataFrame(dict(y=[1, 2, 3, 4],
+     pd.DataFrame(dict(y=[1., 2., 3., 4.],
                        x1=pd.Categorical(list('ABAB')),
                        x2=pd.Categorical(list('CCDD')))),
      #                     1   D   BC  BD
@@ -368,7 +374,7 @@ def test_prior_checks(formula_str, metadata, family, prior_edits):
           y_obs=torch.tensor([1., 2., 3., 4.]))),
 
     ('y ~ 1 + x1 + x2 + x1:x2',
-     pd.DataFrame(dict(y=[1, 2, 3, 4],
+     pd.DataFrame(dict(y=[1., 2., 3., 4.],
                        x1=pd.Categorical(list('ABAB')),
                        x2=pd.Categorical(list('CCDD')))),
      #                     1   B   D   BD
@@ -382,7 +388,7 @@ def test_prior_checks(formula_str, metadata, family, prior_edits):
     # --------------------------------------------------
     ('y ~ x',
      pd.DataFrame(dict(y=pd.Categorical(list('AAB')),
-                       x=[1, 2, 3])),
+                       x=[1., 2., 3.])),
      dict(X=torch.tensor([[1.],
                           [2.],
                           [3.]]),
