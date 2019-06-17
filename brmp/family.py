@@ -8,7 +8,7 @@ from enum import Enum
 Family = namedtuple('Family', 'name params support response')
 
 Param = namedtuple('Param', 'name type')
-Type = Enum('Type', 'real pos_real boolean unit_interval corr_cholesky')
+Type = Enum('Type', 'real pos_real boolean unit_interval corr_cholesky non_neg_int')
 
 # Inverse might also be called recip(rocal).
 LinkFn = Enum('LinkFn', 'identity logit inverse')
@@ -42,6 +42,13 @@ FAMILIES = [
     Family('LKJ',
            [Param('eta', Type.pos_real)],
            Type.corr_cholesky, None),
+    Family('Binomial',
+           [Param('num_trials', Type.non_neg_int), Param('probs', Type.unit_interval)],
+           # TODO: Ideally, this ought to depend on the num_trials
+           # arg. (But for performing model checks this is perhaps
+           # good enough for now?)
+           Type.non_neg_int,
+           Response('probs', LinkFn.logit)),
 ]
 
 # A family of families. In model.py we check that the support of a

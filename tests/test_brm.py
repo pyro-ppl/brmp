@@ -197,6 +197,12 @@ def build_metadata(formula, metadata):
      [],
      [('b_0', Cauchy, {})]),
 
+    ('y ~ x',
+     [Integral('y', min=0, max=10)],
+     getfamily('Binomial'),
+     [],
+     [('b_0', Cauchy, {})]),
+
 ])
 def test_codegen(formula_str, metadata, family, prior_edits, expected):
     formula = parse(formula_str)
@@ -233,6 +239,9 @@ def unwrapfn(fn):
     ('y ~ x', [Categorical('y', list('abc'))], getfamily('Bernoulli')),
     ('y ~ x', [Categorical('y', list('ab'))], getfamily('Normal')),
     ('y ~ x', [Integral('y', min=0, max=1)], getfamily('Normal')),
+    ('y ~ x', [], getfamily('Binomial')),
+    ('y ~ x', [Integral('y', min=-1, max=1)], getfamily('Binomial')),
+    ('y ~ x', [Categorical('y', list('abc'))], getfamily('Binomial')),
 ])
 def test_family_and_response_type_checks(formula_str, metadata, family):
     formula = parse(formula_str)

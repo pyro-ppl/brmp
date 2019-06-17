@@ -6,7 +6,7 @@ import pandas as pd
 from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula
 from pyro.contrib.brm.design import DesignMeta, PopulationMeta, GroupMeta
-from pyro.contrib.brm.family import getfamily, Family, nonlocparams, Type
+from pyro.contrib.brm.family import getfamily, Family, nonlocparams, Type, Delta
 
 # `is_param` indicates whether a node corresponds to a parameter in
 # the model. (Nodes without this flag set exist only to add structure
@@ -35,6 +35,16 @@ def prior(family_name, args):
 RESPONSE_PRIORS = {
     'Normal': {
         'sigma': Prior(getfamily('HalfCauchy'), [3.])
+    },
+    'Binomial': {
+        # TODO: We ought to not have a default for this parameter.
+        # It's not possible to pick a sensible default value for it
+        # even if we look at the data. But since using a Delta here is
+        # a kludge that will hopefully be replaced with some other
+        # mechanism, it might not be worth relaxing the assumption
+        # that we always can come up with default priors solely to
+        # accommodate this.
+        'num_trials': Prior(Delta(Type.non_neg_int), [1])
     }
 }
 

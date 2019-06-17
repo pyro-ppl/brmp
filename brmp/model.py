@@ -10,16 +10,19 @@ def family_matches_response(formula, metadata, family):
     assert type(formula) == Formula
     assert type(metadata) == dict
     assert type(family) == Family
+    factor = metadata[formula.response]
     if family.support == Type.real:
-        return type(metadata[formula.response]) == RealValued
+        return type(factor) == RealValued
     elif family.support == Type.boolean:
-        factor = metadata[formula.response]
         if type(factor) == Categorical:
             return len(factor.levels) == 2
         elif type(factor) == Integral:
             return factor.min == 0 and factor.max == 1
         else:
             return False
+    elif family.support == Type.non_neg_int:
+        factor = metadata[formula.response]
+        return type(factor) == Integral and factor.min >= 0
     else:
         return False
 
