@@ -37,8 +37,7 @@ Factor = namedtuple('Factor',
                     ['name',    # column name
                      'levels']) # list of level names
 
-# Extract metadata (as expected by `genmodel`) from a pandas
-# dataframe.
+# Extract metadata from a pandas dataframe.
 def dfmetadata(df):
     return [Factor(c, list(df[c].dtype.categories))
             for c in df
