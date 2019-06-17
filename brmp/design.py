@@ -111,6 +111,9 @@ def codefactor(dfcol, reduced):
 
 
 
+# TODO: Consider building the whole design matrix as a numpy array.
+# (This could be useful for other backends.) Then covert the whole
+# thing to torch in one go as a post-processing step where necessary.
 def col2torch(col):
     default_dtype = torch.get_default_dtype()
     if type(col) == torch.Tensor:
@@ -323,6 +326,11 @@ def width(coding):
 # this in makedata, but we'd need to do so for population and group
 # levels.
 
+# TODO: This could be generalised to work with a wider range of data
+# representation. Rather than expecting a pandas dataframe, it could
+# take a dictionary that gives access to the columns (iterables full
+# of floats, ints, or level values?) and the existing dataframe
+# metadata structure to describe the types of the columns, etc.
 def designmatrix(terms, df):
     assert type(terms) == OrderedSet
     N = len(df)
