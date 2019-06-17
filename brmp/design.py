@@ -18,7 +18,7 @@ from pyro.contrib.brm.formula import Formula, OrderedSet, Term
 # confusion with the similarly named design matrix metadata?
 def make_metadata_lookup(metadata):
     assert type(metadata) == list
-    assert all(type(factor) == Factor for factor in metadata)
+    assert all(type(factor) == Categorical for factor in metadata)
     # Turn a list of factors into a dictionary keyed by column name.
     return dict((factor.name, factor) for factor in metadata)
 
@@ -33,13 +33,13 @@ def make_metadata_lookup(metadata):
 # of which have to do with whether instances of the type can be
 # converted to strings in a sensible way.)
 
-Factor = namedtuple('Factor',
-                    ['name',    # column name
-                     'levels']) # list of level names
+Categorical = namedtuple('Categorical',
+                         ['name',    # column name
+                          'levels']) # list of level names
 
 # Extract metadata from a pandas dataframe.
 def dfmetadata(df):
-    return [Factor(c, list(df[c].dtype.categories))
+    return [Categorical(c, list(df[c].dtype.categories))
             for c in df
             if is_categorical_dtype(df[c])]
 
