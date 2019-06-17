@@ -10,7 +10,7 @@ from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet
 from pyro.contrib.brm.codegen import genmodel, eval_model
 from pyro.contrib.brm.design import dummy_design, Factor, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding
 from pyro.contrib.brm.priors import prior, Prior, PriorEdit, get_response_prior, build_prior_tree
-from pyro.contrib.brm.family import getfamily, FAMILIES
+from pyro.contrib.brm.family import getfamily, FAMILIES, Delta, Type
 from pyro.contrib.brm.model import build_model, parameters
 from pyro.contrib.brm.fit import pyro_get_param
 
@@ -166,6 +166,12 @@ default_params = dict(
      [PriorEdit(('resp', 'sigma'), prior('HalfCauchy', [4.]))],
      [('b_0', Cauchy, {}),
       ('sigma', HalfCauchy, {'scale': 4.})]),
+
+    ('y ~ x',
+     [],
+     getfamily('Normal'),
+     [PriorEdit(('resp', 'sigma'), Prior(Delta(Type.pos_real), [0.5]))],
+     [('b_0', Cauchy, {})]),
 
     # Custom response family.
     ('y ~ x',

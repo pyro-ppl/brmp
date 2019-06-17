@@ -27,10 +27,10 @@ def pyro_posterior(run):
 # by `parameter_names(model)` where `model` is the `Model` from which
 # samples were drawn.
 def pyro_get_param(sample, name):
-    if name == 'b' or name.startswith('r_') or name.startswith('sd_'):
-        return sample.nodes['_RETURN']['value'][name]
-    else:
+    if name in sample.nodes:
         return sample.nodes[name]['value']
+    else:
+        return sample.nodes['_RETURN']['value'][name]
 
 # This aims to be generic/polymorphic, requiring only arithmetic
 # operations and `sqrt` on values returned by `get_param`. The idea is

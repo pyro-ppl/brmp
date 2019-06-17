@@ -223,8 +223,17 @@ def genmodel(model):
     # Sample from priors over the response distribution parameters
     # that aren't predicted from the data.
     for param, param_prior in zip(model.response.nonlocparams, model.response.priors):
-        body.append(sample(param.name, gendist(param_prior.family, param_prior.arguments, [1], False)))
-
+        if param_prior.family.name == 'Delta':
+            # Skip sampling from a Delta distribution as an
+            # optimisation. Since we still need to be able to recover
+            # the value of this parameter from each posterior sample
+            # (each backend needs to make available all parameters
+            # described by `model`), we will later include this in the
+            # value returned by this model function.
+            assert len(param_prior.arguments) == 1
+            body.append('{} = torch.tensor([{}])'.format(param.name, param_prior.arguments[0]))
+        else:
+            body.append(sample(param.name, gendist(param_prior.family, param_prior.arguments, [1], False)))
 
     # TODO: Optimisations (for numerical stability/perf.) are
     # available for some response family/link function pairs. (Though
@@ -248,9 +257,17 @@ def genmodel(model):
     # Values of interest that are not generated directly by sample
     # statements (such as the `b` vector) are returned from the model
     # so that they can be retrieved from the execution trace later.
+
+    # Make parameters with delta priors available via the model's
+    # return value. This is an optimisation that avoids sampling from
+    # a delta prior.
+    delta_params = [param.name for param, param_prior in zip(model.response.nonlocparams, model.response.priors)
+                    if param_prior.family.name == 'Delta']
+
     returned_params = (['b'] +
                        ['sd_{}'.format(i) for i in range(num_groups)] +
-                       ['r_{}'.format(i) for i in range(num_groups)])
+                       ['r_{}'.format(i) for i in range(num_groups)] +
+                       delta_params)
     retval =  '{{{}}}'.format(', '.join('\'{}\': {}'.format(p, p) for p in returned_params))
     body.append('return {}'.format(retval))
 
