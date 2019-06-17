@@ -85,7 +85,7 @@ def dummy_design(formula, metadata, N):
 # --------------------
 
 def codenumeric(dfcol):
-    assert is_float_dtype(dfcol)
+    assert is_float_dtype(dfcol) or is_integer_dtype(dfcol)
     return [dfcol]
 
 
@@ -150,6 +150,7 @@ def col2torch(col):
 InterceptC = namedtuple('InterceptC', [])
 InteractionC = namedtuple('InteractionC', ['codes']) # codes is a list of CategoricalCs
 CategoricalC = namedtuple('CategoricalC', ['factor', 'reduced'])
+# Represents coding of either integer or real-valued columns.
 NumericC = namedtuple('NumericC', ['name'])
 
 # TODO: I do similar dispatching on type in `designmatrix` and
@@ -436,7 +437,7 @@ def responsevector(column, df):
     assert type(df) == pd.DataFrame
     assert column in df
     dfcol = df[column]
-    if is_float_dtype(dfcol):
+    if is_float_dtype(dfcol) or is_integer_dtype(dfcol):
         coded = codenumeric(dfcol)
     elif is_categorical_dtype(dfcol) and len(dfcol.cat.categories) == 2:
         # TODO: How does a user know how this was coded? For design

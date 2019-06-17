@@ -384,6 +384,17 @@ def test_prior_checks(formula_str, metadata, family, prior_edits):
                           [1., 1., 1., 1.]]),
           y_obs=torch.tensor([1., 2., 3., 4.]))),
 
+    # Integer-valued Factors
+    # --------------------------------------------------
+    ('y ~ x1 + x2',
+     pd.DataFrame(dict(y=[1, 2, 3],
+                       x1=[4, 5, 6],
+                       x2=[7., 8., 9.])),
+     dict(X=torch.tensor([[4., 7.],
+                          [5., 8.],
+                          [6., 9.]]),
+          y_obs=torch.tensor([1., 2., 3.]))),
+
     # Categorical Response
     # --------------------------------------------------
     ('y ~ x',
