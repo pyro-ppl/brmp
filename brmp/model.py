@@ -2,7 +2,7 @@ from collections import namedtuple
 
 from pyro.contrib.brm.utils import unzip
 from .formula import Formula
-from .design import RealValued, Categorical
+from .design import RealValued, Categorical, Integral
 from .family import Family, Type, nonlocparams
 from .priors import select, tryselect, Prior, Node
 
@@ -10,12 +10,14 @@ def family_matches_response(formula, metadata, family):
     assert type(formula) == Formula
     assert type(metadata) == dict
     assert type(family) == Family
-    if type(metadata[formula.response]) == RealValued:
-        return family.support == Type.real
-    elif type(metadata[formula.response]) == Categorical:
+    if family.support == Type.real:
+        return type(metadata[formula.response]) == RealValued
+    elif family.support == Type.boolean:
         factor = metadata[formula.response]
-        if len(factor.levels) == 2:
-            return family.support == Type.boolean
+        if type(factor) == Categorical:
+            return len(factor.levels) == 2
+        elif type(factor) == Integral:
+            return factor.min == 0 and factor.max == 1
         else:
             return False
     else:

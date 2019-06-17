@@ -8,7 +8,7 @@ from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, LKJCorrC
 
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
 from pyro.contrib.brm.codegen import genmodel, eval_model
-from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding
+from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding
 from pyro.contrib.brm.priors import prior, Prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import getfamily, FAMILIES, Delta, Type
 from pyro.contrib.brm.model import build_model, parameters
@@ -38,6 +38,11 @@ def build_metadata(formula, metadata):
     #(Formula('y', [], []), [], [], ['sigma']),
 
     ('y ~ 1 + x', [], getfamily('Normal'), [],
+     [('b_0', Cauchy, {}),
+      ('sigma', HalfCauchy, {})]),
+
+    # Integer valued predictor.
+    ('y ~ 1 + x', [Integral('x', min=0, max=10)], getfamily('Normal'), [],
      [('b_0', Cauchy, {}),
       ('sigma', HalfCauchy, {})]),
 
@@ -186,6 +191,12 @@ def build_metadata(formula, metadata):
      [],
      [('b_0', Cauchy, {})]),
 
+    ('y ~ x',
+     [Integral('y', min=0, max=1)],
+     getfamily('Bernoulli'),
+     [],
+     [('b_0', Cauchy, {})]),
+
 ])
 def test_codegen(formula_str, metadata, family, prior_edits, expected):
     formula = parse(formula_str)
@@ -218,8 +229,10 @@ def unwrapfn(fn):
 
 @pytest.mark.parametrize('formula_str, metadata, family', [
     ('y ~ x', [], getfamily('Bernoulli')),
+    ('y ~ x', [Integral('y', min=0, max=2)], getfamily('Bernoulli')),
     ('y ~ x', [Categorical('y', list('abc'))], getfamily('Bernoulli')),
     ('y ~ x', [Categorical('y', list('ab'))], getfamily('Normal')),
+    ('y ~ x', [Integral('y', min=0, max=1)], getfamily('Normal')),
 ])
 def test_family_and_response_type_checks(formula_str, metadata, family):
     formula = parse(formula_str)

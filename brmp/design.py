@@ -63,14 +63,17 @@ def dummy_df(metadata, N):
         return np.random.rand(N)
     def gen_categorical_col(levels):
         return pd.Categorical(random.choices(levels, k=N))
+    def gen_integral_col(factor):
+        return np.random.randint(factor.min, factor.max + 1, N)
     def dispatch(factor):
         if type(metadata[factor]) == RealValued:
             return gen_numeric_col()
         elif type(metadata[factor]) == Categorical:
             return gen_categorical_col(metadata[factor].levels)
+        elif type(metadata[factor]) == Integral:
+            return gen_integral_col(metadata[factor])
         else:
-            # TODO: Support integral columns.
-            raise Exception('don\'t know how to generate dummy data of this type')
+            raise Exception('unknown factor type')
     cols = {factor: dispatch(factor) for factor in metadata}
     return pd.DataFrame(cols)
 
