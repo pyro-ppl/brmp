@@ -17,7 +17,10 @@ def makedesc(formula, df, family, prior_edits):
     prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
     return build_model(formula, prior_tree, family, df_metadata_lu)
 
-def brm(formula_str, df, family=getfamily('Normal'), prior_edits=[]):
+def brm(formula_str, df, family=getfamily('Normal'), prior_edits=[],
+        iter=2000, warmup=None):
+    if warmup is None:
+        warmup = iter // 2
     formula = parse(formula_str)
     model_desc = makedesc(formula, df, family, prior_edits)
     code = genmodel(model_desc)
@@ -34,5 +37,5 @@ def brm(formula_str, df, family=getfamily('Normal'), prior_edits=[]):
     # could be used in the matrices' __repr__, for example.)
     data = makedata(formula, df)
     nuts_kernel = NUTS(model, jit_compile=False, adapt_step_size=True)
-    run = MCMC(nuts_kernel, num_samples=500, warmup_steps=100).run(**data)
+    run = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup).run(**data)
     return Fit(run, code, data, model_desc, pyro_posterior(run))
