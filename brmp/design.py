@@ -54,7 +54,7 @@ def dfmetadata(df):
         elif is_float_dtype(dfcol):
             return RealValued(dfcol.name)
         else:
-            raise Exception('unhandled column type encountered')
+            raise Exception('unhandled column type encountered for column "{}"'.format(dfcol.name))
     return [dfcol2meta(df[c]) for c in df]
 
 def dummy_df(metadata, N):
