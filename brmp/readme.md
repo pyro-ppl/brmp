@@ -51,8 +51,8 @@ this.
 A thin wrapper around the core functionality aims to eventually
 provide a brms-like interface for fitting models.
 See
-[this notebook](https://nbviewer.jupyter.org/github/null-a/pyro/blob/brmp/pyro/contrib/brm/examples/Example1.ipynb) for
-an example of using the system to fit a simple model
+[these notebooks](https://nbviewer.jupyter.org/github/null-a/pyro/tree/brmp/pyro/contrib/brm/examples/) for
+examples of using the system to fit some simple models.
 
 ## Limitations
 
