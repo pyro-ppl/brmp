@@ -44,31 +44,33 @@ Response = namedtuple('Response', 'param linkfn')
 
 # TODO: Add more response families.
 
+def const(x):
+    def f(*args):
+        return x
+    return f
+
 FAMILIES = [
     Family('Normal',
            [Param('mu', Type['Real']()), Param('sigma', Type['PosReal']())],
-           Type['Real'](),
+           const(Type['Real']()),
            Response('mu', LinkFn.identity)),
     Family('Bernoulli',
            [Param('probs', Type['UnitInterval']())],
-           Type['Boolean'](),
+           const(Type['Boolean']()),
            Response('probs', LinkFn.logit)),
     Family('Cauchy',
            [Param('loc', Type['Real']()), Param('scale', Type['PosReal']())],
-           Type['Real'](), None),
+           const(Type['Real']()), None),
     Family('HalfCauchy',
            [Param('scale', Type['PosReal']())],
-           Type['PosReal'](), None),
+           const(Type['PosReal']()), None),
     Family('LKJ',
            [Param('eta', Type['PosReal']())],
-           Type['CorrCholesky'](), None),
+           const(Type['CorrCholesky']()), None),
     Family('Binomial',
            [Param('num_trials', Type['IntegerRange'](0, None)),
             Param('probs', Type['UnitInterval']())],
-           # TODO: Ideally, this ought to depend on the num_trials
-           # arg. (But for performing model checks this is perhaps
-           # good enough for now?)
-           Type['IntegerRange'](0, None),
+           const(Type['IntegerRange'](0, None)),
            Response('probs', LinkFn.logit)),
 ]
 
@@ -80,7 +82,7 @@ FAMILIES = [
 def Delta(support):
     # Could instead pass string and look-up with `Type[s]`.
     assert istype(support)
-    return Family('Delta', [Param('value', support)], support, None)
+    return Family('Delta', [Param('value', support)], const(support), None)
 
 def lookup(items, name):
     for item in items:
