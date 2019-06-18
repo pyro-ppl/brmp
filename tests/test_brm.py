@@ -233,21 +233,21 @@ def unwrapfn(fn):
     return unwrapfn(fn.base_dist) if type(fn) == Independent else fn
 
 
-@pytest.mark.parametrize('formula_str, metadata, family', [
-    ('y ~ x', [], getfamily('Bernoulli')),
-    ('y ~ x', [Integral('y', min=0, max=2)], getfamily('Bernoulli')),
-    ('y ~ x', [Categorical('y', list('abc'))], getfamily('Bernoulli')),
-    ('y ~ x', [Categorical('y', list('ab'))], getfamily('Normal')),
-    ('y ~ x', [Integral('y', min=0, max=1)], getfamily('Normal')),
-    ('y ~ x', [], getfamily('Binomial')),
-    ('y ~ x', [Integral('y', min=-1, max=1)], getfamily('Binomial')),
-    ('y ~ x', [Categorical('y', list('abc'))], getfamily('Binomial')),
+@pytest.mark.parametrize('formula_str, metadata, family, prior_edits', [
+    ('y ~ x', [], getfamily('Bernoulli'), []),
+    ('y ~ x', [Integral('y', min=0, max=2)], getfamily('Bernoulli'), []),
+    ('y ~ x', [Categorical('y', list('abc'))], getfamily('Bernoulli'), []),
+    ('y ~ x', [Categorical('y', list('ab'))], getfamily('Normal'), []),
+    ('y ~ x', [Integral('y', min=0, max=1)], getfamily('Normal'), []),
+    ('y ~ x', [], getfamily('Binomial'), []),
+    ('y ~ x', [Integral('y', min=-1, max=1)], getfamily('Binomial'), []),
+    ('y ~ x', [Categorical('y', list('abc'))], getfamily('Binomial'), []),
 ])
-def test_family_and_response_type_checks(formula_str, metadata, family):
+def test_family_and_response_type_checks(formula_str, metadata, family, prior_edits):
     formula = parse(formula_str)
     metadata = build_metadata(formula, metadata)
     design_metadata = designmatrices_metadata(formula, metadata)
-    prior_tree = build_prior_tree(formula, design_metadata, family, [])
+    prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
     with pytest.raises(Exception, match='not compatible'):
         model = build_model(formula, prior_tree, family, metadata)
 
