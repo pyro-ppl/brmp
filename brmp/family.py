@@ -8,7 +8,27 @@ from enum import Enum
 Family = namedtuple('Family', 'name params support response')
 
 Param = namedtuple('Param', 'name type')
-Type = Enum('Type', 'real pos_real boolean unit_interval corr_cholesky non_neg_int')
+
+def mktype(*args):
+    out = namedtuple(*args)
+    def eq(a, b):
+        return type(a) == type(b) and tuple(a) == tuple(b)
+    out.__eq__ = eq
+    out.__ne__ = lambda a, b: not eq(a, b)
+    return out
+
+Type = dict(
+    Real         = mktype('Real', ''),
+    PosReal      = mktype('PosReal', ''),
+    Boolean      = mktype('Boolean', ''),
+    UnitInterval = mktype('UnitInterval', ''),
+    CorrCholesky = mktype('CorrCholesky', ''),
+    IntegerRange = mktype('IntegerRange', 'lb ub'),
+)
+
+def istype(ty):
+    return type(ty) in Type.values()
+
 
 # Inverse might also be called recip(rocal).
 LinkFn = Enum('LinkFn', 'identity logit inverse')
@@ -26,28 +46,29 @@ Response = namedtuple('Response', 'param linkfn')
 
 FAMILIES = [
     Family('Normal',
-           [Param('mu', Type.real), Param('sigma', Type.pos_real)],
-           Type.real,
+           [Param('mu', Type['Real']()), Param('sigma', Type['PosReal']())],
+           Type['Real'](),
            Response('mu', LinkFn.identity)),
     Family('Bernoulli',
-           [Param('probs', Type.unit_interval)],
-           Type.boolean,
+           [Param('probs', Type['UnitInterval']())],
+           Type['Boolean'](),
            Response('probs', LinkFn.logit)),
     Family('Cauchy',
-           [Param('loc', Type.real), Param('scale', Type.pos_real)],
-           Type.real, None),
+           [Param('loc', Type['Real']()), Param('scale', Type['PosReal']())],
+           Type['Real'](), None),
     Family('HalfCauchy',
-           [Param('scale', Type.pos_real)],
-           Type.pos_real, None),
+           [Param('scale', Type['PosReal']())],
+           Type['PosReal'](), None),
     Family('LKJ',
-           [Param('eta', Type.pos_real)],
-           Type.corr_cholesky, None),
+           [Param('eta', Type['PosReal']())],
+           Type['CorrCholesky'](), None),
     Family('Binomial',
-           [Param('num_trials', Type.non_neg_int), Param('probs', Type.unit_interval)],
+           [Param('num_trials', Type['IntegerRange'](0, None)),
+            Param('probs', Type['UnitInterval']())],
            # TODO: Ideally, this ought to depend on the num_trials
            # arg. (But for performing model checks this is perhaps
            # good enough for now?)
-           Type.non_neg_int,
+           Type['IntegerRange'](0, None),
            Response('probs', LinkFn.logit)),
 ]
 
@@ -58,7 +79,7 @@ FAMILIES = [
 # and update the check in priors to always accept such.
 def Delta(support):
     # Could instead pass string and look-up with `Type[s]`.
-    assert type(support) == Type
+    assert istype(support)
     return Family('Delta', [Param('value', support)], support, None)
 
 def lookup(items, name):

@@ -181,7 +181,7 @@ def build_metadata(formula, metadata):
     ('y ~ x',
      [],
      getfamily('Normal'),
-     [PriorEdit(('resp', 'sigma'), Prior(Delta(Type.pos_real), [0.5]))],
+     [PriorEdit(('resp', 'sigma'), Prior(Delta(Type['PosReal']()), [0.5]))],
      [('b_0', Cauchy, {})]),
 
     # Custom response family.

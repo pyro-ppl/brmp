@@ -44,7 +44,7 @@ RESPONSE_PRIORS = {
         # mechanism, it might not be worth relaxing the assumption
         # that we always can come up with default priors solely to
         # accommodate this.
-        'num_trials': Prior(Delta(Type.non_neg_int), [1])
+        'num_trials': Prior(Delta(Type['IntegerRange'](0, None)), [1])
     }
 }
 
@@ -132,10 +132,10 @@ def default_prior(formula, design_metadata, family):
                           [chk_support(p.type)])
                      for p in nonlocparams(family)]
     return Node('root', None, False, [], [
-        Node('b',    PriorEdit(('b',),   prior('Cauchy', [0., 1.])), False, [chk_support(Type.real)],     b_children),
-        Node('sd',   PriorEdit(('sd',),  prior('HalfCauchy', [3.])), False, [chk_support(Type.pos_real)], sd_children),
-        Node('cor',  PriorEdit(('cor',), prior('LKJ', [1.])),        False, [chk_lkj],                    cor_children),
-        Node('resp', None,                                           False, [],                           resp_children)])
+        Node('b',    PriorEdit(('b',),   prior('Cauchy', [0., 1.])), False, [chk_support(Type['Real']())],    b_children),
+        Node('sd',   PriorEdit(('sd',),  prior('HalfCauchy', [3.])), False, [chk_support(Type['PosReal']())], sd_children),
+        Node('cor',  PriorEdit(('cor',), prior('LKJ', [1.])),        False, [chk_lkj],                        cor_children),
+        Node('resp', None,                                           False, [],                               resp_children)])
 
 # TODO: This ought to warn/error when an element of `priors` has a
 # path that doesn't correspond to a node in the tree.
@@ -202,7 +202,7 @@ def chk_support(typ):
     # (However this is easier and good enough for now.)
     def pred(prior):
         return prior.family.support == typ
-    return Chk(pred, 'has support of {}'.format(typ.name))
+    return Chk(pred, 'has support of {}'.format(typ))
 
 @chk('is LKJ')
 def chk_lkj(prior):

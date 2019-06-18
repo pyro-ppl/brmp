@@ -11,16 +11,18 @@ def family_matches_response(formula, metadata, family):
     assert type(metadata) == dict
     assert type(family) == Family
     factor = metadata[formula.response]
-    if family.support == Type.real:
+    if type(family.support) == Type['Real']:
         return type(factor) == RealValued
-    elif family.support == Type.boolean:
+    elif type(family.support) == Type['Boolean']:
         if type(factor) == Categorical:
             return len(factor.levels) == 2
         elif type(factor) == Integral:
             return factor.min == 0 and factor.max == 1
         else:
             return False
-    elif family.support == Type.non_neg_int:
+    elif (type(family.support) == Type['IntegerRange'] and
+          family.support.lb == 0 and
+          family.support.ub == None):
         factor = metadata[formula.response]
         return type(factor) == Integral and factor.min >= 0
     else:
