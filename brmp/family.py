@@ -1,5 +1,7 @@
 from collections import namedtuple
 from enum import Enum
+import inspect
+from functools import partial
 
 # This is intended to be independent of Pyro, with a view to
 # supporting multiple code gen back-ends eventually.
@@ -7,7 +9,10 @@ from enum import Enum
 # TODO: Ensure that families always have a support specified.
 Family = namedtuple('Family', 'name params support response')
 
-Param = namedtuple('Param', 'name type')
+# TODO: Check that `value` is in `type` (or None).
+Param = namedtuple('Param', 'name type value')
+def param(name, typ):
+    return Param(name, typ, None)
 
 def mktype(*args):
     out = namedtuple(*args)
@@ -51,28 +56,57 @@ def const(x):
 
 FAMILIES = [
     Family('Normal',
-           [Param('mu', Type['Real']()), Param('sigma', Type['PosReal']())],
+           [param('mu', Type['Real']()), param('sigma', Type['PosReal']())],
            const(Type['Real']()),
            Response('mu', LinkFn.identity)),
     Family('Bernoulli',
-           [Param('probs', Type['UnitInterval']())],
+           [param('probs', Type['UnitInterval']())],
            const(Type['Boolean']()),
            Response('probs', LinkFn.logit)),
     Family('Cauchy',
-           [Param('loc', Type['Real']()), Param('scale', Type['PosReal']())],
+           [param('loc', Type['Real']()), param('scale', Type['PosReal']())],
            const(Type['Real']()), None),
     Family('HalfCauchy',
-           [Param('scale', Type['PosReal']())],
+           [param('scale', Type['PosReal']())],
            const(Type['PosReal']()), None),
     Family('LKJ',
-           [Param('eta', Type['PosReal']())],
+           [param('eta', Type['PosReal']())],
            const(Type['CorrCholesky']()), None),
     Family('Binomial',
-           [Param('num_trials', Type['IntegerRange'](0, None)),
-            Param('probs', Type['UnitInterval']())],
-           const(Type['IntegerRange'](0, None)),
+           [param('num_trials', Type['IntegerRange'](0, None)),
+            param('probs', Type['UnitInterval']())],
+           lambda num_trials: Type['IntegerRange'](0, num_trials),
            Response('probs', LinkFn.logit)),
 ]
+
+def apply1(family, name, value):
+    if name not in [p.name for p in family.params]:
+        raise Exception('Unknown parameter "{}"'.format(name))
+    def setval(param, value):
+        return Param(param.name, param.type, value)
+    params = [setval(param, value) if param.name == name else param
+              for param in family.params]
+    if name in inspect.getfullargspec(family.support).args:
+        support = partial(family.support, **{name: value})
+    else:
+        support = family.support
+    return Family(family.name, params, support, family.response)
+
+# This could be __call__ on a Family class.
+def apply(family, **kwargs):
+    for name, value in kwargs.items():
+        family = apply1(family, name, value)
+    return family
+
+def known_support(family):
+    return len(inspect.getfullargspec(family.support).args) == 0
+
+def fully_applied(family):
+    return all(param.value is not None for param in family.params)
+
+def args(family):
+    return [param.value for param in family.params]
+
 
 # A family of families. In model.py we check that the support of a
 # prior matches the domain of a response distribution parameter, hence
@@ -82,7 +116,7 @@ FAMILIES = [
 def Delta(support):
     # Could instead pass string and look-up with `Type[s]`.
     assert istype(support)
-    return Family('Delta', [Param('value', support)], const(support), None)
+    return Family('Delta', [param('value', support)], const(support), None)
 
 def lookup(items, name):
     for item in items:
@@ -96,7 +130,8 @@ def getfamily(name):
 def nonlocparams(family):
     assert type(family) == Family
     assert family.response is not None
-    return [param for param in family.params if not param.name == family.response.param]
+    return [param for param in family.params
+            if not (param.name == family.response.param or param.value is not None)]
 
 def main():
     pass

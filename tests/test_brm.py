@@ -9,8 +9,8 @@ from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, LKJCorrC
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
 from pyro.contrib.brm.codegen import genmodel, eval_model
 from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding
-from pyro.contrib.brm.priors import prior, Prior, PriorEdit, get_response_prior, build_prior_tree
-from pyro.contrib.brm.family import getfamily, FAMILIES, Delta, Type
+from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
+from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Delta, Type, apply
 from pyro.contrib.brm.model import build_model, parameters
 from pyro.contrib.brm.fit import pyro_get_param
 
@@ -181,7 +181,7 @@ def build_metadata(formula, metadata):
     ('y ~ x',
      [],
      getfamily('Normal'),
-     [PriorEdit(('resp', 'sigma'), Prior(Delta(Type['PosReal']()), [0.5]))],
+     [PriorEdit(('resp', 'sigma'), apply(Delta(Type['PosReal']()), value=0.5))],
      [('b_0', Cauchy, {})]),
 
     # Custom response family.
@@ -239,9 +239,19 @@ def unwrapfn(fn):
     ('y ~ x', [Categorical('y', list('abc'))], getfamily('Bernoulli'), []),
     ('y ~ x', [Categorical('y', list('ab'))], getfamily('Normal'), []),
     ('y ~ x', [Integral('y', min=0, max=1)], getfamily('Normal'), []),
-    ('y ~ x', [], getfamily('Binomial'), []),
-    ('y ~ x', [Integral('y', min=-1, max=1)], getfamily('Binomial'), []),
-    ('y ~ x', [Categorical('y', list('abc'))], getfamily('Binomial'), []),
+    ('y ~ x', [], apply(getfamily('Binomial'), num_trials=1), []),
+    ('y ~ x', [Integral('y', min=-1, max=1)], apply(getfamily('Binomial'), num_trials=1), []),
+
+    # TODO: Make it possible to have a test like this pass. (Requires
+    # the ability to notice that the support of a Binomial response
+    # distribution doesn't fit the data.
+
+    # ('y ~ x',
+    #  [Integral('y', min=0, max=3)],
+    #  getfamily('Binomial'),
+    #  [PriorEdit(('resp', 'num_trials'), Prior(Delta(Type['IntegerRange'](0, None)), [2]))]),
+
+    ('y ~ x', [Categorical('y', list('abc'))], apply(getfamily('Binomial'), num_trials=1), []),
 ])
 def test_family_and_response_type_checks(formula_str, metadata, family, prior_edits):
     formula = parse(formula_str)
@@ -440,7 +450,7 @@ def test_response_priors_is_complete():
         if family.response is not None:
             for param in family.params:
                 if not param.name == family.response.param:
-                    assert type(get_response_prior(family.name, param.name)) == Prior
+                    assert type(get_response_prior(family.name, param.name)) == Family
 
 @pytest.mark.parametrize('formula_str, expected_formula', [
     ('y ~ 1', Formula('y', OrderedSet(_1), [])),

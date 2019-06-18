@@ -1,5 +1,4 @@
-from .priors import Prior
-from .family import Family, LinkFn, getfamily
+from .family import Family, LinkFn, getfamily, args
 from .model import Model, Group
 
 def gendist(family, args, shape, batch):
@@ -48,14 +47,14 @@ def genprior(varname, prior_desc):
     assert type(varname) == str
     assert type(prior_desc) == list
     assert all(type(p)    == tuple and
-               type(p[0]) == Prior and
+               type(p[0]) == Family and
                type(p[1]) == int
                for p in prior_desc)
     code = []
 
     # Sample each segment of a coefficient vector.
     for i, (prior, length) in enumerate(prior_desc):
-        code.append(sample('{}_{}'.format(varname, i), gendist(prior.family, prior.arguments, [length], False)))
+        code.append(sample('{}_{}'.format(varname, i), gendist(prior, args(prior), [length], False)))
 
     # TODO: Optimisation -- avoid `torch.concat` when only sample is
     # drawn. (Binding the sampled value directly to `varname`.)
@@ -114,8 +113,8 @@ def gengroup(i, group):
 
         # Prior over correlations.
         prior = group.corr_prior
-        assert len(prior.arguments) == 1
-        code.append(sample('L_{}'.format(i), lkj_corr_cholesky(M_i, shape=prior.arguments[0])))
+        assert len(args(prior)) == 1
+        code.append(sample('L_{}'.format(i), lkj_corr_cholesky(M_i, shape=args(prior)[0])))
         code.append('assert L_{}.shape == (M_{}, M_{}) # {} x {}'.format(i, i, i, M_i, M_i))
 
         # Compute the final (scaled, correlated) coefficients.
@@ -223,17 +222,17 @@ def genmodel(model):
     # Sample from priors over the response distribution parameters
     # that aren't predicted from the data.
     for param, param_prior in zip(model.response.nonlocparams, model.response.priors):
-        if param_prior.family.name == 'Delta':
+        if param_prior.name == 'Delta':
             # Skip sampling from a Delta distribution as an
             # optimisation. Since we still need to be able to recover
             # the value of this parameter from each posterior sample
             # (each backend needs to make available all parameters
             # described by `model`), we will later include this in the
             # value returned by this model function.
-            assert len(param_prior.arguments) == 1
-            body.append('{} = torch.tensor([{}])'.format(param.name, param_prior.arguments[0]))
+            assert len(args(param_prior)) == 1
+            body.append('{} = torch.tensor([{}])'.format(param.name, args(param_prior)[0]))
         else:
-            body.append(sample(param.name, gendist(param_prior.family, param_prior.arguments, [1], False)))
+            body.append(sample(param.name, gendist(param_prior, args(param_prior), [1], False)))
 
     # TODO: Optimisations (for numerical stability/perf.) are
     # available for some response family/link function pairs. (Though
@@ -244,12 +243,15 @@ def genmodel(model):
 
     # TODO: This relies on the parameters defined in each Family
     # appearing in the same order as Pyro expects.
-    def response_arg(param_name):
-        if param_name == model.response.family.response.param:
+    def response_arg(param):
+        if param.name == model.response.family.response.param:
             return geninvlinkfn(model.response.family.response.linkfn, 'mu')
+        elif param.value is not None:
+            return 'torch.tensor({}).expand(N)'.format(param.value)
         else:
-            return '{}.expand(N)'.format(param_name)
-    response_args = [response_arg(p.name) for p in model.response.family.params]
+            return '{}.expand(N)'.format(param.name)
+    response_args = [response_arg(p) for p in model.response.family.params]
+
 
     body.append('with pyro.plate("obs", N):')
     body.append(indent(sample('y', gendist(model.response.family, response_args, shape=['N'], batch=True), 'y_obs')))
@@ -262,7 +264,7 @@ def genmodel(model):
     # return value. This is an optimisation that avoids sampling from
     # a delta prior.
     delta_params = [param.name for param, param_prior in zip(model.response.nonlocparams, model.response.priors)
-                    if param_prior.family.name == 'Delta']
+                    if param_prior.name == 'Delta']
 
     returned_params = (['b'] +
                        ['sd_{}'.format(i) for i in range(num_groups)] +

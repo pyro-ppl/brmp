@@ -6,7 +6,7 @@ import pandas as pd
 from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula
 from pyro.contrib.brm.design import DesignMeta, PopulationMeta, GroupMeta
-from pyro.contrib.brm.family import getfamily, Family, nonlocparams, Type, Delta
+from pyro.contrib.brm.family import getfamily, Family, nonlocparams, Type, Delta, apply, apply1, fully_applied
 
 # `is_param` indicates whether a node corresponds to a parameter in
 # the model. (Nodes without this flag set exist only to add structure
@@ -17,24 +17,24 @@ Node = namedtuple('Node', 'name prior_edit is_param checks children')
 def leaf(name, prior_edit=None, checks=[]):
     return Node(name, prior_edit, True, checks, [])
 
-# TODO: This currently requires `parameters` to be a list of floats.
-# (Actually, the family gives us more info than this, e.g. that a
-# parameter is constrained to take only positive reals.) This ought to
-# be checked.
-
-# TODO: Can also check that the number of args matches the number of
-# params. (Having done this, is would be safe to remove the assertion
-# that LKJ has a single param that's currently in `codgen.py`.)
-
-Prior = namedtuple('Prior', 'family arguments')
-
 # e.g. Prior('Normal', [0., 1.])
-def prior(family_name, args):
-    return Prior(getfamily(family_name), args)
+
+# TODO: This is no longer prior specific. e.g. It could be used when
+# specifying a response family. This suggests moving this to family.py
+# and renaming. Though eventually I think a function of this sort
+# won't be necessary since we ought to be able to write e.g.
+# `Binomial(num_trials=n)`.
+def prior(family_name, values):
+    family = getfamily(family_name)
+    names = [p.name for p in family.params]
+    for (name, val) in zip(names, values):
+        family = apply1(family, name, val)
+    return family
+
 
 RESPONSE_PRIORS = {
     'Normal': {
-        'sigma': Prior(getfamily('HalfCauchy'), [3.])
+        'sigma': prior('HalfCauchy', [3.])
     },
     'Binomial': {
         # TODO: We ought to not have a default for this parameter.
@@ -44,7 +44,7 @@ RESPONSE_PRIORS = {
         # mechanism, it might not be worth relaxing the assumption
         # that we always can come up with default priors solely to
         # accommodate this.
-        'num_trials': Prior(Delta(Type['IntegerRange'](0, None)), [1])
+        'num_trials': apply(Delta(Type['IntegerRange'](0, None)), value=1)
     }
 }
 
@@ -145,6 +145,10 @@ def customize_prior(tree, prior_edits):
     assert type(prior_edits) == list
     assert all(type(p) == PriorEdit for p in prior_edits)
     for prior_edit in prior_edits:
+        # TODO: It probably makes sense to move this to the
+        # constructor of PriorEdit, once such a thing exists.
+        if not fully_applied(prior_edit.prior):
+            raise Exception('Distribution arguments missing from prior "{}"'.format(prior_edit.prior.name))
         tree = edit(tree, prior_edit.path,
                     lambda n: Node(n.name, prior_edit, n.is_param, n.checks, n.children))
     return tree
@@ -185,7 +189,7 @@ class Chk():
         self.name = name
 
     def __call__(self, prior):
-        assert type(prior) == Prior
+        assert type(prior) == Family
         return self.predicate(prior)
 
     def __repr__(self):
@@ -201,12 +205,12 @@ def chk_support(typ):
     # support of the prior is a subset of type of the parameter.
     # (However this is easier and good enough for now.)
     def pred(prior):
-        return prior.family.support() == typ
+        return prior.support() == typ
     return Chk(pred, 'has support of {}'.format(typ))
 
 @chk('is LKJ')
 def chk_lkj(prior):
-    return prior.family.name == 'LKJ'
+    return prior.name == 'LKJ'
 
 def check(tree):
     errors = defaultdict(lambda: defaultdict(list))

@@ -3,13 +3,22 @@ from collections import namedtuple
 from pyro.contrib.brm.utils import unzip
 from .formula import Formula
 from .design import RealValued, Categorical, Integral
-from .family import Family, Type, nonlocparams
-from .priors import select, tryselect, Prior, Node
+from .family import Family, Type, nonlocparams, known_support, args
+from .priors import select, tryselect, Node
+
+import logging
+logger = logging.getLogger()
 
 def family_matches_response(formula, metadata, family):
     assert type(formula) == Formula
     assert type(metadata) == dict
     assert type(family) == Family
+    # When the support of the response distribution depends on
+    # parameters sampled from priors then we don't currently check
+    # that the support lines up with the data.
+    if not known_support(family):
+        logger.warning('Did not check for compatibility between the response family and data.')
+        return True
     factor = metadata[formula.response]
     if type(family.support()) == Type['Real']:
         return type(factor) == RealValued
@@ -80,7 +89,7 @@ def build_model(formula, prior_tree, family, dfmetadata):
         group = Group(dfmetadata[node.name], sd_coefs, sd_priors, corr_prior)
         # Assert invariants.
         assert len(group.coefs) == len(group.sd_priors)
-        assert group.corr_prior is None or type(group.corr_prior) == Prior
+        assert group.corr_prior is None or type(group.corr_prior) == Family
         groups.append(group)
 
     nl_params = nonlocparams(family)
@@ -97,34 +106,35 @@ def model_repr(model):
     out = []
     def write(s):
         out.append(s)
-    # TODO: Move to a `Prior` class?
-    def prior_repr(prior):
-        return '{}({})'.format(prior.family.name, ', '.join([str(arg) for arg in prior.arguments]))
+    # TODO: Move to a `Family` class?
+    def family_repr(family):
+        params = ', '.join('{}={}'.format(param.name, param.value) for param in family.params if not param.value is None)
+        return '{}({})'.format(family.name, params)
     write('=' * 40)
     write('Population')
     write('-' * 40)
     write('Coef Priors:')
     for (coef, prior) in zip(model.population.coefs, model.population.priors):
-        write('{:<15} | {}'.format(coef, prior_repr(prior)))
+        write('{:<15} | {}'.format(coef, family_repr(prior)))
     for i, group in enumerate(model.groups):
         write('=' * 40)
         write('Group {}'.format(i))
         write('-' * 40)
         write('Factor: {}\nLevels: {}'.format(group.factor.name, group.factor.levels))
-        write('Corr. Prior: {}'.format(None if group.corr_prior is None else prior_repr(group.corr_prior)))
+        write('Corr. Prior: {}'.format(None if group.corr_prior is None else family_repr(group.corr_prior)))
         write('S.D. Priors:')
         for (coef, sd_prior) in zip(group.coefs, group.sd_priors):
-            write('{:<15} | {}'.format(coef, prior_repr(sd_prior)))
+            write('{:<15} | {}'.format(coef, family_repr(sd_prior)))
     write('=' * 40)
     write('Response')
     write('-' * 40)
-    write('Family: {}'.format(model.response.family.name))
+    write('Family: {}'.format(family_repr(model.response.family)))
     write('Link:')
     write('  Parameter: {}'.format(model.response.family.response.param))
     write('  Function:  {}'.format(model.response.family.response.linkfn.name))
     write('Priors:')
     for (param, prior) in zip(model.response.nonlocparams, model.response.priors):
-        write('{:<15} | {}'.format(param.name, prior_repr(prior)))
+        write('{:<15} | {}'.format(param.name, family_repr(prior)))
     write('=' * 40)
     return '\n'.join(out)
 
