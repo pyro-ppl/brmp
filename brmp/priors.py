@@ -197,6 +197,9 @@ def chk(name):
     return decorate
 
 def chk_support(typ):
+    # TODO: This could probably be relaxed to only require that the
+    # support of the prior is a subset of type of the parameter.
+    # (However this is easier and good enough for now.)
     def pred(prior):
         return prior.family.support == typ
     return Chk(pred, 'has support of {}'.format(typ.name))
