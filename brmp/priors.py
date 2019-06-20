@@ -39,7 +39,8 @@ RESPONSE_PRIORS = {
 }
 
 def get_response_prior(family, parameter):
-    return RESPONSE_PRIORS[family][parameter]
+    if family in RESPONSE_PRIORS:
+        return RESPONSE_PRIORS[family][parameter]
 
 # This is similar to brms `set_prior`. (e.g. `set_prior('<prior>',
 # coef='x1')` is similar to `PriorEdit(['x1'], '<prior>)`.) By
@@ -117,9 +118,13 @@ def default_prior(formula, design_metadata, family):
     b_children = [leaf(name) for name in design_metadata.population.coefs]
     cor_children = [leaf(group.column) for group in formula.groups if group.corr and len(group.terms) > 1]
     sd_children = [Node(gm.name, None, False, [], [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
-    resp_children = [leaf(p.name,
-                          PriorEdit(('resp', p.name), get_response_prior(family.name, p.name)),
-                          [chk_support(p.type)])
+
+    def mk_resp_prior_edit(param_name, family_name):
+        prior = get_response_prior(family_name, param_name)
+        if prior is not None:
+            return PriorEdit(('resp', param_name), prior)
+
+    resp_children = [leaf(p.name, mk_resp_prior_edit(p.name, family.name), [chk_support(p.type)])
                      for p in nonlocparams(family)]
     return Node('root', None, False, [], [
         Node('b',    PriorEdit(('b',),   prior('Cauchy', [0., 1.])), False, [chk_support(Type['Real']())],    b_children),
@@ -178,9 +183,13 @@ class Chk():
         self.predicate = predicate
         self.name = name
 
-    def __call__(self, prior):
-        assert type(prior) == Family
-        return self.predicate(prior)
+    def __call__(self, node):
+        assert type(node) == Node
+        if node.prior_edit is None:
+            # There is no prior to check.
+            return True
+        else:
+            return self.predicate(node.prior_edit.prior)
 
     def __repr__(self):
         return 'Chk("{}")'.format(self.name)
@@ -206,7 +215,10 @@ def check(tree):
     errors = defaultdict(lambda: defaultdict(list))
     for (node, path) in leaves(tree):
         for chk in node.checks:
-            if not chk(node.prior_edit.prior):
+            if not chk(node):
+                # This holds because checks can only fail when a node
+                # has a `prior_edit`.
+                assert node.prior_edit is not None
                 errors[node.prior_edit.path][chk].append(path)
     return errors
 
