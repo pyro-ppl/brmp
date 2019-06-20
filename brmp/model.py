@@ -42,8 +42,8 @@ def check_family_matches_response(formula, metadata, family):
         # TODO: This could be more informative. e.g. If choosing
         # Bernoulli fails, is the problem that the response is
         # numeric, or that it has more than two levels?
-        error = 'The "{}" family is not compatible with the type of response column "{}".'
-        raise Exception(error.format(family.name, formula.response))
+        error = 'The response distribution "{}" is not compatible with the type of the response column "{}".'
+        raise Exception(error.format(family_repr(family), formula.response))
 
 
 Model = namedtuple('Model', 'population groups response')
