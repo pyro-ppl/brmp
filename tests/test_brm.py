@@ -10,7 +10,7 @@ from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfa
 from pyro.contrib.brm.codegen import genmodel, eval_model
 from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
-from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Delta, Type, apply
+from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
 from pyro.contrib.brm.model import build_model, parameters
 from pyro.contrib.brm.fit import pyro_get_param
 
@@ -178,13 +178,13 @@ def build_metadata(formula, metadata):
      [('b_0', Cauchy, {}),
       ('sigma', HalfCauchy, {'scale': 4.})]),
 
+    # Custom response family.
     ('y ~ x',
      [],
-     getfamily('Normal'),
-     [PriorEdit(('resp', 'sigma'), apply(Delta(Type['PosReal']()), value=0.5))],
+     apply(getfamily('Normal'), sigma=0.5),
+     [],
      [('b_0', Cauchy, {})]),
 
-    # Custom response family.
     ('y ~ x',
      [Categorical('y', list('AB'))],
      getfamily('Bernoulli'),

@@ -113,16 +113,6 @@ def family_repr(family):
                        if not param.value is None)
     return '{}({})'.format(family.name, params)
 
-# A family of families. In model.py we check that the support of a
-# prior matches the domain of a response distribution parameter, hence
-# the need to specify the support here. An alternative (which I like
-# less, but might be more convenient) would be to have a wildcard type
-# and update the check in priors to always accept such.
-def Delta(support):
-    # Could instead pass string and look-up with `Type[s]`.
-    assert istype(support)
-    return Family('Delta', [param('value', support)], const(support), None)
-
 def lookup(items, name):
     for item in items:
         if item.name == name:

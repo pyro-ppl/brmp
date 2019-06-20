@@ -6,19 +6,16 @@ from .design import RealValued, Categorical, Integral
 from .family import Family, Type, nonlocparams, support_depends_on_args, args, family_repr
 from .priors import select, tryselect, Node
 
-import logging
-logger = logging.getLogger()
-
 def family_matches_response(formula, metadata, family):
     assert type(formula) == Formula
     assert type(metadata) == dict
     assert type(family) == Family
-    # When the support of the response distribution depends on
-    # parameters sampled from priors then we don't currently check
-    # that the support lines up with the data.
-    if support_depends_on_args(family):
-        logger.warning('Did not check for compatibility between the response family and data.')
-        return True
+    # I don't there anyway for this not to hold with the present
+    # system. However, it /could/ arise if it were possible to put a
+    # prior over e.g. the `num_trials` parameter of Binomial, for
+    # example. Because this holds we know we can safely
+    # call`family.support` with zero args below.
+    assert not support_depends_on_args(family)
     factor = metadata[formula.response]
     if type(family.support()) == Type['Real']:
         return type(factor) == RealValued

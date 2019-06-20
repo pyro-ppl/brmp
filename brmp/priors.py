@@ -6,7 +6,7 @@ import pandas as pd
 from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula
 from pyro.contrib.brm.design import DesignMeta, PopulationMeta, GroupMeta
-from pyro.contrib.brm.family import getfamily, Family, nonlocparams, Type, Delta, apply, apply1, fully_applied
+from pyro.contrib.brm.family import getfamily, Family, nonlocparams, Type, apply, apply1, fully_applied
 
 # `is_param` indicates whether a node corresponds to a parameter in
 # the model. (Nodes without this flag set exist only to add structure
