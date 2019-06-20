@@ -36,16 +36,6 @@ RESPONSE_PRIORS = {
     'Normal': {
         'sigma': prior('HalfCauchy', [3.])
     },
-    'Binomial': {
-        # TODO: We ought to not have a default for this parameter.
-        # It's not possible to pick a sensible default value for it
-        # even if we look at the data. But since using a Delta here is
-        # a kludge that will hopefully be replaced with some other
-        # mechanism, it might not be worth relaxing the assumption
-        # that we always can come up with default priors solely to
-        # accommodate this.
-        'num_trials': apply(Delta(Type['IntegerRange'](0, None)), value=1)
-    }
 }
 
 def get_response_prior(family, parameter):

@@ -199,7 +199,7 @@ def build_metadata(formula, metadata):
 
     ('y ~ x',
      [Integral('y', min=0, max=10)],
-     getfamily('Binomial'),
+     apply(getfamily('Binomial'), num_trials=10),
      [],
      [('b_0', Cauchy, {})]),
 
@@ -438,13 +438,6 @@ def test_designmatrix(formula_str, df, expected):
     for k in expected.keys():
         assert data[k].dtype == expected[k].dtype
         assert_equal(data[k], expected[k])
-
-def test_response_priors_is_complete():
-    for family in FAMILIES:
-        if family.response is not None:
-            for param in family.params:
-                if not param.name == family.response.param:
-                    assert type(get_response_prior(family.name, param.name)) == Family
 
 @pytest.mark.parametrize('formula_str, expected_formula', [
     ('y ~ 1', Formula('y', OrderedSet(_1), [])),
