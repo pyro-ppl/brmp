@@ -154,6 +154,19 @@ def customize_prior(tree, prior_edits):
 def build_prior_tree(formula, design_metadata, family, prior_edits, chk=True):
     tree = fill(customize_prior(default_prior(formula, design_metadata, family), prior_edits))
     if chk:
+        # TODO: I might consider delaying this check (that all
+        # parameters have priors) until just before code generation
+        # happens. This could allow an under-specified model to be
+        # pretty-printed, which might make it easier for users to see
+        # what's going on. (Once `brm` returns a model rather than
+        # running inference.) Doing so would require the `Model` data
+        # structure and pretty printing code to handle missing priors.
+        # (Does something similar apply to the response/family
+        # compatibility checks currently in model.py?)
+        missing_prior_paths = leaves_without_prior(tree)
+        if len(missing_prior_paths) > 0:
+            paths = ', '.join('"{}"'.format('/'.join(path)) for path in missing_prior_paths)
+            raise Exception('Prior missing from {}.'.format(paths))
         errors = check(tree)
         if errors:
             raise Exception(format_errors(errors))
@@ -227,3 +240,6 @@ def format_errors(errors):
     paths = ', '.join('"{}"'.format('/'.join(path))
                       for path in errors.keys())
     return 'Invalid prior specified at {}.'.format(paths)
+
+def leaves_without_prior(tree):
+    return [path for (node, path) in leaves(tree) if node.prior_edit is None]

@@ -256,29 +256,38 @@ def test_family_and_response_type_checks(formula_str, metadata, family, prior_ed
         model = build_model(formula, prior_tree, family, metadata)
 
 
-@pytest.mark.parametrize('formula_str, metadata, family, prior_edits', [
+@pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected_error', [
     ('y ~ x',
      [],
      getfamily('Normal'),
-     [PriorEdit(('resp', 'sigma'), prior('Normal', [0., 1.]))]),
+     [PriorEdit(('resp', 'sigma'), prior('Normal', [0., 1.]))],
+     r'(?i)invalid prior'),
     ('y ~ x1 | x2',
      [Categorical('x2', list('ab'))],
      getfamily('Normal'),
-     [PriorEdit(('sd', 'x2'), prior('Normal', [0., 1.]))]),
+     [PriorEdit(('sd', 'x2'), prior('Normal', [0., 1.]))],
+     r'(?i)invalid prior'),
     ('y ~ 1 + x1 | x2',
      [Categorical('x2', list('ab'))],
      getfamily('Normal'),
-     [PriorEdit(('cor', 'x2'), prior('Normal', [0., 1.]))]),
+     [PriorEdit(('cor', 'x2'), prior('Normal', [0., 1.]))],
+     r'(?i)invalid prior'),
     ('y ~ x',
      [],
      getfamily('Normal'),
-     [PriorEdit(('b',), prior('Bernoulli', [.5]))]),
+     [PriorEdit(('b',), prior('Bernoulli', [.5]))],
+     r'(?i)invalid prior'),
+    ('y ~ x',
+     [Integral('y', 0, 1)],
+     getfamily('Binomial'),
+     [],
+     r'(?i)prior missing'),
 ])
-def test_prior_checks(formula_str, metadata, family, prior_edits):
+def test_prior_checks(formula_str, metadata, family, prior_edits, expected_error):
     formula = parse(formula_str)
     metadata = build_metadata(formula, metadata)
     design_metadata = designmatrices_metadata(formula, metadata)
-    with pytest.raises(Exception, match=r'(?i)invalid prior'):
+    with pytest.raises(Exception, match=expected_error):
         build_prior_tree(formula, design_metadata, family, prior_edits)
 
 

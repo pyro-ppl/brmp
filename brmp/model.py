@@ -51,15 +51,6 @@ Population = namedtuple('Population', 'coefs priors')
 Group = namedtuple('Group', 'factor coefs sd_priors corr_prior')
 Response = namedtuple('Response', 'family nonlocparams priors')
 
-# TODO: We need to check that all parameters have priors. For now I
-# can check it here when building the model. Longer-term, I ought to
-# consider delaying such a check until just before code generation
-# happens. This would allow an underspecified model to be
-# pretty-printed, which might make it easier for users to see what's
-# going on. Doing so would require the `Model` data structure and
-# pretty printing code to handle missing priors. (Does something
-# similar apply to the response/family compatibility checks?)
-
 def build_model(formula, prior_tree, family, dfmetadata):
     assert type(formula) == Formula
     assert type(prior_tree) == Node
