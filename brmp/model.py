@@ -3,7 +3,7 @@ from collections import namedtuple
 from pyro.contrib.brm.utils import unzip
 from .formula import Formula
 from .design import RealValued, Categorical, Integral
-from .family import Family, Type, nonlocparams, known_support, args
+from .family import Family, Type, nonlocparams, known_support, args, family_repr
 from .priors import select, tryselect, Node
 
 import logging
@@ -106,10 +106,6 @@ def model_repr(model):
     out = []
     def write(s):
         out.append(s)
-    # TODO: Move to a `Family` class?
-    def family_repr(family):
-        params = ', '.join('{}={}'.format(param.name, param.value) for param in family.params if not param.value is None)
-        return '{}({})'.format(family.name, params)
     write('=' * 40)
     write('Population')
     write('-' * 40)

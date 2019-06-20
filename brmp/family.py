@@ -107,6 +107,11 @@ def fully_applied(family):
 def args(family):
     return [param.value for param in family.params]
 
+def family_repr(family):
+    params = ', '.join('{}={}'.format(param.name, param.value)
+                       for param in family.params
+                       if not param.value is None)
+    return '{}({})'.format(family.name, params)
 
 # A family of families. In model.py we check that the support of a
 # prior matches the domain of a response distribution parameter, hence
