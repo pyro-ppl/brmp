@@ -3,7 +3,7 @@ from collections import namedtuple
 from pyro.contrib.brm.utils import unzip
 from .formula import Formula
 from .design import RealValued, Categorical, Integral
-from .family import Family, Type, nonlocparams, known_support, args, family_repr
+from .family import Family, Type, nonlocparams, support_depends_on_args, args, family_repr
 from .priors import select, tryselect, Node
 
 import logging
@@ -16,7 +16,7 @@ def family_matches_response(formula, metadata, family):
     # When the support of the response distribution depends on
     # parameters sampled from priors then we don't currently check
     # that the support lines up with the data.
-    if not known_support(family):
+    if support_depends_on_args(family):
         logger.warning('Did not check for compatibility between the response family and data.')
         return True
     factor = metadata[formula.response]

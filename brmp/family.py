@@ -98,8 +98,8 @@ def apply(family, **kwargs):
         family = apply1(family, name, value)
     return family
 
-def known_support(family):
-    return len(inspect.getfullargspec(family.support).args) == 0
+def support_depends_on_args(family):
+    return len(inspect.getfullargspec(family.support).args) > 0
 
 def fully_applied(family):
     return all(param.value is not None for param in family.params)
