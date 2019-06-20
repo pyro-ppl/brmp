@@ -241,16 +241,10 @@ def unwrapfn(fn):
     ('y ~ x', [Integral('y', min=0, max=1)], getfamily('Normal'), []),
     ('y ~ x', [], apply(getfamily('Binomial'), num_trials=1), []),
     ('y ~ x', [Integral('y', min=-1, max=1)], apply(getfamily('Binomial'), num_trials=1), []),
-
-    # TODO: Make it possible to have a test like this pass. (Requires
-    # the ability to notice that the support of a Binomial response
-    # distribution doesn't fit the data.
-
-    # ('y ~ x',
-    #  [Integral('y', min=0, max=3)],
-    #  getfamily('Binomial'),
-    #  [PriorEdit(('resp', 'num_trials'), Prior(Delta(Type['IntegerRange'](0, None)), [2]))]),
-
+    ('y ~ x',
+     [Integral('y', min=0, max=3)],
+     apply(getfamily('Binomial'), num_trials=2),
+     []),
     ('y ~ x', [Categorical('y', list('abc'))], apply(getfamily('Binomial'), num_trials=1), []),
 ])
 def test_family_and_response_type_checks(formula_str, metadata, family, prior_edits):
