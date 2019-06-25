@@ -213,7 +213,8 @@ def test_codegen(formula_str, metadata, family, prior_edits, expected):
     code = genmodel(model_desc)
     #print(code)
     model = eval_model(code)
-    data = dummy_design(formula, metadata, 5)
+    N = 5
+    data = dummy_design(formula, metadata, N)
     trace = poutine.trace(model).get_trace(**data)
     expected_sites = [site for (site, _, _) in expected]
     assert set(trace.stochastic_nodes) - {'obs'} == set(expected_sites)
@@ -228,6 +229,7 @@ def test_codegen(formula_str, metadata, family, prior_edits, expected):
         shape = pyro_get_param(trace, parameter.name).shape
         expected_shape = parameter.shape
         assert shape == expected_shape
+    assert pyro_get_param(trace, 'mu').shape == (N,)
 
 def unwrapfn(fn):
     return unwrapfn(fn.base_dist) if type(fn) == Independent else fn

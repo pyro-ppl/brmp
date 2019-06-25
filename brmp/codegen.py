@@ -249,7 +249,7 @@ def genmodel(model):
     # Values of interest that are not generated directly by sample
     # statements (such as the `b` vector) are returned from the model
     # so that they can be retrieved from the execution trace later.
-    returned_params = (['b'] +
+    returned_params = (['mu', 'b'] +
                        ['sd_{}'.format(i) for i in range(num_groups)] +
                        ['r_{}'.format(i) for i in range(num_groups)])
     retval =  '{{{}}}'.format(', '.join('\'{}\': {}'.format(p, p) for p in returned_params))

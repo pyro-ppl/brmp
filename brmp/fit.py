@@ -25,7 +25,8 @@ def pyro_posterior(run):
 
 # It's expected that this should support all parameter names returned
 # by `parameter_names(model)` where `model` is the `Model` from which
-# samples were drawn.
+# samples were drawn. It should also support fetching the (final)
+# value bound to `mu` in the generated code.
 def pyro_get_param(sample, name):
     if name in sample.nodes:
         return sample.nodes[name]['value']
