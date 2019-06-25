@@ -10,10 +10,10 @@ def family_matches_response(formula, metadata, family):
     assert type(formula) == Formula
     assert type(metadata) == dict
     assert type(family) == Family
-    # I don't there anyway for this not to hold with the present
-    # system. However, it /could/ arise if it were possible to put a
-    # prior over e.g. the `num_trials` parameter of Binomial, for
-    # example. Because this holds we know we can safely
+    # I don't think there is any way for this not to hold with the
+    # present system. However, it /could/ arise if it were possible to
+    # put a prior over e.g. the `num_trials` parameter of Binomial,
+    # for example. Because this holds we know we can safely
     # call`family.support` with zero args below.
     assert not support_depends_on_args(family)
     factor = metadata[formula.response]
