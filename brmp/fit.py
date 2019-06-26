@@ -1,9 +1,11 @@
 from collections import namedtuple, defaultdict
 
+import numpy as np
+
 from pyro.contrib.brm.model import model_repr, parameter_names
 
 Fit = namedtuple('Fit', ['run', 'code', 'data', 'model', 'posterior', 'invlinkfn'])
-Posterior = namedtuple('Posterior', ['samples', 'get_param'])
+Posterior = namedtuple('Posterior', ['samples', 'get_param', 'to_numpy'])
 
 # The idea is that `pyro_posterior` and `pyro_get_param` capture the
 # backend specific part of processing posterior samples. Alternatives
@@ -18,7 +20,7 @@ Posterior = namedtuple('Posterior', ['samples', 'get_param'])
 # allowing things like `query.marginal('b').mean()`, etc.
 
 def pyro_posterior(run):
-    return Posterior(run.exec_traces, pyro_get_param)
+    return Posterior(run.exec_traces, pyro_get_param, pyro_to_numpy)
 
 # Extracts a value of interest (e.g. 'b', 'r_0', 'L_1', 'sigma') from
 # a single sample.
@@ -33,31 +35,26 @@ def pyro_get_param(sample, name):
     else:
         return sample.nodes['_RETURN']['value'][name]
 
+# This provides a back-end specific method for turning a parameter
+# value (as returned by `get_param`) into a numpy array.
+def pyro_to_numpy(param):
+    return param.numpy()
+
 def marginals(fit):
     sums = defaultdict(float)
     params = parameter_names(fit.model)
     return {p: marginal(fit, p) for p in params}
 
-# This aims to be generic/polymorphic, requiring only arithmetic
-# operations and `sqrt` on values returned by `get_param`. The idea is
-# that this might make it possible to support backends which
-# potentially differ in the way they store samples, and perhaps in
-# whether they use numpy or torch to represent vectors/matrices.
-
-# TODO: Use Welford for better stability/single pass?
 def marginal(fit, parameter_name):
     assert type(fit) == Fit
     assert type(parameter_name) == str
     samples = fit.posterior.samples
     get_param = fit.posterior.get_param
-    # We don't include Bessel's correction.
-    N = len(samples)
-    assert N > 0
-    _sum = sum(get_param(sample, parameter_name) for sample in samples)
-    mean = _sum / float(N)
-    sum_of_sq_diffs = sum((get_param(sample, parameter_name) - mean) ** 2
-                          for sample in samples)
-    sd = (sum_of_sq_diffs / float(N)).sqrt()
+    to_numpy = fit.posterior.to_numpy
+    samples_arr = np.stack([to_numpy(get_param(sample, parameter_name))
+                            for sample in samples])
+    mean = np.mean(samples_arr, 0)
+    sd = np.std(samples_arr, 0)
     return mean, sd
 
 
