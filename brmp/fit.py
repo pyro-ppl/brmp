@@ -1,4 +1,4 @@
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 
 import numpy as np
 
@@ -41,7 +41,6 @@ def pyro_to_numpy(param):
     return param.numpy()
 
 def marginals(fit, qs):
-    sums = defaultdict(float)
     params = parameter_names(fit.model)
     return {p: marginal(fit, p, qs) for p in params}
 
