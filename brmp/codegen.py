@@ -156,7 +156,7 @@ def gengroup(i, group):
 
     return code
 
-def geninvlinkfn(linkfn, code):
+def geninvlinkbody(linkfn, code):
     if linkfn == LinkFn.identity:
         return code
     elif linkfn == LinkFn.logit:
@@ -164,6 +164,9 @@ def geninvlinkfn(linkfn, code):
     else:
         raise NotImplementedError('code generation for link function {} not implemented'.format(linkfn))
 
+def geninvlinkfn(model):
+    body = geninvlinkbody(model.response.family.response.linkfn, 'x')
+    return '\n'.join(method('invlink', ['x'], ['return {}'.format(body)]))
 
 # TODO: I'm missing opportunities to vectorise here. Adjacent segments
 # that share a family and differ only in parameters can be handled
@@ -236,7 +239,7 @@ def genmodel(model):
     # appearing in the same order as Pyro expects.
     def response_arg(param):
         if param.name == model.response.family.response.param:
-            return geninvlinkfn(model.response.family.response.linkfn, 'mu')
+            return geninvlinkbody(model.response.family.response.linkfn, 'mu')
         elif param.value is not None:
             return 'torch.tensor({}).expand(N)'.format(param.value)
         else:

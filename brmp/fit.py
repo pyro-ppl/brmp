@@ -2,7 +2,7 @@ from collections import namedtuple, defaultdict
 
 from pyro.contrib.brm.model import model_repr, parameter_names
 
-Fit = namedtuple('Fit', ['run', 'code', 'data', 'model', 'posterior'])
+Fit = namedtuple('Fit', ['run', 'code', 'data', 'model', 'posterior', 'invlinkfn'])
 Posterior = namedtuple('Posterior', ['samples', 'get_param'])
 
 # The idea is that `pyro_posterior` and `pyro_get_param` capture the
