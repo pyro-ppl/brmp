@@ -7,7 +7,7 @@ import pyro.poutine as poutine
 from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, LKJCorrCholesky
 
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.codegen import genmodel, eval_model
+from pyro.contrib.brm.codegen import genmodel, eval_method
 from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
@@ -212,7 +212,7 @@ def test_codegen(formula_str, metadata, family, prior_edits, expected):
     model_desc = build_model(formula, prior_tree, family, metadata)
     code = genmodel(model_desc)
     #print(code)
-    model = eval_model(code)
+    model = eval_method(code)
     N = 5
     data = dummy_design(formula, metadata, N)
     trace = poutine.trace(model).get_trace(**data)

@@ -1,3 +1,4 @@
+import re
 from .family import Family, LinkFn, getfamily, args
 from .model import Model, Group
 
@@ -261,10 +262,13 @@ def genmodel(model):
               ['y_obs=None'])
     return '\n'.join(method('model', params, body))
 
-def eval_model(model_code):
+def eval_method(code):
+    match = re.search(r'^def +(\w+)\(', code)
+    assert match is not None
+    method_name = match.group(1)
     import torch
     import pyro
     import pyro.distributions as dist
     g = locals()
-    exec(model_code, g)
-    return g['model']
+    exec(code, g)
+    return g[method_name]

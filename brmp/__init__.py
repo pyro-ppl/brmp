@@ -1,7 +1,7 @@
 from pyro.infer.mcmc import MCMC, NUTS
 
 from pyro.contrib.brm.formula import parse
-from pyro.contrib.brm.codegen import genmodel, eval_model
+from pyro.contrib.brm.codegen import genmodel, eval_method
 from pyro.contrib.brm.design import makedata, dfmetadata, make_metadata_lookup, designmatrices_metadata
 from pyro.contrib.brm.fit import Fit, pyro_posterior
 from pyro.contrib.brm.family import getfamily
@@ -24,7 +24,7 @@ def brm(formula_str, df, family=getfamily('Normal'), prior_edits=[],
     formula = parse(formula_str)
     model_desc = makedesc(formula, df, family, prior_edits)
     code = genmodel(model_desc)
-    model = eval_model(code)
+    model = eval_method(code)
     # TODO: Both `makedata` and `designmatrices_metadata` call
     # `coding` (from design.py) internally. Instead we ought to call
     # this once and share the result. (Perhaps by having the process
