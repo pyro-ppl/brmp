@@ -1,5 +1,5 @@
 import re
-from .family import Family, LinkFn, getfamily, args
+from .family import Family, LinkFn, getfamily, args, free_param_names
 from .model import Model, Group
 
 def gendist(family, args, shape, batch):
@@ -20,6 +20,25 @@ def gendist(family, args, shape, batch):
     # `to_event()` call is a no-op, and could therefore be dropped as
     # an optimisation. (Eqv., when eventdims == 0?)
     return '{}({}).to_event({})'.format(family.name, ', '.join(args_code), eventdims)
+
+def gen_response_dist(model):
+    # TODO: Optimisations (for numerical stability/perf.) are
+    # available for some response family/link function pairs. (Though
+    # maybe only for particular back-ends.) e.g. In Pyro `Bernoulli`
+    # has a `logits` param, so it's possible to pass `mu` directly as
+    # that.
+
+    # TODO: This relies on the parameters defined in each Family
+    # appearing in the same order as Pyro expects.
+    def response_arg(param):
+        if param.name == model.response.family.response.param:
+            return geninvlinkbody(model.response.family.response.linkfn, 'mu')
+        elif param.value is not None:
+            return 'torch.tensor({}).expand(N)'.format(param.value)
+        else:
+            return '{}.expand(N)'.format(param.name)
+    response_args = [response_arg(p) for p in model.response.family.params]
+    return gendist(model.response.family, response_args, shape=['N'], batch=True)
 
 def lkj_corr_cholesky(size, shape):
     assert type(size) == int # the size of the matrix
@@ -164,9 +183,25 @@ def geninvlinkbody(linkfn, code):
     else:
         raise NotImplementedError('code generation for link function {} not implemented'.format(linkfn))
 
+# TODO: Re-evaluate whether it really makes sense to have these
+# implemented by each back end. An alternative is to implement link
+# functions / response expectations once, as functions which operate
+# on parameters represented as numpy arrays. (Since I imagining that
+# each back end will come with the ability to map its parameter values
+# to numpy arrays.) This would avoid having to so something like this
+# for every backend, and would have the advantage of not coming from
+# generated code. On the downside, it might mean duplicating some
+# logic, e.g. for parameter shapes.
 def geninvlinkfn(model):
     body = geninvlinkbody(model.response.family.response.linkfn, 'x')
     return '\n'.join(method('invlink', ['x'], ['return {}'.format(body)]))
+
+def gen_expected_response_fn(model):
+    distcode = gen_response_dist(model)
+    args = free_param_names(model.response.family)
+    body = ["N = mu.shape[0]",
+            "return dist.{}.mean".format(distcode)]
+    return '\n'.join(method('expected_response', args, body))
 
 # TODO: I'm missing opportunities to vectorise here. Adjacent segments
 # that share a family and differ only in parameters can be handled
@@ -228,27 +263,8 @@ def genmodel(model):
     for param, param_prior in zip(model.response.nonlocparams, model.response.priors):
         body.append(sample(param.name, gendist(param_prior, args(param_prior), [1], False)))
 
-    # TODO: Optimisations (for numerical stability/perf.) are
-    # available for some response family/link function pairs. (Though
-    # maybe only for particular back-ends.) e.g. In Pyro `Bernoulli`
-    # has a `logits` param, so it's possible to pass `mu` directly as
-    # that.
-
-
-    # TODO: This relies on the parameters defined in each Family
-    # appearing in the same order as Pyro expects.
-    def response_arg(param):
-        if param.name == model.response.family.response.param:
-            return geninvlinkbody(model.response.family.response.linkfn, 'mu')
-        elif param.value is not None:
-            return 'torch.tensor({}).expand(N)'.format(param.value)
-        else:
-            return '{}.expand(N)'.format(param.name)
-    response_args = [response_arg(p) for p in model.response.family.params]
-
-
     body.append('with pyro.plate("obs", N):')
-    body.append(indent(sample('y', gendist(model.response.family, response_args, shape=['N'], batch=True), 'y_obs')))
+    body.append(indent(sample('y', gen_response_dist(model), 'y_obs')))
 
     # Values of interest that are not generated directly by sample
     # statements (such as the `b` vector) are returned from the model

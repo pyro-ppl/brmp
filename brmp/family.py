@@ -128,6 +128,14 @@ def nonlocparams(family):
     return [param for param in family.params
             if not (param.name == family.response.param or param.value is not None)]
 
+# Note that the location parameter is always called "mu" in the list
+# returned by this function.
+def free_param_names(family):
+    assert type(family) == Family
+    assert family.response is not None
+    return ['mu' if param.name == family.response.param else param.name
+            for param in family.params if param.value is None]
+
 def main():
     pass
 
