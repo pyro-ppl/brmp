@@ -5,6 +5,8 @@ import numpy as np
 from pyro.contrib.brm.model import model_repr, parameter_names
 from pyro.contrib.brm.family import free_param_names
 
+#from pyro.contrib.brm.utils import join
+
 # TODO: Should invlinkfn & expected_response_fn be on Posterior with
 # other back end specific fns?
 
@@ -44,31 +46,92 @@ def pyro_get_param(sample, name):
 def pyro_to_numpy(param):
     return param.numpy()
 
-def marginals(fit, qs):
-    params = parameter_names(fit.model)
-    return {p: marginal(fit, p, qs) for p in params}
 
-def marginal(fit, parameter_name, qs):
+default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
+
+def format_quantiles(qs):
+    return ['{:g}%'.format(q * 100) for q in qs]
+
+def marginal(fit, extractor):
     assert type(fit) == Fit
-    assert type(parameter_name) == str
+    samples = fit.posterior.samples
+    to_numpy = fit.posterior.to_numpy
+    # `extractor` is a function that extracts from a sample some value
+    # of interest, which is expected to be in the back end specific
+    # representation. These values are mapped to numpy arrays using
+    # the function back specific `to_numpy()` function. Once converted
+    # to numpy, the extracted values are reshaped into vectors in
+    # order that they can be stacked in a single matrix. (This is
+    # necessary for e.g. group level `r_i` parameters which are
+    # themselves matrices.)
+    #
+    # Creating this intermediate list is a bit unpleasant -- could
+    # fill a pre-allocated array instead.
+    #
+    return np.stack([to_numpy(extractor(s)).reshape(-1) for s in samples])
+
+def param_marginal(fit, parameter_name):
+    get_param = fit.posterior.get_param
+    return marginal(fit, lambda s: get_param(s, parameter_name))
+
+# Computes statistics for an array produced by `marginal`.
+def marginal_stats(arr, qs):
+    assert len(arr.shape) == 2
     assert type(qs) == list
     assert all(0 <= q <= 1 for q in qs)
-    samples = fit.posterior.samples
-    get_param = fit.posterior.get_param
-    to_numpy = fit.posterior.to_numpy
-    samples_arr = np.stack([to_numpy(get_param(sample, parameter_name))
-                            for sample in samples])
-    mean = np.mean(samples_arr, 0)
-    sd = np.std(samples_arr, 0)
-    quantiles = np.quantile(samples_arr, qs, 0)
-    return mean, sd, quantiles
+    mean = np.mean(arr, 0)
+    sd = np.std(arr, 0)
+    quantiles = np.quantile(arr, qs, 0)
+    stacked = np.hstack((mean.reshape((-1, 1)), sd.reshape((-1, 1)), quantiles.T))
+    return stacked
 
-# TODO: Extract new function from the bits that are shared between
-# this and `marginal`.
+# TODO: Would it be better to replace these tables with pandas data
+# frames? They also let you get at the underlying data as a numpy
+# array (I assume), and have their own pretty printing.
+class ArrReprWrapper:
+    def __init__(self, array, row_labels, col_labels):
+        assert len(array.shape) == 2
+        assert row_labels is None or array.shape[0] == len(row_labels)
+        assert col_labels is None or array.shape[1] == len(col_labels)
+        self.array = array
+        self.col_labels = col_labels
+        self.row_labels = row_labels
+
+    def __repr__(self):
+        # Format a float. 2 decimal places, space for sign.
+        def ff(x):
+            return '{: .2f}'.format(x)
+        table = [[ff(c) for c in r] for r in self.array.tolist()]
+        return layout_table(add_labels(table, self.col_labels, self.row_labels))
+
+def add_labels(table, col_labels, row_labels):
+    assert type(table) == list
+    assert all(type(row) == list for row in table)
+    out = [col_labels] if col_labels is not None else []
+    out += table
+    if row_labels is not None:
+        rlabels = row_labels if col_labels is None else [''] + row_labels
+        assert len(out) == len(rlabels)
+        out = [[name] + r for r, name in zip(out, rlabels)]
+    return out
+
+def layout_table(rows):
+    out = []
+    num_rows = len(rows)
+    assert num_rows > 0
+    num_cols = len(rows[0])
+    assert all(len(row) == num_cols for row in rows)
+    max_widths = [0] * num_cols
+    for row in rows:
+        for i, cell in enumerate(row):
+            max_widths[i] = max(max_widths[i], len(cell))
+    fmt = ' '.join('{{:>{}}}'.format(mw) for mw in max_widths)
+    return '\n'.join(fmt.format(*row) for row in rows)
 
 # brms                                | brmp
 # -------------------------------------------------------------
 # fitted(fit)                         | fitted(fit)
+# fitted(fit, summary=TRUE)           | summary(fitted(fir))
 # fitted(dpar='mu', scale='linear')   | fitted(fit, 'linear')
 # fitted(dpar='mu', scale='response') | fitted(fit, 'response')
 
@@ -76,9 +139,7 @@ def fitted(fit, what='expectation'):
     assert type(fit) == Fit
     assert what in ['expectation', 'linear', 'response']
 
-    samples   = fit.posterior.samples
     get_param = fit.posterior.get_param
-    to_numpy  = fit.posterior.to_numpy
 
     def expectation(sample):
         # Fetch the value of each response parameter from the sample.
@@ -94,90 +155,34 @@ def fitted(fit, what='expectation'):
 
     f=dict(expectation=expectation, linear=linear, response=response)[what]
 
-    return np.stack([to_numpy(f(s)) for s in samples])
+    return marginal(fit, f)
 
-default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
+# TODO: We could follow brms and make this available via a `summary`
+# flag on `fitted`?
+def summary(arr, qs=default_quantiles, row_labels=None):
+    col_labels = ['mean', 'sd'] + format_quantiles(qs)
+    return ArrReprWrapper(marginal_stats(arr, qs), row_labels, col_labels)
 
-# TODO: Have this return a wrapper around the numpy array. (`stacked`
-# in the code below.) The wrapper can have something like print table
-# as its `__repr__()` implementation, and an e.g. `array` property to
-# access the underlying data. Or, perhaps better yet, have this return
-# a data frame? (Likewise for other similar methods?)
-
-# TODO: The tables this produces and those produced by
-# `print_marginals` look very similar -- consolidate?
-
-# `summary(fitted(fit))` is intended to be similar to
-# `fitted(fit, summary=TRUE)` in brms.
-
-def summary(arr, qs=default_quantiles, labels=None):
-    # `arr` is expected to be an array of sample. The first index
-    # ranges over samples.
-    N = arr.shape[1]
-    # TODO: Check is iterable.
-    assert labels is None or len(labels) == N
-    mean = np.mean(arr, 0)
-    sd = np.std(arr, 0)
-    quantiles = np.quantile(arr, qs, 0)
-    stacked = np.hstack([mean.reshape((-1, 1)), sd.reshape((-1, 1)), quantiles.T])
-    header = [['mean', 'sd'] + ['{:g}%'.format(q * 100) for q in qs]]
-    rows = header + [[ff(c) for c in r] for r in stacked.tolist()]
-    if labels is not None:
-        rows = [[label] + row for label, row in zip([''] + list(labels), rows)]
-    print_table(rows)
-
-# TODO: Have this be generated by the `__repr__` method on `Fit`?
-# Allowing users to `print(fit)` to see this?
-def print_marginals_simple(fit):
-    for name, (mean, sd, _) in marginals(fit).items():
-        print('==================================================')
-        print(name)
-        print('-- mean ------------------------------------------')
-        print(mean)
-        print('-- stddev ----------------------------------------')
-        print(sd)
-
-# Format a float.
-def ff(x):
-    return '{: .2f}'.format(x)
-
-# This relies on the assumption that all models make available the
-# parameters described by the `parameters` function in model.py, and
-# that each of these is a tensor/multi-dimensional array of the
-# expected size.
-def print_marginals(fit, qs=default_quantiles):
-    rows = [['', 'mean', 'sd'] + ['{:g}%'.format(q * 100) for q in qs]]
-    mean_and_sd = marginals(fit, qs)
-    b_mean, b_sd, b_quantiles = mean_and_sd['b']
-    assert len(fit.model.population.coefs) == len(b_mean) == len(b_sd) == len(b_quantiles.T)
-    for coef, mean, sd, quantiles in zip(fit.model.population.coefs, b_mean, b_sd, b_quantiles.T):
-        readable_name = 'b_{}'.format(coef)
-        rows.append([readable_name, ff(mean), ff(sd)] + [ff(q) for q in quantiles])
+def marginals(fit, qs=default_quantiles):
+    arrs = []
+    row_labels = []
+    col_labels = ['mean', 'sd'] + format_quantiles(qs)
+    def param_stats(name):
+        return marginal_stats(param_marginal(fit, name), qs)
+    # Population coefs.
+    arrs.append(param_stats('b'))
+    row_labels.extend('b_{}'.format(coef) for coef in fit.model.population.coefs)
+    # Groups.
     for ix, group in enumerate(fit.model.groups):
-        r_mean, r_sd, r_quantiles = mean_and_sd['r_{}'.format(ix)]
-        for i, level in enumerate(group.factor.levels):
-            for j, coef in enumerate(group.coefs):
-                readable_name = 'r_{}[{},{}]'.format(group.factor.name, level, coef)
-                rows.append([readable_name, ff(r_mean[i, j]), ff(r_sd[i, j])] + [ff(q) for q in r_quantiles[:, i, j]])
-
+        arrs.append(param_stats('r_{}'.format(ix)))
+        row_labels.extend('r_{}[{},{}]'.format(group.factor.name, level, coef)
+                          for level in group.factor.levels
+                          for coef in group.coefs)
+    # Response parameters.
     for param in fit.model.response.nonlocparams:
-        param_mean, param_sd, param_quantiles = mean_and_sd[param.name]
-        rows.append([param.name, ff(param_mean[0]), ff(param_sd[0])] + [ff(q) for q in param_quantiles[:, 0]])
-
-    print_table(rows)
-
-def print_table(rows):
-    num_rows = len(rows)
-    assert num_rows > 0
-    num_cols = len(rows[0])
-    assert all(len(row) == num_cols for row in rows)
-    max_widths = [0] * num_cols
-    for row in rows:
-        for i, cell in enumerate(row):
-            max_widths[i] = max(max_widths[i], len(cell))
-    fmt = ' '.join('{{:>{}}}'.format(mw) for mw in max_widths)
-    for row in rows:
-        print(fmt.format(*row))
+        arrs.append(param_stats(param.name))
+        row_labels.append(param.name)
+    return ArrReprWrapper(np.vstack(arrs), row_labels, col_labels)
 
 def print_model(fit):
     print(model_repr(fit.model))

@@ -3,7 +3,7 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 from pyro.contrib.brm import brm
-from pyro.contrib.brm.fit import print_marginals
+from pyro.contrib.brm.fit import marginals
 
 def f(x):
     eps = np.random.normal(0, 0.5, x.shape)
@@ -18,7 +18,7 @@ df = pd.DataFrame(dict(x=xs, y=ys))
 
 fit = brm('y ~ 1 + x', df)
 
-print_marginals(fit)
+print(marginals(fit))
 #                  mean    sd
 # b_intercept     -0.94  0.56
 # b_x              3.60  0.25
