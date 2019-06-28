@@ -174,6 +174,9 @@ def marginals(fit, qs=default_quantiles):
     row_labels.extend('b_{}'.format(coef) for coef in fit.model.population.coefs)
     # Groups.
     for ix, group in enumerate(fit.model.groups):
+        arrs.append(param_stats('sd_{}'.format(ix)))
+        row_labels.extend('sd_{}__{}'.format(group.factor.name, coef)
+                          for coef in group.coefs)
         arrs.append(param_stats('r_{}'.format(ix)))
         row_labels.extend('r_{}[{},{}]'.format(group.factor.name, level, coef)
                           for level in group.factor.levels
