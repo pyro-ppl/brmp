@@ -4,7 +4,7 @@ import torch
 import pandas as pd
 
 import pyro.poutine as poutine
-from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, LKJCorrCholesky
+from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, HalfNormal, LKJCorrCholesky
 
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
 from pyro.contrib.brm.codegen import genmodel, eval_method
@@ -21,6 +21,7 @@ default_params = dict(
     Normal          = dict(loc=0., scale=1.),
     Cauchy          = dict(loc=0., scale=1.),
     HalfCauchy      = dict(scale=3.),
+    HalfNormal      = dict(scale=1.),
     LKJCorrCholesky = dict(eta=1.),
 )
 
@@ -154,9 +155,9 @@ def build_metadata(formula, metadata):
     ('y ~ 1 + x2 + x3 || x1',
      [Categorical('x1', list('ab'))],
      getfamily('Normal'),
-     [PriorEdit(('sd', 'x1', 'intercept'), prior('HalfCauchy', [4.]))],
+     [PriorEdit(('sd', 'x1', 'intercept'), prior('HalfNormal', [4.]))],
      [('sigma', HalfCauchy, {}),
-      ('sd_0_0', HalfCauchy, {'scale': 4.}),
+      ('sd_0_0', HalfNormal, {'scale': 4.}),
       ('sd_0_1', HalfCauchy, {}),
       ('z_0', Normal, {})]),
 

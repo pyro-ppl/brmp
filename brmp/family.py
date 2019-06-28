@@ -77,6 +77,10 @@ FAMILIES = [
             param('probs', Type['UnitInterval']())],
            lambda num_trials: Type['IntegerRange'](0, num_trials),
            Response('probs', LinkFn.logit)),
+    Family('HalfNormal',
+           [param('sigma', Type['PosReal']())],
+           const(Type['PosReal']()),
+           None),
 ]
 
 def apply1(family, name, value):
