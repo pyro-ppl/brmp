@@ -1,18 +1,20 @@
 import pytest
 
+import numpy as np
 import torch
 import pandas as pd
 
 import pyro.poutine as poutine
 from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, HalfNormal, LKJCorrCholesky
 
+from pyro.contrib.brm import brm
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
 from pyro.contrib.brm.codegen import genmodel, eval_method
-from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding
+from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding, dummy_df
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
 from pyro.contrib.brm.model import build_model, parameters
-from pyro.contrib.brm.fit import pyro_get_param
+from pyro.contrib.brm.fit import pyro_get_param, marginals, fitted
 
 
 from tests.common import assert_equal
@@ -502,3 +504,19 @@ def test_parser(formula_str, expected_formula):
 def test_coding(formula_str, expected_coding):
     formula = parse(formula_str)
     assert categorical_coding(formula.terms) == expected_coding
+
+def test_marginals_fitted_smoke():
+    N = 10
+    S = 4
+    df = dummy_df(make_metadata_lookup([RealValued('y'),
+                                        RealValued('x'),
+                                        Categorical('a', list('ab'))]),
+                  N)
+    fit = brm('y ~ 1 + x + (1 | a)', df, iter=S, warmup=0)
+    def chk(arr, expected_shape):
+        assert np.all(np.isfinite(arr))
+        assert arr.shape == expected_shape
+    chk(marginals(fit).array, (6, 7)) # num coefs x num stats
+    chk(fitted(fit), (S, N))
+    chk(fitted(fit, 'linear'), (S, N))
+    chk(fitted(fit, 'response'), (S, N))
