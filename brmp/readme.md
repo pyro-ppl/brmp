@@ -9,15 +9,15 @@ design matrices from a model specified using (a subset of) the lme4
 syntax and a pandas dataframe. Here are some example formulae that the
 system can handle:
 
-| Formula                                   | Description |
+| Formula                                      | Description |
 |----|----|
-| `y ~ x`                                   | Population-level effects |
-| `y ~ 1 + x`                               ||
-| `y ~ x1:x2` | Interaction between categorical variables |
-| `y ~ 1 + x0 + (x1 \| z)`                   | Group-level effects |
-| `y ~ 1 + x0 + (1 + x1 \| z)`               ||
-| `y ~ 1 + x0 + (1 + x1 \|\| z)`              | No correlation between group coefficients |
-| `y ~ 1 + x0 + (x1 \| z0) + (1 + x2 \|\| z1)` | Multiple groups |
+| `y ~ x`                                      | Population-level effects |
+| `y ~ 1 + x`                                  ||
+| `y ~ x1:x2`                                  | Interaction between categorical variables |
+| `y ~ 1 + x0 + (x1 \| z)`                     | Group-level effects |
+| `y ~ 1 + x0 + (1 + x1 \| z)`                 ||
+| `y ~ 1 + x0 + (1 + x1 \|\| z)`               | No correlation between group coefficients |
+| `y ~ 1 + x0 + (x1 \| z0) + (1 + x2 \|\| z1)` | Combinations of the above |
 
 
 The file [`ex1.py`](./ex1.py) shows the model code and data generated
@@ -46,12 +46,28 @@ Users can give multiple such specifications and they combine in a
 sensible way. See [`ex1.py`](./ex1.py#L141) for a simple example of
 this.
 
-### Interface
+### Response Families
 
-A thin wrapper around the core functionality aims to eventually
-provide a brms-like interface for fitting models.
-See
-[these notebooks](https://nbviewer.jupyter.org/github/null-a/pyro/tree/brmp/pyro/contrib/brm/examples/) for
+The library supports models with either (uni-variate) Gaussian or
+Binomial (inc. Bernoulli) distributed responses.
+
+### Posterior Summaries etc.
+
+The library includes the following functions for working with
+posteriors:
+
+* `marginals(...)`: This produces a model summary similar to that
+  obtained by doing `fit <- brm(...) ; fit$fit` in brms.
+* `fitted(...)`: This is analogous to
+  the [`fitted`](https://rdrr.io/cran/brms/man/fitted.brmsfit.html)
+  method in brms.
+
+See the baseball notebook (linked below) for example usage.
+
+### Examples
+
+These
+[notebooks](https://nbviewer.jupyter.org/github/null-a/pyro/tree/brmp/pyro/contrib/brm/examples/) show
 examples of using the system to fit some simple models.
 
 ## Limitations
@@ -64,8 +80,12 @@ examples of using the system to fit some simple models.
   can be specified with the formula `y ~ 1 + x1 + x2 + x1:x2`.)
 * The syntax for removing columns is not supported. e.g. `y ~ x - 1`
 * The response is always uni-variate.
-* The response is Gaussian or Bernoulli distributed. In particular
-  Categorical responses (beyond the binary case) are not supported.
+* Parameters of the response distribution cannot take their values
+  from the data. e.g. The number of trials parameter of Binomial can
+  only be set to a constant, and cannot vary across rows of the data.
+* Only a limited number of response families are supported. In
+  particular, Categorical responses (beyond the binary case) are not
+  supported.
 * Some priors used in the generated code don't match those generated
   by brms. e.g. There's no Half Student-t distribution, setting prior
   parameters based on the data isn't supported.
@@ -74,6 +94,8 @@ examples of using the system to fit some simple models.
 * This doesn't include any of the fancy stuff brms does, such as its
   extensions to the lme4 grouping syntax, splines, monotonic effects,
   GP terms, etc.
+* The `fitted` function does not implement all of the functionality of
+  its analogue in brms.
 * There are no tools to help with MCMC diagnostics, posterior checks,
   hypothesis testing, etc.
 * Lots more, probably...
