@@ -14,8 +14,8 @@ from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integ
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
 from pyro.contrib.brm.model import build_model, parameters
-from pyro.contrib.brm.fit import pyro_get_param, marginals, fitted
-
+from pyro.contrib.brm.fit import marginals, fitted
+from pyro.contrib.brm.pyro_backend import get_param as pyro_get_param
 
 from tests.common import assert_equal
 

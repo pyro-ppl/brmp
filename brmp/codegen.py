@@ -1,6 +1,7 @@
 import re
 from .family import Family, LinkFn, getfamily, args, free_param_names
 from .model import Model, Group
+from .backend import GenModel
 
 def gendist(family, args, shape, batch):
     assert type(family) == Family
@@ -291,3 +292,15 @@ def eval_method(code):
     g = locals()
     exec(code, g)
     return g[method_name]
+
+def gen(model_desc):
+    assert type(model_desc) == Model
+    code = genmodel(model_desc)
+    fn = eval_method(code)
+    inv_link_code = geninvlinkfn(model_desc)
+    inv_link_fn = eval_method(inv_link_code)
+    expected_response_code = gen_expected_response_fn(model_desc)
+    expected_response_fn = eval_method(expected_response_code)
+    return GenModel(fn, code,
+                    inv_link_fn, inv_link_code,
+                    expected_response_fn, expected_response_code)

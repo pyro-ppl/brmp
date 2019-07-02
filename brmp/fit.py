@@ -7,45 +7,14 @@ from pyro.contrib.brm.family import free_param_names
 
 #from pyro.contrib.brm.utils import join
 
-# TODO: Should invlinkfn & expected_response_fn be on Posterior with
-# other back end specific fns?
+# TODO: model -> model_desc (or abstract_model)
+#       generated_model -> model
 
-Fit = namedtuple('Fit', ['run', 'code', 'data', 'model', 'posterior', 'invlinkfn', 'expected_response_fn'])
+# TODO: Drop this `code` prop. Make it possible for e.g. ex0.py to use
+# `fit.model.code` instead.
+
+Fit = namedtuple('Fit', 'data model generated_model posterior backend code')
 Posterior = namedtuple('Posterior', ['samples', 'get_param', 'to_numpy'])
-
-# The idea is that `pyro_posterior` and `pyro_get_param` capture the
-# backend specific part of processing posterior samples. Alternatives
-# to this approach include:
-
-# 1. Have each back end return an iterable of samples, where each
-# sample is something like a dictionary holding all of the parameters
-# of interest. (Effectively the backend would be returning the result
-# of mapping `get_param` over every sample for every parameter.
-
-# 2. Have each backend implement some kind of query interface,
-# allowing things like `query.marginal('b').mean()`, etc.
-
-def pyro_posterior(run):
-    return Posterior(run.exec_traces, pyro_get_param, pyro_to_numpy)
-
-# Extracts a value of interest (e.g. 'b', 'r_0', 'L_1', 'sigma') from
-# a single sample.
-
-# It's expected that this should support all parameter names returned
-# by `parameter_names(model)` where `model` is the `Model` from which
-# samples were drawn. It should also support fetching the (final)
-# value bound to `mu` in the generated code.
-def pyro_get_param(sample, name):
-    if name in sample.nodes:
-        return sample.nodes[name]['value']
-    else:
-        return sample.nodes['_RETURN']['value'][name]
-
-# This provides a back-end specific method for turning a parameter
-# value (as returned by `get_param`) into a numpy array.
-def pyro_to_numpy(param):
-    return param.numpy()
-
 
 default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
 
@@ -139,7 +108,9 @@ def fitted(fit, what='expectation'):
     assert type(fit) == Fit
     assert what in ['expectation', 'linear', 'response']
 
-    get_param = fit.posterior.get_param
+    get_param            = fit.posterior.get_param
+    expected_response    = fit.generated_model.expected_response_fn
+    inv_link             = fit.generated_model.inv_link_fn
 
     def expectation(sample):
         # Fetch the value of each response parameter from the sample.
@@ -147,11 +118,11 @@ def fitted(fit, what='expectation'):
                 for name in free_param_names(fit.model.response.family)]
         # Compute the expected value of the response. This is in the
         # representation used by the current back end.
-        return fit.expected_response_fn(*args)
+        return expected_response(*args)
     def linear(sample):
         return get_param(sample, 'mu')
     def response(sample):
-        return fit.invlinkfn(get_param(sample, 'mu'))
+        return inv_link(get_param(sample, 'mu'))
 
     f=dict(expectation=expectation, linear=linear, response=response)[what]
 

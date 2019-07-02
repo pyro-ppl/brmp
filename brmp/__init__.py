@@ -1,15 +1,14 @@
-from pyro.infer.mcmc import MCMC, NUTS
-
 from pyro.contrib.brm.formula import parse
-from pyro.contrib.brm.codegen import genmodel, geninvlinkfn, gen_expected_response_fn, eval_method
 from pyro.contrib.brm.design import makedata, dfmetadata, make_metadata_lookup, designmatrices_metadata
-from pyro.contrib.brm.fit import Fit, pyro_posterior
+from pyro.contrib.brm.fit import Fit
+from pyro.contrib.brm.backend import Backend
 from pyro.contrib.brm.family import getfamily
 from pyro.contrib.brm.priors import build_prior_tree
-from pyro.contrib.brm.model import build_model
+from pyro.contrib.brm.model import build_model, model_repr
+from pyro.contrib.brm.pyro_backend import backend as pyro_backend
 
-def makecode(formula, df, family, prior_edits):
-    return genmodel(makedesc(formula, df, family, prior_edits))
+def makecode(formula, df, family, prior_edits, backend=pyro_backend):
+    return backend.gen(makedesc(formula, df, family, prior_edits)).code
 
 def makedesc(formula, df, family, prior_edits):
     df_metadata_lu = make_metadata_lookup(dfmetadata(df))
@@ -17,18 +16,10 @@ def makedesc(formula, df, family, prior_edits):
     prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
     return build_model(formula, prior_tree, family, df_metadata_lu)
 
-def brm(formula_str, df, family=getfamily('Normal'), prior_edits=[],
-        iter=2000, warmup=None):
-    if warmup is None:
-        warmup = iter // 2
+def defm(formula_str, df, family=None, prior_edits=None):
+    family = family or getfamily('Normal')
+    prior_edits = prior_edits or []
     formula = parse(formula_str)
-    model_desc = makedesc(formula, df, family, prior_edits)
-    code = genmodel(model_desc)
-    model = eval_method(code)
-    # Generate the inverse link function. This is required to perform
-    # some posterior analyses.
-    invlinkfn = eval_method(geninvlinkfn(model_desc))
-    expected_response_fn = eval_method(gen_expected_response_fn(model_desc))
     # TODO: Both `makedata` and `designmatrices_metadata` call
     # `coding` (from design.py) internally. Instead we ought to call
     # this once and share the result. (Perhaps by having the process
@@ -38,8 +29,25 @@ def brm(formula_str, df, family=getfamily('Normal'), prior_edits=[],
     #
     # Related: Perhaps design matrices ought to always have metadata
     # (i.e. column names) associated with them, as in Patsy. (This
-    # could be used in the matrices' __repr__, for example.)
+    model = makedesc(formula, df, family, prior_edits)
     data = makedata(formula, df)
-    nuts_kernel = NUTS(model, jit_compile=False, adapt_step_size=True)
-    run = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup).run(**data)
-    return Fit(run, code, data, model_desc, pyro_posterior(run), invlinkfn, expected_response_fn)
+    return DefmResult(model, data)
+
+# A wrapper around a pair of model and data. Has a friendly `repr` and
+# makes it easy to fit the model.
+class DefmResult:
+    def __init__(self, model, data):
+        self.model = model
+        self.data = data
+
+    def fit(self, backend=pyro_backend, **kwargs):
+        assert type(backend) == Backend
+        generated_model = backend.gen(self.model)
+        posterior = backend.infer(self.data, generated_model, **kwargs)
+        return Fit(self.data, self.model, generated_model, posterior, backend, generated_model.code)
+
+    def __repr__(self):
+        return model_repr(self.model)
+
+def brm(formula_str, df, family=None, prior_edits=None, iter=None, warmup=None):
+    return defm(formula_str, df, family, prior_edits).fit(pyro_backend, iter=iter, warmup=warmup)
