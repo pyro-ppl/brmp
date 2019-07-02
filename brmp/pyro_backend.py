@@ -37,7 +37,7 @@ def get_param(sample, name):
 def to_numpy(param):
     return param.numpy()
 
-def infer(data, model, iter, warmup):
+def infer(data, model, iter=None, warmup=None):
     assert type(data) == dict
     assert type(model) == Model
 

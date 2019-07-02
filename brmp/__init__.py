@@ -49,5 +49,5 @@ class DefmResult:
     def __repr__(self):
         return model_repr(self.desc)
 
-def brm(formula_str, df, family=None, prior_edits=None, iter=None, warmup=None):
-    return defm(formula_str, df, family, prior_edits).fit(pyro_backend, iter=iter, warmup=warmup)
+def brm(formula_str, df, family=None, prior_edits=None, **kwargs):
+    return defm(formula_str, df, family, prior_edits).fit(pyro_backend, **kwargs)
