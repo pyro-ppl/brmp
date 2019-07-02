@@ -37,9 +37,9 @@ def get_param(sample, name):
 def to_numpy(param):
     return param.numpy()
 
-def infer(data, generated_model, iter, warmup):
+def infer(data, model, iter, warmup):
     assert type(data) == dict
-    assert type(generated_model) == Model
+    assert type(model) == Model
 
     # TODO: Turn the data into the format required by this particular
     # backend.
@@ -47,7 +47,7 @@ def infer(data, generated_model, iter, warmup):
     iter = 10 if iter is None else iter
     warmup = iter // 2 if warmup is None else warmup
 
-    nuts_kernel = NUTS(generated_model.fn, jit_compile=False, adapt_step_size=True)
+    nuts_kernel = NUTS(model.fn, jit_compile=False, adapt_step_size=True)
     run = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup).run(**data)
 
     return posterior(run)

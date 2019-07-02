@@ -29,25 +29,25 @@ def defm(formula_str, df, family=None, prior_edits=None):
     #
     # Related: Perhaps design matrices ought to always have metadata
     # (i.e. column names) associated with them, as in Patsy. (This
-    model = makedesc(formula, df, family, prior_edits)
+    desc = makedesc(formula, df, family, prior_edits)
     data = makedata(formula, df)
-    return DefmResult(model, data)
+    return DefmResult(desc, data)
 
 # A wrapper around a pair of model and data. Has a friendly `repr` and
 # makes it easy to fit the model.
 class DefmResult:
-    def __init__(self, model, data):
-        self.model = model
+    def __init__(self, desc, data):
+        self.desc = desc
         self.data = data
 
     def fit(self, backend=pyro_backend, **kwargs):
         assert type(backend) == Backend
-        generated_model = backend.gen(self.model)
-        posterior = backend.infer(self.data, generated_model, **kwargs)
-        return Fit(self.data, self.model, generated_model, posterior, backend, generated_model.code)
+        model = backend.gen(self.desc)
+        posterior = backend.infer(self.data, model, **kwargs)
+        return Fit(self.data, self.desc, model, posterior, backend)
 
     def __repr__(self):
-        return model_repr(self.model)
+        return model_repr(self.desc)
 
 def brm(formula_str, df, family=None, prior_edits=None, iter=None, warmup=None):
     return defm(formula_str, df, family, prior_edits).fit(pyro_backend, iter=iter, warmup=warmup)

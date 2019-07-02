@@ -7,13 +7,7 @@ from pyro.contrib.brm.family import free_param_names
 
 #from pyro.contrib.brm.utils import join
 
-# TODO: model -> model_desc (or abstract_model)
-#       generated_model -> model
-
-# TODO: Drop this `code` prop. Make it possible for e.g. ex0.py to use
-# `fit.model.code` instead.
-
-Fit = namedtuple('Fit', 'data model generated_model posterior backend code')
+Fit = namedtuple('Fit', 'data model_desc model posterior backend')
 Posterior = namedtuple('Posterior', ['samples', 'get_param', 'to_numpy'])
 
 default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
@@ -108,14 +102,14 @@ def fitted(fit, what='expectation'):
     assert type(fit) == Fit
     assert what in ['expectation', 'linear', 'response']
 
-    get_param            = fit.posterior.get_param
-    expected_response    = fit.generated_model.expected_response_fn
-    inv_link             = fit.generated_model.inv_link_fn
+    get_param         = fit.posterior.get_param
+    expected_response = fit.model.expected_response_fn
+    inv_link          = fit.model.inv_link_fn
 
     def expectation(sample):
         # Fetch the value of each response parameter from the sample.
         args = [get_param(sample, name)
-                for name in free_param_names(fit.model.response.family)]
+                for name in free_param_names(fit.model_desc.response.family)]
         # Compute the expected value of the response. This is in the
         # representation used by the current back end.
         return expected_response(*args)
@@ -142,9 +136,9 @@ def marginals(fit, qs=default_quantiles):
         return marginal_stats(param_marginal(fit, name), qs)
     # Population coefs.
     arrs.append(param_stats('b'))
-    row_labels.extend('b_{}'.format(coef) for coef in fit.model.population.coefs)
+    row_labels.extend('b_{}'.format(coef) for coef in fit.model_desc.population.coefs)
     # Groups.
-    for ix, group in enumerate(fit.model.groups):
+    for ix, group in enumerate(fit.model_desc.groups):
         arrs.append(param_stats('sd_{}'.format(ix)))
         row_labels.extend('sd_{}__{}'.format(group.factor.name, coef)
                           for coef in group.coefs)
@@ -153,10 +147,10 @@ def marginals(fit, qs=default_quantiles):
                           for level in group.factor.levels
                           for coef in group.coefs)
     # Response parameters.
-    for param in fit.model.response.nonlocparams:
+    for param in fit.model_desc.response.nonlocparams:
         arrs.append(param_stats(param.name))
         row_labels.append(param.name)
     return ArrReprWrapper(np.vstack(arrs), row_labels, col_labels)
 
 def print_model(fit):
-    print(model_repr(fit.model))
+    print(model_repr(fit.model_desc))

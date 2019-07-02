@@ -24,7 +24,7 @@ print(marginals(fit))
 # b_x              3.60  0.25
 # sigma            0.93  0.26
 
-print(fit.code)
+print(fit.model.code)
 # def model(X, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
