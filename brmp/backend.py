@@ -5,8 +5,8 @@ Backend = namedtuple('Backend', 'name gen infer')
 
 # We could have a class that wraps a (function, code) pair, making the
 # code available via a code property and the function available via
-# __call__. `GenModel` could also be callable. Too cute?
-GenModel = namedtuple('GenModel', [
+# __call__. `Model` could also be callable. Too cute?
+Model = namedtuple('Model', [
     'fn', 'code',
     'inv_link_fn', 'inv_link_code',
     'expected_response_fn', 'expected_response_code',

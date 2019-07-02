@@ -1,6 +1,6 @@
 from pyro.infer.mcmc import MCMC, NUTS
 
-from pyro.contrib.brm.backend import Backend, GenModel
+from pyro.contrib.brm.backend import Backend, Model
 from pyro.contrib.brm.fit import Posterior
 from pyro.contrib.brm.codegen import gen
 
@@ -39,7 +39,7 @@ def to_numpy(param):
 
 def infer(data, generated_model, iter, warmup):
     assert type(data) == dict
-    assert type(generated_model) == GenModel
+    assert type(generated_model) == Model
 
     # TODO: Turn the data into the format required by this particular
     # backend.
