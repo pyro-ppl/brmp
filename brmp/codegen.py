@@ -1,6 +1,6 @@
 import re
 from .family import Family, LinkFn, getfamily, args, free_param_names
-from .model import Model, Group
+from .model import ModelDesc, Group
 from .backend import GenModel
 
 def gendist(family, args, shape, batch):
@@ -227,7 +227,7 @@ def contig(xs):
 
 
 def genmodel(model):
-    assert type(model) == Model
+    assert type(model) == ModelDesc
     num_groups = len(model.groups)
 
     body = []
@@ -294,7 +294,7 @@ def eval_method(code):
     return g[method_name]
 
 def gen(model_desc):
-    assert type(model_desc) == Model
+    assert type(model_desc) == ModelDesc
     code = genmodel(model_desc)
     fn = eval_method(code)
     inv_link_code = geninvlinkfn(model_desc)

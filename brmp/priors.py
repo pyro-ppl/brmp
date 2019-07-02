@@ -159,9 +159,9 @@ def build_prior_tree(formula, design_metadata, family, prior_edits, chk=True):
         # happens. This could allow an under-specified model to be
         # pretty-printed, which might make it easier for users to see
         # what's going on. (Once `brm` returns a model rather than
-        # running inference.) Doing so would require the `Model` data
-        # structure and pretty printing code to handle missing priors.
-        # (Does something similar apply to the response/family
+        # running inference.) Doing so would require the `ModelDesc`
+        # data structure and pretty printing code to handle missing
+        # priors. (Does something similar apply to the response/family
         # compatibility checks currently in model.py?)
         missing_prior_paths = leaves_without_prior(tree)
         if len(missing_prior_paths) > 0:

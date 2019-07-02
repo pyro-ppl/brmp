@@ -43,7 +43,8 @@ def check_family_matches_response(formula, metadata, family):
         raise Exception(error.format(family_repr(family), formula.response))
 
 
-Model = namedtuple('Model', 'population groups response')
+# Abstract model description.
+ModelDesc = namedtuple('ModelDesc', 'population groups response')
 Population = namedtuple('Population', 'coefs priors')
 Group = namedtuple('Group', 'factor coefs sd_priors corr_prior')
 Response = namedtuple('Response', 'family nonlocparams priors')
@@ -94,11 +95,11 @@ def build_model(formula, prior_tree, family, dfmetadata):
     # Assert invariants.
     assert len(response.nonlocparams) == len(response.priors)
 
-    return Model(population, groups, response)
+    return ModelDesc(population, groups, response)
 
 
 def model_repr(model):
-    assert type(model) == Model
+    assert type(model) == ModelDesc
     out = []
     def write(s):
         out.append(s)
