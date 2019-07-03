@@ -97,7 +97,7 @@ def gengroup(i, group):
     assert type(group) == Group
 
     code = ['']
-    code.append(comment('[{}] {}'.format(i, group.factor)))
+    code.append(comment('Group {}: factor={}'.format(i, group.factor.name)))
 
     # The number of coefficients per level.
     M_i = len(group.coefs)
