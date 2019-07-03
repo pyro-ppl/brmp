@@ -32,6 +32,8 @@ def build_metadata(formula, metadata):
     default_metadata = make_metadata_lookup([RealValued(factor) for factor in allfactors(formula)])
     return dict(default_metadata, **make_metadata_lookup(metadata))
 
+# I expect these to also pass with PYRO_TENSOR_TYPE='torch.FloatTensor'.
+
 # TODO: Extend this. Could check that the response is observed?
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', [
     # TODO: This (and similar examples below) can't be expressed with
