@@ -15,10 +15,10 @@ default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
 def format_quantiles(qs):
     return ['{:g}%'.format(q * 100) for q in qs]
 
-def marginal(fit, extractor):
-    assert type(fit) == Fit
-    samples = fit.posterior.samples
-    to_numpy = fit.posterior.to_numpy
+def marginal(posterior, extractor):
+    assert type(posterior) == Posterior
+    samples = posterior.samples
+    to_numpy = posterior.to_numpy
     # `extractor` is a function that extracts from a sample some value
     # of interest, which is expected to be in the back end specific
     # representation. These values are mapped to numpy arrays using
@@ -33,9 +33,9 @@ def marginal(fit, extractor):
     #
     return np.stack([to_numpy(extractor(s)).reshape(-1) for s in samples])
 
-def param_marginal(fit, parameter_name):
-    get_param = fit.posterior.get_param
-    return marginal(fit, lambda s: get_param(s, parameter_name))
+def param_marginal(posterior, parameter_name):
+    get_param = posterior.get_param
+    return marginal(posterior, lambda s: get_param(s, parameter_name))
 
 # Computes statistics for an array produced by `marginal`.
 def marginal_stats(arr, qs):
@@ -122,7 +122,7 @@ def fitted(fit, what='expectation'):
 
     f=dict(expectation=expectation, linear=linear, response=response)[what]
 
-    return marginal(fit, f)
+    return marginal(fit.posterior, f)
 
 # TODO: We could follow brms and make this available via a `summary`
 # flag on `fitted`?
@@ -137,7 +137,7 @@ def marginals(fit, qs=default_quantiles):
     row_labels = []
     col_labels = ['mean', 'sd'] + format_quantiles(qs)
     def param_stats(name):
-        return marginal_stats(param_marginal(fit, name), qs)
+        return marginal_stats(param_marginal(fit.posterior, name), qs)
     # Population coefs.
     arrs.append(param_stats('b'))
     row_labels.extend('b_{}'.format(coef) for coef in fit.model_desc.population.coefs)
