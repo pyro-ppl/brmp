@@ -22,11 +22,11 @@ def marginal(posterior, extractor):
     # `extractor` is a function that extracts from a sample some value
     # of interest, which is expected to be in the back end specific
     # representation. These values are mapped to numpy arrays using
-    # the function back specific `to_numpy()` function. Once converted
-    # to numpy, the extracted values are reshaped into vectors in
-    # order that they can be stacked in a single matrix. (This is
-    # necessary for e.g. group level `r_i` parameters which are
-    # themselves matrices.)
+    # the back end specific `to_numpy()` function. Once converted to
+    # numpy, the extracted values are reshaped into vectors in order
+    # that they can be stacked in a single matrix. (This is necessary
+    # for e.g. group level `r_i` parameters which are themselves
+    # matrices.)
     #
     # Creating this intermediate list is a bit unpleasant -- could
     # fill a pre-allocated array instead.
