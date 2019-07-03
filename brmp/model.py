@@ -113,7 +113,7 @@ def model_repr(model):
         write('=' * 40)
         write('Group {}'.format(i))
         write('-' * 40)
-        write('Factor: {}\nLevels: {}'.format(group.factor.name, group.factor.levels))
+        write('Factor: {}\nNum Levels: {}'.format(group.factor.name, len(group.factor.levels)))
         write('Corr. Prior: {}'.format(None if group.corr_prior is None else family_repr(group.corr_prior)))
         write('S.D. Priors:')
         for (coef, sd_prior) in zip(group.coefs, group.sd_priors):
