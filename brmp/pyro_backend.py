@@ -2,7 +2,7 @@ from pyro.infer.mcmc import MCMC, NUTS
 
 from pyro.contrib.brm.backend import Backend, Model
 from pyro.contrib.brm.fit import Posterior
-from pyro.contrib.brm.codegen import gen
+from pyro.contrib.brm.pyro_codegen import gen
 
 # The idea is that `pyro_posterior` and `pyro_get_param` capture the
 # backend specific part of processing posterior samples. Alternatives
