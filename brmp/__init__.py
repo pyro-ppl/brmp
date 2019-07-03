@@ -43,8 +43,9 @@ class DefmResult:
     def fit(self, backend=pyro_backend, **kwargs):
         assert type(backend) == Backend
         model = backend.gen(self.desc)
-        posterior = backend.infer(self.data, model, **kwargs)
-        return Fit(self.data, self.desc, model, posterior, backend)
+        data = backend.from_numpy(self.data)
+        posterior = backend.infer(data, model, **kwargs)
+        return Fit(data, self.desc, model, posterior, backend)
 
     def __repr__(self):
         return model_repr(self.desc)

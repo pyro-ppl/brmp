@@ -4,7 +4,6 @@ from functools import reduce
 import operator as op
 import random
 
-import torch
 import numpy as np
 import pandas as pd
 # http://pandas.pydata.org/pandas-docs/stable/reference/general_utility_functions.html#dtype-introspection
@@ -124,31 +123,13 @@ def codeinteraction(dfcols, reduced_flags):
 def codefactor(dfcol, reduced):
     return codeinteraction([dfcol], [reduced])
 
-
-
-# TODO: Consider building the whole design matrix as a numpy array.
-# (This could be useful for other backends.) Then covert the whole
-# thing to torch in one go as a post-processing step where necessary.
-def col2torch(col):
-    default_dtype = torch.get_default_dtype()
-    if type(col) == torch.Tensor:
-        # Rely on caller generating columns with the default dtype.
+def col2numpy(col):
+    default_dtype = np.float64
+    if type(col) == np.ndarray:
         assert col.dtype == default_dtype
         return col
     else:
-        # TODO: It's possible to do torch.tensor(col) directly rather
-        # than going to_numpy and then from_numpy. What does that do?
-        # Is it preferable?
-        npcol = col.to_numpy()
-        # `torch.from_numpy` doesn't handle bools, so convert those to
-        # something it does handle.
-        if npcol.dtype == np.bool_:
-            npcol = npcol.astype(np.uint8)
-        out = torch.from_numpy(npcol)
-        # Convert to default dtype if necessary.
-        if not out.dtype == default_dtype:
-            out = out.to(default_dtype)
-        return out
+        return col.to_numpy(default_dtype)
 
 InterceptC = namedtuple('InterceptC', [])
 InteractionC = namedtuple('InteractionC', ['codes']) # codes is a list of CategoricalCs
@@ -352,7 +333,7 @@ def designmatrix(terms, df):
     N = len(df)
     def dispatch(code):
         if type(code) == InterceptC:
-            return [torch.ones(N)]
+            return [np.ones(N)]
         elif type(code) == InteractionC:
             return codeinteraction([df[c.factor.name] for c in code.codes],
                                    [c.reduced for c in code.codes])
@@ -363,9 +344,9 @@ def designmatrix(terms, df):
     metadata = make_metadata_lookup(dfmetadata(df))
     coding_desc = coding(terms, metadata)
     coded_cols = join([dispatch(c) for c in coding_desc])
-    X = torch.stack([col2torch(col) for col in coded_cols], dim=1) if coded_cols else torch.empty(N, 0)
+    X = np.stack([col2numpy(col) for col in coded_cols], axis=1) if coded_cols else np.empty((N, 0))
     assert X.shape == (N, width(coding_desc))
-    if X.shape[1] > 0 and torch.matrix_rank(X) != X.shape[1]:
+    if X.shape[1] > 0 and np.linalg.matrix_rank(X) != X.shape[1]:
         print('WARNING: Design matrix may not be full rank.')
     return X
 
@@ -433,7 +414,7 @@ def lookupvector(column, df):
     assert type(df) == pd.DataFrame
     assert column in df
     assert is_categorical_dtype(df[column])
-    return torch.from_numpy(df[column].cat.codes.to_numpy(np.int64))
+    return df[column].cat.codes.to_numpy(np.int64)
 
 def responsevector(column, df):
     assert type(column) == str
@@ -450,7 +431,7 @@ def responsevector(column, df):
     else:
         raise Exception('Don\'t know how to code a response of this type.')
     assert len(coded) == 1
-    return col2torch(coded[0])
+    return col2numpy(coded[0])
 
 def makedata(formula, df):
     assert type(formula) == Formula

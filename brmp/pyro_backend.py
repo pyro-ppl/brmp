@@ -1,3 +1,6 @@
+import numpy as np
+import torch
+
 from pyro.infer.mcmc import MCMC, NUTS
 
 from pyro.contrib.brm.backend import Backend, Model
@@ -37,12 +40,33 @@ def get_param(sample, name):
 def to_numpy(param):
     return param.numpy()
 
+# TODO: `from_numpy` should probably just handle a single array --
+# this mapping over `data` can happen once for all somewhere else.
+def from_numpy(data):
+    assert type(data) == dict
+    default_dtype = torch.get_default_dtype()
+    def doit(arr):
+        if arr.size == 0:
+            # Attempting to convert an empty array using
+            # `torch.from_numpy()` throws an error, so make a new
+            # empty array instead. I think this can only happen when
+            # `arr` holds floats, which at present will always be 64
+            # bit. (See `col2numpy` in design.py.)
+            assert arr.dtype == np.float64
+            out = torch.empty(arr.shape)
+            assert out.dtype == default_dtype
+            return out
+        else:
+            out = torch.from_numpy(arr)
+            if torch.is_floating_point(out) and not out.dtype == default_dtype:
+                out = out.type(default_dtype)
+            return out
+
+    return {k: doit(arr) for k, arr in data.items()}
+
 def infer(data, model, iter=None, warmup=None):
     assert type(data) == dict
     assert type(model) == Model
-
-    # TODO: Turn the data into the format required by this particular
-    # backend.
 
     iter = 10 if iter is None else iter
     warmup = iter // 2 if warmup is None else warmup
@@ -52,4 +76,4 @@ def infer(data, model, iter=None, warmup=None):
 
     return posterior(run)
 
-backend = Backend('Pyro', gen, infer)
+backend = Backend('Pyro', gen, infer, from_numpy)
