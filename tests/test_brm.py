@@ -294,10 +294,6 @@ def test_prior_checks(formula_str, metadata, family, prior_edits, expected_error
     with pytest.raises(Exception, match=expected_error):
         build_prior_tree(formula, design_metadata, family, prior_edits)
 
-
-# We have to ask for float32 tensors here because the default tensor
-# type is changed to float64 in conftest.py.
-
 @pytest.mark.parametrize('formula_str, df, expected', [
     # (Formula('y', [], []),
     #  pd.DataFrame(dict(y=[1, 2, 3])),
