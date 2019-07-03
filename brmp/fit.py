@@ -98,6 +98,8 @@ def layout_table(rows):
 # fitted(dpar='mu', scale='linear')   | fitted(fit, 'linear')
 # fitted(dpar='mu', scale='response') | fitted(fit, 'response')
 
+# https://rdrr.io/cran/brms/man/fitted.brmsfit.html
+
 def fitted(fit, what='expectation'):
     assert type(fit) == Fit
     assert what in ['expectation', 'linear', 'response']
@@ -128,6 +130,8 @@ def summary(arr, qs=default_quantiles, row_labels=None):
     col_labels = ['mean', 'sd'] + format_quantiles(qs)
     return ArrReprWrapper(marginal_stats(arr, qs), row_labels, col_labels)
 
+# Similar to the following:
+# https://rdrr.io/cran/rstan/man/stanfit-method-summary.html
 def marginals(fit, qs=default_quantiles):
     arrs = []
     row_labels = []
