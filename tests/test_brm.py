@@ -9,13 +9,12 @@ from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, HalfNorm
 
 from pyro.contrib.brm import brm
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.pyro_codegen import genmodel, eval_method
 from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding, dummy_df
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
 from pyro.contrib.brm.model import build_model, parameters
 from pyro.contrib.brm.fit import marginals, fitted
-from pyro.contrib.brm.pyro_backend import get_param as pyro_get_param
+from pyro.contrib.brm.pyro_backend import get_param as pyro_get_param, backend as pyro_backend
 
 from tests.common import assert_equal
 
@@ -213,9 +212,7 @@ def test_codegen(formula_str, metadata, family, prior_edits, expected):
     design_metadata = designmatrices_metadata(formula, metadata)
     prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
     model_desc = build_model(formula, prior_tree, family, metadata)
-    code = genmodel(model_desc)
-    #print(code)
-    model = eval_method(code)
+    model = pyro_backend.gen(model_desc).fn
     N = 5
     data = dummy_design(formula, metadata, N)
     trace = poutine.trace(model).get_trace(**data)
