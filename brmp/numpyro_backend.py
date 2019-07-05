@@ -71,7 +71,7 @@ def infer(data, model, seed=0, iter=None, warmup=None):
     # than accessing the underlying array (using `_value`) and
     # indexing into that. Why?
     allsamplesT = [{name: allsamples[name]._value[i] for name in names}
-                for i in range(iter)]
+                   for i in range(iter)]
 
     return Posterior(allsamplesT, get_param, to_numpy)
 
