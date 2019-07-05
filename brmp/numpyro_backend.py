@@ -5,7 +5,7 @@ from numpyro.handlers import substitute
 from numpyro.hmc_util import initialize_model
 from numpyro.mcmc import mcmc
 
-from pyro.contrib.brm.backend import Backend, Model
+from pyro.contrib.brm.backend import Backend, Model, apply_default_hmc_args
 from pyro.contrib.brm.fit import Posterior
 from pyro.contrib.brm.numpyro_codegen import gen
 
@@ -29,9 +29,7 @@ def infer(data, model, seed=0, iter=None, warmup=None):
     assert type(data) == dict
     assert type(model) == Model
 
-    # TODO: Share these default with the Pyro backend.
-    iter = 10 if iter is None else iter
-    warmup = iter // 2 if warmup is None else warmup
+    iter, warmup = apply_default_hmc_args(iter, warmup)
 
     rng = random.PRNGKey(seed)
     init_params, potential_fn, constrain_fn = initialize_model(rng, model.fn, **data)

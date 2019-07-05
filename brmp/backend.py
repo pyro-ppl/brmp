@@ -11,3 +11,8 @@ Model = namedtuple('Model', [
     'inv_link_fn', 'inv_link_code',
     'expected_response_fn', 'expected_response_code',
 ])
+
+def apply_default_hmc_args(iter, warmup):
+    iter = 10 if iter is None else iter
+    warmup = iter // 2 if warmup is None else warmup
+    return iter, warmup

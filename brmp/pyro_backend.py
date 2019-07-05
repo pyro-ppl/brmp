@@ -3,7 +3,7 @@ import torch
 
 from pyro.infer.mcmc import MCMC, NUTS
 
-from pyro.contrib.brm.backend import Backend, Model
+from pyro.contrib.brm.backend import Backend, Model, apply_default_hmc_args
 from pyro.contrib.brm.fit import Posterior
 from pyro.contrib.brm.pyro_codegen import gen
 
@@ -74,8 +74,7 @@ def infer(data, model, iter=None, warmup=None):
     assert type(data) == dict
     assert type(model) == Model
 
-    iter = 10 if iter is None else iter
-    warmup = iter // 2 if warmup is None else warmup
+    iter, warmup = apply_default_hmc_args(iter, warmup)
 
     nuts_kernel = NUTS(model.fn, jit_compile=False, adapt_step_size=True)
     run = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup).run(**data)
