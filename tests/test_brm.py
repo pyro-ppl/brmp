@@ -275,6 +275,7 @@ def test_numpyro_codegen(formula_str, metadata, family, prior_edits, expected):
             val = fn.__getattribute__(name)
             assert_equal(val._value, np.broadcast_to(expected_val, val.shape))
 
+@pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', codegen_cases)
 @pytest.mark.parametrize('backend', [
     pyro_backend,
     # Set environment variable `RUN_SLOW=1` to run against the NumPyro
@@ -282,8 +283,7 @@ def test_numpyro_codegen(formula_str, metadata, family, prior_edits, expected):
     pytest.param(numpyro_backend,
                  marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow'))
 ])
-@pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', codegen_cases)
-def test_parameter_shapes(backend, formula_str, metadata, family, prior_edits, expected):
+def test_parameter_shapes(formula_str, metadata, family, prior_edits, expected, backend):
     # Make dummy data.
     N = 5
     formula = parse(formula_str)
