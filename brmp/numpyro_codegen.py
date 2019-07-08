@@ -18,7 +18,27 @@ def gendist(family, args, shape, batch):
     args_code = [arg if type(arg) == str else 'np.array({}).broadcast({})'.format(arg, shape) for arg in args]
     return '{}({})'.format(family.name, ', '.join(args_code))
 
-def gen_response_dist(model):
+# `vectorize` is false during regular model evaluation. In this
+# setting this is a distribution over an N (num. of rows in the data
+# set) vector of responses/observations. Any parameters of the
+# distribution specified as part of the family will be broadcast (over
+# all N responses) by `gendist`. (TODO: Eventually -- current happens
+# internal to this function.) Other parameters are broadcast here. All
+# such parameters are real values (represented as singleton tensors).
+
+# The vectorized variant is used only by `expected_response_fn`. In
+# this setting the distribution is over an SxN matrix. Each row is a
+# single sampled response from the model. `gen_dist` will still
+# correctly broadcast any parameters specified on the family. Other
+# parameters of the response distribution are broadcast here -- these
+# are expected to have shape Sx1 and are expanded/broadcast to SxN.
+
+def gen_response_dist(model, vectorize=False):
+    # This function assumes that the variables S/N, mu, and any other
+    # free parameters of the distribution will already be in scope.
+
+    shape=['S', 'N'] if vectorize else ['N']
+
     # TODO: Optimisations (for numerical stability/perf.) are
     # available for some response family/link function pairs. (Though
     # maybe only for particular back-ends.) e.g. In Pyro `Bernoulli`
@@ -31,11 +51,13 @@ def gen_response_dist(model):
         if param.name == model.response.family.response.param:
             return geninvlinkbody(model.response.family.response.linkfn, 'mu')
         elif param.value is not None:
-            return 'np.array({}).broadcast([N])'.format(param.value)
+            return 'np.array({}).broadcast([{}])'.format(param.value, ', '.join(shape))
+        elif vectorize:
+            return '{}.tile((1, N))'.format(param.name)
         else:
             return '{}.broadcast([N])'.format(param.name)
     response_args = [response_arg(p) for p in model.response.family.params]
-    return gendist(model.response.family, response_args, shape=['N'], batch=True)
+    return gendist(model.response.family, response_args, shape=shape, batch=True)
 
 def lkj_corr_cholesky(size, shape):
     assert type(size) == int # the size of the matrix
@@ -194,9 +216,9 @@ def geninvlinkfn(model):
     return '\n'.join(method('invlink', ['x'], ['return {}'.format(body)]))
 
 def gen_expected_response_fn(model):
-    distcode = gen_response_dist(model)
+    distcode = gen_response_dist(model, vectorize=True)
     args = free_param_names(model.response.family)
-    body = ["N = mu.shape[0]",
+    body = ["S, N = mu.shape",
             "return dist.{}.mean".format(distcode)]
     return '\n'.join(method('expected_response', args, body))
 

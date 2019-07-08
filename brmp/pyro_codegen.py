@@ -15,14 +15,22 @@ def gendist(family, args, shape, batch):
     # know at run-time only).
     assert all(type(dim) in [int, str] for dim in shape)
     assert type(batch) == bool
-    eventdims = len(shape) - 1 if batch else len(shape)
-    args_code = [arg if type(arg) == str else 'torch.tensor({}).expand({})'.format(arg, shape) for arg in args]
-    # TODO: When len(shape) == 1 and batch==True, then this
-    # `to_event()` call is a no-op, and could therefore be dropped as
-    # an optimisation. (Eqv., when eventdims == 0?)
-    return '{}({}).to_event({})'.format(family.name, ', '.join(args_code), eventdims)
 
-def gen_response_dist(model):
+    args_code = [arg if type(arg) == str else 'torch.tensor({}).expand({})'.format(arg, shape) for arg in args]
+    out = '{}({})'.format(family.name, ', '.join(args_code))
+
+    # It is sufficient for present purposes that this function only
+    # handles the cases where either all dims are *event* dims (e.g.
+    # when sampling a vector of coefs) or where all dims are *batch*
+    # dims (e.g. sampling a vector/matrix of response variables, which
+    # can only be scalar at present).
+    if not batch:
+        out = out + '.to_event({})'.format(len(shape))
+    return out
+
+def gen_response_dist(model, vectorize=False):
+    shape=['S', 'N'] if vectorize else ['N']
+
     # TODO: Optimisations (for numerical stability/perf.) are
     # available for some response family/link function pairs. (Though
     # maybe only for particular back-ends.) e.g. In Pyro `Bernoulli`
@@ -35,11 +43,11 @@ def gen_response_dist(model):
         if param.name == model.response.family.response.param:
             return geninvlinkbody(model.response.family.response.linkfn, 'mu')
         elif param.value is not None:
-            return 'torch.tensor({}).expand(N)'.format(param.value)
+            return 'torch.tensor({}).expand({})'.format(param.value, ', '.join(shape))
         else:
-            return '{}.expand(N)'.format(param.name)
+            return '{}.expand({})'.format(param.name, ', '.join(shape))
     response_args = [response_arg(p) for p in model.response.family.params]
-    return gendist(model.response.family, response_args, shape=['N'], batch=True)
+    return gendist(model.response.family, response_args, shape=shape, batch=True)
 
 def lkj_corr_cholesky(size, shape):
     assert type(size) == int # the size of the matrix
@@ -198,9 +206,9 @@ def geninvlinkfn(model):
     return '\n'.join(method('invlink', ['x'], ['return {}'.format(body)]))
 
 def gen_expected_response_fn(model):
-    distcode = gen_response_dist(model)
+    distcode = gen_response_dist(model, vectorize=True)
     args = free_param_names(model.response.family)
-    body = ["N = mu.shape[0]",
+    body = ["S, N = mu.shape",
             "return dist.{}.mean".format(distcode)]
     return '\n'.join(method('expected_response', args, body))
 

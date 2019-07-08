@@ -10,32 +10,13 @@ from pyro.contrib.brm.family import free_param_names
 Fit = namedtuple('Fit', 'data model_desc model posterior backend')
 Posterior = namedtuple('Posterior', ['samples', 'get_param', 'to_numpy'])
 
+def param_marginal(posterior, parameter_name):
+    return posterior.to_numpy(posterior.get_param(posterior.samples, parameter_name))
+
 default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
 
 def format_quantiles(qs):
     return ['{:g}%'.format(q * 100) for q in qs]
-
-def marginal(posterior, extractor):
-    assert type(posterior) == Posterior
-    samples = posterior.samples
-    to_numpy = posterior.to_numpy
-    # `extractor` is a function that extracts from a sample some value
-    # of interest, which is expected to be in the back end specific
-    # representation. These values are mapped to numpy arrays using
-    # the back end specific `to_numpy()` function. Once converted to
-    # numpy, the extracted values are reshaped into vectors in order
-    # that they can be stacked in a single matrix. (This is necessary
-    # for e.g. group level `r_i` parameters which are themselves
-    # matrices.)
-    #
-    # Creating this intermediate list is a bit unpleasant -- could
-    # fill a pre-allocated array instead.
-    #
-    return np.stack([to_numpy(extractor(s)).reshape(-1) for s in samples])
-
-def param_marginal(posterior, parameter_name):
-    get_param = posterior.get_param
-    return marginal(posterior, lambda s: get_param(s, parameter_name))
 
 # Computes statistics for an array produced by `marginal`.
 def marginal_stats(arr, qs):
@@ -104,25 +85,23 @@ def fitted(fit, what='expectation'):
     assert type(fit) == Fit
     assert what in ['expectation', 'linear', 'response']
 
+    samples           = fit.posterior.samples
     get_param         = fit.posterior.get_param
+    to_numpy          = fit.posterior.to_numpy
     expected_response = fit.model.expected_response_fn
     inv_link          = fit.model.inv_link_fn
 
-    def expectation(sample):
-        # Fetch the value of each response parameter from the sample.
-        args = [get_param(sample, name)
+    if what == 'expectation':
+        args = [get_param(samples, name)
                 for name in free_param_names(fit.model_desc.response.family)]
-        # Compute the expected value of the response. This is in the
-        # representation used by the current back end.
-        return expected_response(*args)
-    def linear(sample):
-        return get_param(sample, 'mu')
-    def response(sample):
-        return inv_link(get_param(sample, 'mu'))
+        return to_numpy(expected_response(*args))
+    elif what == 'linear':
+        return to_numpy(get_param(samples, 'mu'))
+    elif what == 'response':
+        return to_numpy(inv_link(get_param(samples, 'mu')))
+    else:
+        raise 'Unhandled value of the `what` parameter encountered.'
 
-    f=dict(expectation=expectation, linear=linear, response=response)[what]
-
-    return marginal(fit.posterior, f)
 
 # TODO: We could follow brms and make this available via a `summary`
 # flag on `fitted`?
@@ -136,8 +115,10 @@ def marginals(fit, qs=default_quantiles):
     arrs = []
     row_labels = []
     col_labels = ['mean', 'sd'] + format_quantiles(qs)
+    def flatten(arr):
+        return arr.reshape((arr.shape[0], -1))
     def param_stats(name):
-        return marginal_stats(param_marginal(fit.posterior, name), qs)
+        return marginal_stats(flatten(param_marginal(fit.posterior, name)), qs)
     # Population coefs.
     arrs.append(param_stats('b'))
     row_labels.extend('b_{}'.format(coef) for coef in fit.model_desc.population.coefs)

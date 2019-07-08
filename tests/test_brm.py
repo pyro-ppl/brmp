@@ -17,7 +17,7 @@ from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integ
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
 from pyro.contrib.brm.model import build_model, parameters
-from pyro.contrib.brm.fit import marginals, fitted
+from pyro.contrib.brm.fit import marginals, fitted, param_marginal
 from pyro.contrib.brm.pyro_backend import backend as pyro_backend
 from pyro.contrib.brm.numpyro_backend import backend as numpyro_backend
 
@@ -293,16 +293,15 @@ def test_parameter_shapes(formula_str, metadata, family, prior_edits, expected, 
     # Define model, and generate a single posterior sample.
     model = defm(formula_str, df, family, prior_edits)
     fit = model.fit(backend=backend, iter=1, warmup=0)
-    sample = fit.posterior.samples[0]
 
     # Check parameter sizes.
     for parameter in parameters(model.desc):
-        p = fit.posterior.get_param(sample, parameter.name)
+        # Get the first (and only) sample.
+        p = param_marginal(fit.posterior, parameter.name)[0]
         shape = p.shape
         expected_shape = parameter.shape
-        #print(shape, expected_shape, parameter, p)
         assert shape == expected_shape
-    assert fit.posterior.get_param(sample, 'mu').shape == (N,)
+    assert param_marginal(fit.posterior, 'mu')[0].shape == (N,)
 
 
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits', [
@@ -570,14 +569,21 @@ def test_coding(formula_str, expected_coding):
 
 # I expect these to also pass with PYRO_TENSOR_TYPE='torch.FloatTensor'.
 
-def test_marginals_fitted_smoke():
+@pytest.mark.parametrize('backend', [
+    pyro_backend,
+    # Set environment variable `RUN_SLOW=1` to run against the NumPyro
+    # back end.
+    pytest.param(numpyro_backend,
+                 marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow'))
+])
+def test_marginals_fitted_smoke(backend):
     N = 10
     S = 4
     df = dummy_df(make_metadata_lookup([RealValued('y'),
                                         RealValued('x'),
                                         Categorical('a', list('ab'))]),
                   N)
-    fit = brm('y ~ 1 + x + (1 | a)', df, iter=S, warmup=0)
+    fit = defm('y ~ 1 + x + (1 | a)', df).fit(backend=backend, iter=S, warmup=0)
     def chk(arr, expected_shape):
         assert np.all(np.isfinite(arr))
         assert arr.shape == expected_shape
