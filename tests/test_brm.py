@@ -32,8 +32,7 @@ def build_metadata(formula, metadata):
     default_metadata = make_metadata_lookup([RealValued(factor) for factor in allfactors(formula)])
     return dict(default_metadata, **make_metadata_lookup(metadata))
 
-# TODO: Extend this. Could check that the response is observed?
-@pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', [
+codegen_cases = [
     # TODO: This (and similar examples below) can't be expressed with
     # the current parser. Is it useful to fix this (`y ~ -1`?), or can
     # these be dropped?
@@ -204,8 +203,10 @@ def build_metadata(formula, metadata):
      apply(getfamily('Binomial'), num_trials=10),
      [],
      [('b_0', Cauchy, {})]),
+]
 
-])
+# TODO: Extend this. Could check that the response is observed?
+@pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', codegen_cases)
 def test_codegen(formula_str, metadata, family, prior_edits, expected):
     formula = parse(formula_str)
     metadata = build_metadata(formula, metadata)
