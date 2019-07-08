@@ -6,7 +6,7 @@ import torch
 import pandas as pd
 
 import pyro.poutine as poutine
-from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, HalfNormal, LKJCorrCholesky
+from pyro.distributions import Independent
 
 from pyro.contrib.brm import brm, defm
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
@@ -21,11 +21,11 @@ from pyro.contrib.brm.numpyro_backend import backend as numpyro_backend
 from tests.common import assert_equal
 
 default_params = dict(
-    Normal          = dict(loc=0., scale=1.),
-    Cauchy          = dict(loc=0., scale=1.),
-    HalfCauchy      = dict(scale=3.),
-    HalfNormal      = dict(scale=1.),
-    LKJCorrCholesky = dict(eta=1.),
+    Normal     = dict(loc=0., scale=1.),
+    Cauchy     = dict(loc=0., scale=1.),
+    HalfCauchy = dict(scale=3.),
+    HalfNormal = dict(scale=1.),
+    LKJ        = dict(eta=1.),
 )
 
 def build_metadata(formula, metadata):
@@ -41,190 +41,197 @@ codegen_cases = [
     #(Formula('y', [], []), [], [], ['sigma']),
 
     ('y ~ 1 + x', [], getfamily('Normal'), [],
-     [('b_0', Cauchy, {}),
-      ('sigma', HalfCauchy, {})]),
+     [('b_0', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {})]),
 
     # Integer valued predictor.
     ('y ~ 1 + x', [Integral('x', min=0, max=10)], getfamily('Normal'), [],
-     [('b_0', Cauchy, {}),
-      ('sigma', HalfCauchy, {})]),
+     [('b_0', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {})]),
 
     ('y ~ 1 + x1 + x2', [], getfamily('Normal'), [],
-     [('b_0', Cauchy, {}),
-      ('sigma', HalfCauchy, {})]),
+     [('b_0', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {})]),
 
     ('y ~ x1:x2',
      [Categorical('x1', list('ab')), Categorical('x2', list('cd'))],
      getfamily('Normal'), [],
-     [('b_0', Cauchy, {}),
-      ('sigma', HalfCauchy, {})]),
+     [('b_0', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {})]),
 
     #(Formula('y', [], [Group([], 'z', True)]), [Categorical('z', list('ab'))], [], ['sigma', 'z_1']),
     # Groups with fewer than two terms don't sample the (Cholesky
     # decomp. of the) correlation matrix.
     #(Formula('y', [], [Group([], 'z', True)]), [Categorical('z', list('ab'))], [], ['sigma', 'z_1']),
     ('y ~ 1 | z', [Categorical('z', list('ab'))], getfamily('Normal'), [],
-     [('sigma', HalfCauchy, {}),
-      ('z_0', Normal, {}),
-      ('sd_0_0', HalfCauchy, {})]),
+     [('sigma', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('sd_0_0', 'HalfCauchy', {})]),
 
     ('y ~ x | z', [Categorical('z', list('ab'))], getfamily('Normal'), [],
-     [('sigma', HalfCauchy, {}),
-      ('z_0', Normal, {}),
-      ('sd_0_0', HalfCauchy, {})]),
+     [('sigma', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('sd_0_0', 'HalfCauchy', {})]),
 
     ('y ~ 1 + x1 + x2 + (1 + x3 | z)', [Categorical('z', list('ab'))], getfamily('Normal'), [],
-     [('b_0', Cauchy, {}),
-      ('sigma', HalfCauchy, {}),
-      ('z_0', Normal, {}),
-      ('sd_0_0', HalfCauchy, {}),
-      ('L_0', LKJCorrCholesky, {})]),
+     [('b_0', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('sd_0_0', 'HalfCauchy', {}),
+      ('L_0', 'LKJ', {})]),
 
     ('y ~ 1 + x1 + x2 + (1 + x3 || z)', [Categorical('z', list('ab'))], getfamily('Normal'), [],
-     [('b_0', Cauchy, {}),
-      ('sigma', HalfCauchy, {}),
-      ('z_0', Normal, {}),
-      ('sd_0_0', HalfCauchy, {})]),
+     [('b_0', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('sd_0_0', 'HalfCauchy', {})]),
 
     ('y ~ 1 + x1 + x2 + (1 + x3 + x4 | z1) + (1 + x5 | z2)',
      [Categorical('z1', list('ab')), Categorical('z2', list('ab'))],
      getfamily('Normal'),
      [],
-     [('b_0', Cauchy, {}),
-      ('sigma', HalfCauchy, {}),
-      ('z_0', Normal, {}),
-      ('sd_0_0', HalfCauchy, {}),
-      ('L_0', LKJCorrCholesky, {}),
-      ('z_1', Normal, {}),
-      ('sd_1_0', HalfCauchy, {}),
-      ('L_1', LKJCorrCholesky, {})]),
+     [('b_0', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('sd_0_0', 'HalfCauchy', {}),
+      ('L_0', 'LKJ', {}),
+      ('z_1', 'Normal', {}),
+      ('sd_1_0', 'HalfCauchy', {}),
+      ('L_1', 'LKJ', {})]),
 
     # Custom priors.
     ('y ~ 1 + x1 + x2',
      [],
      getfamily('Normal'),
      [PriorEdit(('b',), prior('Normal', [0., 100.]))],
-     [('b_0', Normal, {'loc': 0., 'scale': 100.}),
-      ('sigma', HalfCauchy, {})]),
+     [('b_0', 'Normal', {'loc': 0., 'scale': 100.}),
+      ('sigma', 'HalfCauchy', {})]),
 
     ('y ~ 1 + x1 + x2',
      [],
      getfamily('Normal'),
      [PriorEdit(('b', 'intercept'), prior('Normal', [0., 100.]))],
-     [('b_0', Normal, {'loc': 0., 'scale': 100.}),
-      ('b_1', Cauchy, {}),
-      ('sigma', HalfCauchy, {})]),
+     [('b_0', 'Normal', {'loc': 0., 'scale': 100.}),
+      ('b_1', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {})]),
 
     ('y ~ 1 + x1 + x2',
      [],
      getfamily('Normal'),
      [PriorEdit(('b', 'x1'), prior('Normal', [0., 100.]))],
-     [('b_0', Cauchy, {}),
-      ('b_1', Normal, {'loc': 0., 'scale': 100.}),
-      ('b_2', Cauchy, {}),
-      ('sigma', HalfCauchy, {})]),
+     [('b_0', 'Cauchy', {}),
+      ('b_1', 'Normal', {'loc': 0., 'scale': 100.}),
+      ('b_2', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {})]),
 
     # Prior on coef of a factor.
     ('y ~ 1 + x',
      [Categorical('x', list('ab'))],
      getfamily('Normal'),
      [PriorEdit(('b', 'x[b]'), prior('Normal', [0., 100.]))],
-     [('b_0', Cauchy, {}),
-      ('b_1', Normal, {'loc': 0., 'scale': 100.}),
-      ('sigma', HalfCauchy, {})]),
+     [('b_0', 'Cauchy', {}),
+      ('b_1', 'Normal', {'loc': 0., 'scale': 100.}),
+      ('sigma', 'HalfCauchy', {})]),
 
     # Prior on coef of an interaction.
     ('y ~ x1:x2',
      [Categorical('x1', list('ab')), Categorical('x2', list('cd'))],
      getfamily('Normal'),
      [PriorEdit(('b', 'x1[b]:x2[c]'), prior('Normal', [0., 100.]))],
-     [('b_0', Cauchy, {}),
-      ('b_1', Normal, {'loc': 0., 'scale': 100.}),
-      ('b_2', Cauchy, {}),
-      ('sigma', HalfCauchy, {})]),
+     [('b_0', 'Cauchy', {}),
+      ('b_1', 'Normal', {'loc': 0., 'scale': 100.}),
+      ('b_2', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {})]),
 
     # Prior on group level `sd` choice.
     ('y ~ 1 + x2 + x3 | x1',
      [Categorical('x1', list('ab'))],
      getfamily('Normal'),
      [PriorEdit(('sd', 'x1', 'intercept'), prior('HalfCauchy', [4.]))],
-     [('sigma', HalfCauchy, {}),
-      ('sd_0_0', HalfCauchy, {'scale': 4.}),
-      ('sd_0_1', HalfCauchy, {}),
-      ('z_0', Normal, {}),
-      ('L_0', LKJCorrCholesky, {})]),
+     [('sigma', 'HalfCauchy', {}),
+      ('sd_0_0', 'HalfCauchy', {'scale': 4.}),
+      ('sd_0_1', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('L_0', 'LKJ', {})]),
 
     ('y ~ 1 + x2 + x3 || x1',
      [Categorical('x1', list('ab'))],
      getfamily('Normal'),
      [PriorEdit(('sd', 'x1', 'intercept'), prior('HalfNormal', [4.]))],
-     [('sigma', HalfCauchy, {}),
-      ('sd_0_0', HalfNormal, {'scale': 4.}),
-      ('sd_0_1', HalfCauchy, {}),
-      ('z_0', Normal, {})]),
+     [('sigma', 'HalfCauchy', {}),
+      ('sd_0_0', 'HalfNormal', {'scale': 4.}),
+      ('sd_0_1', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {})]),
 
     # Prior on L.
     ('y ~ 1 + x2 | x1',
      [Categorical('x1', list('ab'))],
      getfamily('Normal'),
      [PriorEdit(('cor',), prior('LKJ', [2.]))],
-     [('sigma', HalfCauchy, {}),
-      ('sd_0_0', HalfCauchy, {}),
-      ('z_0', Normal, {}),
-      ('L_0', LKJCorrCholesky, {'eta': 2.})]),
+     [('sigma', 'HalfCauchy', {}),
+      ('sd_0_0', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('L_0', 'LKJ', {'eta': 2.})]),
 
     # Prior on parameter of response distribution.
     ('y ~ x',
      [],
      getfamily('Normal'),
      [PriorEdit(('resp', 'sigma'), prior('HalfCauchy', [4.]))],
-     [('b_0', Cauchy, {}),
-      ('sigma', HalfCauchy, {'scale': 4.})]),
+     [('b_0', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {'scale': 4.})]),
 
     # Custom response family.
     ('y ~ x',
      [],
      apply(getfamily('Normal'), sigma=0.5),
      [],
-     [('b_0', Cauchy, {})]),
+     [('b_0', 'Cauchy', {})]),
 
     ('y ~ x',
      [Categorical('y', list('AB'))],
      getfamily('Bernoulli'),
      [],
-     [('b_0', Cauchy, {})]),
+     [('b_0', 'Cauchy', {})]),
 
     ('y ~ x',
      [Integral('y', min=0, max=1)],
      getfamily('Bernoulli'),
      [],
-     [('b_0', Cauchy, {})]),
+     [('b_0', 'Cauchy', {})]),
 
     ('y ~ x',
      [Integral('y', min=0, max=10)],
      apply(getfamily('Binomial'), num_trials=10),
      [],
-     [('b_0', Cauchy, {})]),
+     [('b_0', 'Cauchy', {})]),
 ]
 
 # TODO: Extend this. Could check that the response is observed?
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', codegen_cases)
-def test_codegen(formula_str, metadata, family, prior_edits, expected):
+def test_pyro_codegen(formula_str, metadata, family, prior_edits, expected):
+    # Make dummy data.
+    N = 5
     formula = parse(formula_str)
     metadata = build_metadata(formula, metadata)
-    design_metadata = designmatrices_metadata(formula, metadata)
-    prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
-    model_desc = build_model(formula, prior_tree, family, metadata)
-    model = pyro_backend.gen(model_desc).fn
-    N = 5
-    data = pyro_backend.from_numpy(dummy_design(formula, metadata, N))
-    trace = poutine.trace(model).get_trace(**data)
+    df = dummy_df(metadata, N)
+
+    # Define model.
+    model = defm(formula_str, df, family, prior_edits)
+
+    # Generate model function and data.
+    modelfn = pyro_backend.gen(model.desc).fn
+    data = pyro_backend.from_numpy(model.data)
+
+    # Check sample sites.
+    trace = poutine.trace(modelfn).get_trace(**data)
     expected_sites = [site for (site, _, _) in expected]
     assert set(trace.stochastic_nodes) - {'obs'} == set(expected_sites)
-    for (site, family, maybe_params) in expected:
+    for (site, family_name, maybe_params) in expected:
+        pyro_family_name = dict(LKJ='LKJCorrCholesky').get(family_name, family_name)
         fn = unwrapfn(trace.nodes[site]['fn'])
-        params = maybe_params or default_params[fn.__class__.__name__]
-        assert type(fn) == family
+        params = maybe_params or default_params[family_name]
+        assert type(fn).__name__ == pyro_family_name
         for (name, expected_val) in params.items():
             val = fn.__getattribute__(name)
             assert_equal(val, torch.tensor(expected_val).expand(val.shape))
