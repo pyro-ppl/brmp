@@ -69,8 +69,14 @@ def infer(data, model, seed=0, iter=None, warmup=None):
 
     # TODO: Indexing into the JAX array here is significantly slower
     # than accessing the underlying array (using `_value`) and
-    # indexing into that. Why?
-    allsamplesT = [{name: allsamples[name]._value[i] for name in names}
+    # indexing into that. (Why?) We do this conditionally, as some
+    # parameters will (sometimes) be regular numpy rather than JAX
+    # arrays. (e.g. `b` when the model does not include any population
+    # level coefficients.)
+    def unwrap(arr):
+        return arr._value if hasattr(arr, '_value') else arr
+
+    allsamplesT = [{name: unwrap(allsamples[name])[i] for name in names}
                    for i in range(iter)]
 
     return Posterior(allsamplesT, get_param, to_numpy)

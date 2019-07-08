@@ -1,3 +1,4 @@
+import os
 import pytest
 
 import numpy as np
@@ -7,14 +8,15 @@ import pandas as pd
 import pyro.poutine as poutine
 from pyro.distributions import Independent, Normal, Cauchy, HalfCauchy, HalfNormal, LKJCorrCholesky
 
-from pyro.contrib.brm import brm
+from pyro.contrib.brm import brm, defm
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
 from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding, dummy_df
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
 from pyro.contrib.brm.model import build_model, parameters
 from pyro.contrib.brm.fit import marginals, fitted
-from pyro.contrib.brm.pyro_backend import get_param as pyro_get_param, backend as pyro_backend
+from pyro.contrib.brm.pyro_backend import backend as pyro_backend
+from pyro.contrib.brm.numpyro_backend import backend as numpyro_backend
 
 from tests.common import assert_equal
 
@@ -226,14 +228,38 @@ def test_codegen(formula_str, metadata, family, prior_edits, expected):
         for (name, expected_val) in params.items():
             val = fn.__getattribute__(name)
             assert_equal(val, torch.tensor(expected_val).expand(val.shape))
-    for parameter in parameters(model_desc):
-        shape = pyro_get_param(trace, parameter.name).shape
-        expected_shape = parameter.shape
-        assert shape == expected_shape
-    assert pyro_get_param(trace, 'mu').shape == (N,)
 
 def unwrapfn(fn):
     return unwrapfn(fn.base_dist) if type(fn) == Independent else fn
+
+@pytest.mark.parametrize('backend', [
+    pyro_backend,
+    # Set environment variable `RUN_SLOW=1` to run against the NumPyro
+    # back end.
+    pytest.param(numpyro_backend,
+                 marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow'))
+])
+@pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', codegen_cases)
+def test_parameter_shapes(backend, formula_str, metadata, family, prior_edits, expected):
+    # Make dummy data.
+    N = 5
+    formula = parse(formula_str)
+    metadata = build_metadata(formula, metadata)
+    df = dummy_df(metadata, N)
+
+    # Define model, and generate a single posterior sample.
+    model = defm(formula_str, df, family, prior_edits)
+    fit = model.fit(backend=backend, iter=1, warmup=0)
+    sample = fit.posterior.samples[0]
+
+    # Check parameter sizes.
+    for parameter in parameters(model.desc):
+        p = fit.posterior.get_param(sample, parameter.name)
+        shape = p.shape
+        expected_shape = parameter.shape
+        #print(shape, expected_shape, parameter, p)
+        assert shape == expected_shape
+    assert fit.posterior.get_param(sample, 'mu').shape == (N,)
 
 
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits', [
