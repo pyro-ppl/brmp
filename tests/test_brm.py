@@ -8,6 +8,9 @@ import pandas as pd
 import pyro.poutine as poutine
 from pyro.distributions import Independent
 
+from jax import random
+import numpyro.handlers as numpyro
+
 from pyro.contrib.brm import brm, defm
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
 from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding, dummy_df
@@ -238,6 +241,39 @@ def test_pyro_codegen(formula_str, metadata, family, prior_edits, expected):
 
 def unwrapfn(fn):
     return unwrapfn(fn.base_dist) if type(fn) == Independent else fn
+
+@pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', codegen_cases)
+def test_numpyro_codegen(formula_str, metadata, family, prior_edits, expected):
+    # Make dummy data.
+    N = 5
+    formula = parse(formula_str)
+    metadata = build_metadata(formula, metadata)
+    df = dummy_df(metadata, N)
+
+    # Define model.
+    model = defm(formula_str, df, family, prior_edits)
+
+    # Generate model function and data.
+    modelfn = numpyro_backend.gen(model.desc).fn
+    data = numpyro_backend.from_numpy(model.data)
+
+    # Check sample sites.
+    rng = random.PRNGKey(0)
+    trace = numpyro.trace(numpyro.seed(modelfn, rng)).get_trace(**data)
+    expected_sites = [site for (site, _, _) in expected]
+    sample_sites = [name for name, node in trace.items() if not node['is_observed']]
+    assert set(sample_sites) == set(expected_sites)
+    for (site, family_name, maybe_params) in expected:
+        numpyro_family_name = dict(LKJ='LKJCholesky').get(family_name, family_name)
+        fn = trace[site]['fn']
+        params = maybe_params or default_params[family_name]
+        assert type(fn).__name__ == numpyro_family_name
+        for (name, expected_val) in params.items():
+            if family_name == 'LKJ':
+                assert name == 'eta'
+                name = 'concentration'
+            val = fn.__getattribute__(name)
+            assert_equal(val._value, np.broadcast_to(expected_val, val.shape))
 
 @pytest.mark.parametrize('backend', [
     pyro_backend,
