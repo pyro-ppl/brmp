@@ -1,13 +1,22 @@
 # Bayesian Regression Models
 
+This is an attempt to implement
+a [brms](https://github.com/paul-buerkner/brms)-like library in
+Python.
+
+It allows Bayesian regression models to be specified using (a subset
+of) the lme4 syntax. Given such a description and a pandas data frame,
+the library generates model code and design matrices, targeting
+either [Pyro](https://pyro.ai/)
+or [NumPyro](https://github.com/pyro-ppl/numpyro).
+
 ## Current Status
 
-### Formula
+### Model Specification
 
-The core of this library is the ability to generate model code and
-design matrices from a model specified using (a subset of) the lme4
-syntax and a pandas dataframe. Here are some example formulae that the
-system can handle:
+#### Formula
+
+Here are some example formulae that the system can handle:
 
 | Formula                                      | Description |
 |----|----|
@@ -23,7 +32,7 @@ system can handle:
 The file [`ex1.py`](./ex1.py) shows the model code and data generated
 for a number of similar formulae.
 
-### Priors
+#### Priors
 
 Custom priors can be specified at various levels of granularity. For
 example, users can specify:
@@ -46,12 +55,14 @@ Users can give multiple such specifications and they combine in a
 sensible way. See [`ex1.py`](./ex1.py#L141) for a simple example of
 this.
 
-### Response Families
+#### Response Families
 
 The library supports models with either (uni-variate) Gaussian or
 Binomial (inc. Bernoulli) distributed responses.
 
-### Posterior Summaries etc.
+### Inference
+
+Both the Pyro and NumPyro back ends use NUTS for posterior inference.
 
 The library includes the following functions for working with
 posteriors:
