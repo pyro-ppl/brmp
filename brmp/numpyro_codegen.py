@@ -197,7 +197,7 @@ def geninvlinkbody(linkfn, code):
     if linkfn == LinkFn.identity:
         return code
     elif linkfn == LinkFn.logit:
-        return '1. / (1. + np.exp(-{}))'.format(code)
+        return 'sigmoid({})'.format(code)
     else:
         raise NotImplementedError('code generation for link function {} not implemented'.format(linkfn))
 
@@ -304,6 +304,7 @@ def eval_method(code):
     assert match is not None
     method_name = match.group(1)
     import jax.numpy as np
+    from jax.scipy.special import expit as sigmoid
     import numpy as onp
     import numpyro.distributions as dist
     from numpyro.handlers import sample
