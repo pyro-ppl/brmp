@@ -3,18 +3,22 @@ from .family import Family, LinkFn, getfamily, args, free_param_names
 from .model import ModelDesc, Group
 from .backend import Model
 
+def gen_expanded_scalar(val, shape):
+    assert type(val) in [float, int]
+    return 'np.array({}).broadcast([{}])'.format(val, ', '.join(str(dim) for dim in shape))
+
 def gendist(family, args, shape):
     assert type(family) == Family
     assert type(args) == list
     assert len(args) == len(family.params)
-    # Floats are expanded to `shape`, string are assumed to be literal
-    # code.
-    assert all(type(arg) in [float, str] for arg in args)
+    # Floats and ints are expanded to `shape`, string are assumed to
+    # be literal code.
+    assert all(type(arg) in [float, int, str] for arg in args)
     assert type(shape) == list
     # Dimensions are ints (when statically known) or strings (when
     # know at run-time only).
     assert all(type(dim) in [int, str] for dim in shape)
-    args_code = [arg if type(arg) == str else 'np.array({}).broadcast({})'.format(arg, shape) for arg in args]
+    args_code = [arg if type(arg) == str else gen_expanded_scalar(arg, shape) for arg in args]
     return '{}({})'.format(family.name, ', '.join(args_code))
 
 # `vectorize` is false during regular model evaluation. In this
@@ -50,7 +54,7 @@ def gen_response_dist(model, vectorize=False):
         if param.name == model.response.family.response.param:
             return geninvlinkbody(model.response.family.response.linkfn, 'mu')
         elif param.value is not None:
-            return 'np.array({}).broadcast([{}])'.format(param.value, ', '.join(shape))
+            return param.value
         elif vectorize:
             return '{}.tile((1, N))'.format(param.name)
         else:

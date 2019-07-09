@@ -3,20 +3,24 @@ from .family import Family, LinkFn, getfamily, args, free_param_names
 from .model import ModelDesc, Group
 from .backend import Model
 
+def gen_expanded_scalar(val, shape):
+    assert type(val) in [float, int]
+    return 'torch.tensor({}).expand({})'.format(val, ', '.join(str(dim) for dim in shape))
+
 def gendist(family, args, shape, batch):
     assert type(family) == Family
     assert type(args) == list
     assert len(args) == len(family.params)
-    # Floats are expanded to `shape`, string are assumed to be literal
-    # code.
-    assert all(type(arg) in [float, str] for arg in args)
+    # Floats and ints are expanded to `shape`, string are assumed to
+    # be literal code.
+    assert all(type(arg) in [float, int, str] for arg in args)
     assert type(shape) == list
     # Dimensions are ints (when statically known) or strings (when
     # know at run-time only).
     assert all(type(dim) in [int, str] for dim in shape)
     assert type(batch) == bool
 
-    args_code = [arg if type(arg) == str else 'torch.tensor({}).expand({})'.format(arg, shape) for arg in args]
+    args_code = [arg if type(arg) == str else gen_expanded_scalar(arg, shape) for arg in args]
     out = '{}({})'.format(family.name, ', '.join(args_code))
 
     # It is sufficient for present purposes that this function only
@@ -43,7 +47,7 @@ def gen_response_dist(model, vectorize=False):
         if param.name == model.response.family.response.param:
             return geninvlinkbody(model.response.family.response.linkfn, 'mu')
         elif param.value is not None:
-            return 'torch.tensor({}).expand({})'.format(param.value, ', '.join(shape))
+            return param.value # Will be made into an expanded tensor by `gendist`.
         else:
             return '{}.expand({})'.format(param.name, ', '.join(shape))
     response_args = [response_arg(p) for p in model.response.family.params]
