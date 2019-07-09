@@ -3,7 +3,7 @@ from .family import Family, LinkFn, getfamily, args, free_param_names
 from .model import ModelDesc, Group
 from .backend import Model
 
-def gendist(family, args, shape, batch):
+def gendist(family, args, shape):
     assert type(family) == Family
     assert type(args) == list
     assert len(args) == len(family.params)
@@ -14,7 +14,6 @@ def gendist(family, args, shape, batch):
     # Dimensions are ints (when statically known) or strings (when
     # know at run-time only).
     assert all(type(dim) in [int, str] for dim in shape)
-    assert type(batch) == bool
     args_code = [arg if type(arg) == str else 'np.array({}).broadcast({})'.format(arg, shape) for arg in args]
     return '{}({})'.format(family.name, ', '.join(args_code))
 
@@ -57,7 +56,7 @@ def gen_response_dist(model, vectorize=False):
         else:
             return '{}.broadcast([N])'.format(param.name)
     response_args = [response_arg(p) for p in model.response.family.params]
-    return gendist(model.response.family, response_args, shape=shape, batch=True)
+    return gendist(model.response.family, response_args, shape=shape)
 
 def lkj_corr_cholesky(size, shape):
     assert type(size) == int # the size of the matrix
@@ -93,7 +92,7 @@ def genprior(varname, prior_desc):
 
     # Sample each segment of a coefficient vector.
     for i, (prior, length) in enumerate(prior_desc):
-        code.append(sample('{}_{}'.format(varname, i), gendist(prior, args(prior), [length], False)))
+        code.append(sample('{}_{}'.format(varname, i), gendist(prior, args(prior), [length])))
 
     # TODO: Optimisation -- avoid `torch.concat` when only sample is
     # drawn. (Binding the sampled value directly to `varname`.)
@@ -141,7 +140,7 @@ def gengroup(i, group):
     # be to pass `torch.mm(torch.diag(sd_{}), L_{})` as the
     # `scale_tril` argument of a `MultivariateNormal`. Is there any
     # significant different between these two approaches?
-    code.append(sample('z_{}'.format(i), gendist(getfamily('Normal'), [0., 1.], [M_i, N_i], batch=False)))
+    code.append(sample('z_{}'.format(i), gendist(getfamily('Normal'), [0., 1.], [M_i, N_i])))
     code.append('assert z_{}.shape == (M_{}, N_{}) # {} x {}'.format(i, i, i, M_i, N_i))
 
     if group.corr_prior:
@@ -280,7 +279,7 @@ def genmodel(model):
     # Sample from priors over the response distribution parameters
     # that aren't predicted from the data.
     for param, param_prior in zip(model.response.nonlocparams, model.response.priors):
-        body.append(sample(param.name, gendist(param_prior, args(param_prior), [1], False)))
+        body.append(sample(param.name, gendist(param_prior, args(param_prior), [1])))
 
     #body.append('with pyro.plate("obs", N):')
     body.append(sample('y', gen_response_dist(model), 'y_obs'))
