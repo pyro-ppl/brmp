@@ -56,7 +56,7 @@ def gen_response_dist(model, vectorize=False):
         elif param.value is not None:
             return param.value
         elif vectorize:
-            return '{}.tile((1, N))'.format(param.name)
+            return 'np.tile({}, (1, N))'.format(param.name)
         else:
             return '{}.broadcast([N])'.format(param.name)
     response_args = [response_arg(p) for p in model.response.family.params]

@@ -11,7 +11,7 @@ from pyro.distributions import Independent
 from jax import random
 import numpyro.handlers as numpyro
 
-from pyro.contrib.brm import brm, defm
+from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
 from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding, dummy_df
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
@@ -274,6 +274,35 @@ def test_numpyro_codegen(formula_str, metadata, family, prior_edits, expected):
                 name = 'concentration'
             val = fn.__getattribute__(name)
             assert_equal(val._value, np.broadcast_to(expected_val, val.shape))
+
+# Sanity checks to ensure that the generated `expected_response`
+# function does something sensible for some common families.
+@pytest.mark.parametrize('response_meta, family, args, expected', [
+    (RealValued('y'),
+     getfamily('Normal'),
+     [
+         np.array([[1., 2., 3.], [4., 5., 6.]]), # mean
+         np.array([[0.1], [0.2]]),               # sd
+     ],
+     np.array([[1., 2., 3.], [4., 5., 6.]])),    # mean
+
+    (Integral('y', min=0, max=5),
+     apply(getfamily('Binomial'), num_trials=5),
+     [
+         np.array([[-2., 0., 2.], [-1., 0., 1.]]), # logits
+     ],
+     np.array([[0.59601461, 2.5, 4.40398539],
+               [1.34470711, 2.5, 3.65529289]])),   # sigmoid(logits) * num_trials
+])
+@pytest.mark.parametrize('backend', [pyro_backend, numpyro_backend])
+def test_expected_response_codegen(response_meta, family, args, expected, backend):
+    formula = parse('y ~ 1')
+    desc = makedesc(formula, [response_meta], family, [])
+    def expected_response(*args):
+        backend_args = [backend.from_numpy(arg) for arg in args]
+        fn = backend.gen(desc).expected_response_fn
+        return backend.to_numpy(fn(*backend_args))
+    assert_equal(expected_response(*args), expected)
 
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', codegen_cases)
 @pytest.mark.parametrize('backend', [
