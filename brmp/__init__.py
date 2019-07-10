@@ -8,10 +8,11 @@ from pyro.contrib.brm.model import build_model, model_repr
 from pyro.contrib.brm.pyro_backend import backend as pyro_backend
 
 def makecode(formula, df, family, prior_edits, backend=pyro_backend):
-    return backend.gen(makedesc(formula, df, family, prior_edits)).code
+    desc = makedesc(formula, dfmetadata(df), family, prior_edits)
+    return backend.gen(desc).code
 
-def makedesc(formula, df, family, prior_edits):
-    df_metadata_lu = make_metadata_lookup(dfmetadata(df))
+def makedesc(formula, df_metadata, family, prior_edits):
+    df_metadata_lu = make_metadata_lookup(df_metadata)
     design_metadata = designmatrices_metadata(formula, df_metadata_lu)
     prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
     return build_model(formula, prior_tree, family, df_metadata_lu)
@@ -29,7 +30,7 @@ def defm(formula_str, df, family=None, prior_edits=None):
     #
     # Related: Perhaps design matrices ought to always have metadata
     # (i.e. column names) associated with them, as in Patsy. (This
-    desc = makedesc(formula, df, family, prior_edits)
+    desc = makedesc(formula, dfmetadata(df), family, prior_edits)
     data = makedata(formula, df)
     return DefmResult(desc, data)
 
