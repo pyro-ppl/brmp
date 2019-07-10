@@ -13,6 +13,7 @@ from pyro.contrib.brm.pyro_codegen import gen
 # posterior.samples :: bs
 # posterior.get_param :: bs -> ps
 # posterior.to_numpy :: ps -> ndarray
+# backend.from_numpy :: ndarray -> ps
 # model.inv_link_fn :: ps -> ps
 # model.expected_response_fn :: (ps, ps, ...) -> ps
 
@@ -72,29 +73,24 @@ def to_numpy(param_samples):
 # Here we convert to torch tensors. Arrays of floats use the default
 # dtype.
 
-# TODO: `from_numpy` should probably just handle a single array --
-# this mapping over `data` can happen once for all somewhere else.
-def from_numpy(data):
-    assert type(data) == dict
+def from_numpy(arr):
+    assert type(arr) == np.ndarray
     default_dtype = torch.get_default_dtype()
-    def doit(arr):
-        if arr.size == 0:
-            # Attempting to convert an empty array using
-            # `torch.from_numpy()` throws an error, so make a new
-            # empty array instead. I think this can only happen when
-            # `arr` holds floats, which at present will always be 64
-            # bit. (See `col2numpy` in design.py.)
-            assert arr.dtype == np.float64
-            out = torch.empty(arr.shape)
-            assert out.dtype == default_dtype
-            return out
-        else:
-            out = torch.from_numpy(arr)
-            if torch.is_floating_point(out) and not out.dtype == default_dtype:
-                out = out.type(default_dtype)
-            return out
-
-    return {k: doit(arr) for k, arr in data.items()}
+    if arr.size == 0:
+        # Attempting to convert an empty array using
+        # `torch.from_numpy()` throws an error, so make a new
+        # empty array instead. I think this can only happen when
+        # `arr` holds floats, which at present will always be 64
+        # bit. (See `col2numpy` in design.py.)
+        assert arr.dtype == np.float64
+        out = torch.empty(arr.shape)
+        assert out.dtype == default_dtype
+        return out
+    else:
+        out = torch.from_numpy(arr)
+        if torch.is_floating_point(out) and not out.dtype == default_dtype:
+            out = out.type(default_dtype)
+        return out
 
 def infer(data, model, iter=None, warmup=None):
     assert type(data) == dict

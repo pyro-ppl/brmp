@@ -224,7 +224,7 @@ def test_pyro_codegen(formula_str, metadata, family, prior_edits, expected):
 
     # Generate model function and data.
     modelfn = pyro_backend.gen(model.desc).fn
-    data = pyro_backend.from_numpy(model.data)
+    data = {k: pyro_backend.from_numpy(arr) for k, arr in model.data.items()}
 
     # Check sample sites.
     trace = poutine.trace(modelfn).get_trace(**data)
@@ -255,7 +255,7 @@ def test_numpyro_codegen(formula_str, metadata, family, prior_edits, expected):
 
     # Generate model function and data.
     modelfn = numpyro_backend.gen(model.desc).fn
-    data = numpyro_backend.from_numpy(model.data)
+    data = {k: numpyro_backend.from_numpy(arr) for k, arr in model.data.items()}
 
     # Check sample sites.
     rng = random.PRNGKey(0)
