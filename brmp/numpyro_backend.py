@@ -24,8 +24,11 @@ def get_param(samples, name):
 def to_numpy(param_samples):
     return param_samples._value if hasattr(param_samples, '_value') else param_samples
 
-# Data is initially represented as numpy arrays, so there's nothing to
-# do before we can use that with NumPyro models.
+# I would ideally like to transform the numpy array into a JAX array
+# here, in order to comply with the interface as closely as possible.
+# However, since I don't know a super cheap way to do this, and given
+# that these two types are mostly interchangable, I'll just use the
+# identity here.
 def from_numpy(data):
     return data
 
