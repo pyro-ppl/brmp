@@ -1,8 +1,10 @@
-from pyro.contrib.brm.formula import parse
+import pandas as pd
+
+from pyro.contrib.brm.formula import parse, Formula
 from pyro.contrib.brm.design import makedata, dfmetadata, make_metadata_lookup, designmatrices_metadata
 from pyro.contrib.brm.fit import Fit
 from pyro.contrib.brm.backend import Backend
-from pyro.contrib.brm.family import getfamily
+from pyro.contrib.brm.family import getfamily, Family
 from pyro.contrib.brm.priors import build_prior_tree
 from pyro.contrib.brm.model import build_model, model_repr
 from pyro.contrib.brm.pyro_backend import backend as pyro_backend
@@ -12,12 +14,20 @@ def makecode(formula, df, family, prior_edits, backend=pyro_backend):
     return backend.gen(desc).code
 
 def makedesc(formula, df_metadata, family, prior_edits):
+    assert type(formula) == Formula
+    assert type(df_metadata) == list
+    assert type(family) == Family
+    assert type(prior_edits) == list
     df_metadata_lu = make_metadata_lookup(df_metadata)
     design_metadata = designmatrices_metadata(formula, df_metadata_lu)
     prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
     return build_model(formula, prior_tree, family, df_metadata_lu)
 
 def defm(formula_str, df, family=None, prior_edits=None):
+    assert type(formula_str) == str
+    assert type(df) == pd.DataFrame
+    assert family is None or type(family) == Family
+    assert prior_edits is None or type(prior_edits) == list
     family = family or getfamily('Normal')
     prior_edits = prior_edits or []
     formula = parse(formula_str)
