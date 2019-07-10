@@ -44,8 +44,8 @@ def gen_response_dist(model, vectorize=False):
     # TODO: This relies on the parameters defined in each Family
     # appearing in the same order as Pyro expects.
     def response_arg(param):
-        if param.name == model.response.family.response.param:
-            return geninvlinkbody(model.response.family.response.linkfn, 'mu')
+        if param.name == model.response.family.link.param:
+            return geninvlinkbody(model.response.family.link.fn, 'mu')
         elif param.value is not None:
             return param.value # Will be made into an expanded tensor by `gendist`.
         else:
@@ -206,7 +206,7 @@ def geninvlinkbody(linkfn, code):
 # generated code. On the downside, it might mean duplicating some
 # logic, e.g. for parameter shapes.
 def geninvlinkfn(model):
-    body = geninvlinkbody(model.response.family.response.linkfn, 'x')
+    body = geninvlinkbody(model.response.family.link.fn, 'x')
     return '\n'.join(method('invlink', ['x'], ['return {}'.format(body)]))
 
 def gen_expected_response_fn(model):

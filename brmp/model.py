@@ -123,8 +123,8 @@ def model_repr(model):
     write('-' * 40)
     write('Family: {}'.format(family_repr(model.response.family)))
     write('Link:')
-    write('  Parameter: {}'.format(model.response.family.response.param))
-    write('  Function:  {}'.format(model.response.family.response.linkfn.name))
+    write('  Parameter: {}'.format(model.response.family.link.param))
+    write('  Function:  {}'.format(model.response.family.link.fn.name))
     write('Priors:')
     for (param, prior) in zip(model.response.nonlocparams, model.response.priors):
         write('{:<15} | {}'.format(param.name, family_repr(prior)))

@@ -103,7 +103,7 @@ def default_prior(formula, design_metadata, family):
     assert type(formula) == Formula
     assert type(design_metadata) == DesignMeta
     assert type(family) == Family
-    assert family.response is not None
+    assert family.link is not None
     assert type(design_metadata.population) == PopulationMeta
     assert type(design_metadata.groups) == list
     assert all(type(gm) == GroupMeta for gm in design_metadata.groups)

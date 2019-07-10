@@ -7,7 +7,7 @@ from functools import partial
 # supporting multiple code gen back-ends eventually.
 
 # TODO: Ensure that families always have a support specified.
-Family = namedtuple('Family', 'name params support response')
+Family = namedtuple('Family', 'name params support link')
 
 # TODO: Check that `value` is in `type` (or None).
 Param = namedtuple('Param', 'name type value')
@@ -38,7 +38,7 @@ def istype(ty):
 # Inverse might also be called recip(rocal).
 LinkFn = Enum('LinkFn', 'identity logit inverse')
 
-Response = namedtuple('Response', 'param linkfn')
+Link = namedtuple('Link', 'param fn')
 
 # TODO: Code generation currently assumes that the parameters here
 # appear in the order expected by Pyro distribution constructors. This
@@ -58,11 +58,11 @@ FAMILIES = [
     Family('Normal',
            [param('mu', Type['Real']()), param('sigma', Type['PosReal']())],
            const(Type['Real']()),
-           Response('mu', LinkFn.identity)),
+           Link('mu', LinkFn.identity)),
     Family('Bernoulli',
            [param('probs', Type['UnitInterval']())],
            const(Type['Boolean']()),
-           Response('probs', LinkFn.logit)),
+           Link('probs', LinkFn.logit)),
     Family('Cauchy',
            [param('loc', Type['Real']()), param('scale', Type['PosReal']())],
            const(Type['Real']()), None),
@@ -76,7 +76,7 @@ FAMILIES = [
            [param('num_trials', Type['IntegerRange'](0, None)),
             param('probs', Type['UnitInterval']())],
            lambda num_trials: Type['IntegerRange'](0, num_trials),
-           Response('probs', LinkFn.logit)),
+           Link('probs', LinkFn.logit)),
     Family('HalfNormal',
            [param('sigma', Type['PosReal']())],
            const(Type['PosReal']()),
@@ -94,7 +94,7 @@ def apply1(family, name, value):
         support = partial(family.support, **{name: value})
     else:
         support = family.support
-    return Family(family.name, params, support, family.response)
+    return Family(family.name, params, support, family.link)
 
 # This could be __call__ on a Family class.
 def apply(family, **kwargs):
@@ -128,16 +128,16 @@ def getfamily(name):
 
 def nonlocparams(family):
     assert type(family) == Family
-    assert family.response is not None
+    assert family.link is not None
     return [param for param in family.params
-            if not (param.name == family.response.param or param.value is not None)]
+            if not (param.name == family.link.param or param.value is not None)]
 
 # Note that the location parameter is always called "mu" in the list
 # returned by this function.
 def free_param_names(family):
     assert type(family) == Family
-    assert family.response is not None
-    return ['mu' if param.name == family.response.param else param.name
+    assert family.link is not None
+    return ['mu' if param.name == family.link.param else param.name
             for param in family.params if param.value is None]
 
 def main():
