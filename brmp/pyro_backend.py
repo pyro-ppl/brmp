@@ -40,7 +40,7 @@ from pyro.contrib.brm.pyro_codegen import gen
 # allowing things like `query.marginal('b').mean()`, etc.
 
 def posterior(run):
-    return Posterior(run.exec_traces, get_param, to_numpy)
+    return Posterior(run.exec_traces, get_param)
 
 # Extracts a value of interest (e.g. 'b', 'r_0', 'L_1', 'sigma') from
 # a single sample.
@@ -103,4 +103,4 @@ def infer(data, model, iter=None, warmup=None):
 
     return posterior(run)
 
-backend = Backend('Pyro', gen, infer, from_numpy)
+backend = Backend('Pyro', gen, infer, from_numpy, to_numpy)

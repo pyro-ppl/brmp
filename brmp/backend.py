@@ -1,7 +1,7 @@
 from collections import namedtuple
 
 # For now, assume that each back end provides a single inference algorithm.
-Backend = namedtuple('Backend', 'name gen infer from_numpy')
+Backend = namedtuple('Backend', 'name gen infer from_numpy to_numpy')
 
 # We could have a class that wraps a (function, code) pair, making the
 # code available via a code property and the function available via

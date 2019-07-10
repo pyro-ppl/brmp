@@ -48,8 +48,8 @@ def infer(data, model, seed=0, iter=None, warmup=None):
     transformed_samples = vmap(lambda sample: substitute(model.fn, sample)(**data))(samples)
     all_samples = dict(samples, **transformed_samples)
 
-    return Posterior(all_samples, get_param, to_numpy)
+    return Posterior(all_samples, get_param)
 
 # TODO: Make it possible to run inference on a gpu.
 
-backend = Backend('NumPyro', gen, infer, from_numpy)
+backend = Backend('NumPyro', gen, infer, from_numpy, to_numpy)

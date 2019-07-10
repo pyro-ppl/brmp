@@ -8,10 +8,12 @@ from pyro.contrib.brm.family import free_param_names
 #from pyro.contrib.brm.utils import join
 
 Fit = namedtuple('Fit', 'data model_desc model posterior backend')
-Posterior = namedtuple('Posterior', ['samples', 'get_param', 'to_numpy'])
+Posterior = namedtuple('Posterior', ['samples', 'get_param'])
 
-def param_marginal(posterior, parameter_name):
-    return posterior.to_numpy(posterior.get_param(posterior.samples, parameter_name))
+def param_marginal(fit, parameter_name):
+    assert type(fit) == Fit
+    posterior = fit.posterior
+    return fit.backend.to_numpy(posterior.get_param(posterior.samples, parameter_name))
 
 default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
 
@@ -87,7 +89,7 @@ def fitted(fit, what='expectation'):
 
     samples           = fit.posterior.samples
     get_param         = fit.posterior.get_param
-    to_numpy          = fit.posterior.to_numpy
+    to_numpy          = fit.backend.to_numpy
     expected_response = fit.model.expected_response_fn
     inv_link          = fit.model.inv_link_fn
 
@@ -118,7 +120,7 @@ def marginals(fit, qs=default_quantiles):
     def flatten(arr):
         return arr.reshape((arr.shape[0], -1))
     def param_stats(name):
-        return marginal_stats(flatten(param_marginal(fit.posterior, name)), qs)
+        return marginal_stats(flatten(param_marginal(fit, name)), qs)
     # Population coefs.
     arrs.append(param_stats('b'))
     row_labels.extend('b_{}'.format(coef) for coef in fit.model_desc.population.coefs)

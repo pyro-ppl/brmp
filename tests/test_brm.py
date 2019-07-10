@@ -297,11 +297,11 @@ def test_parameter_shapes(formula_str, metadata, family, prior_edits, expected, 
     # Check parameter sizes.
     for parameter in parameters(model.desc):
         # Get the first (and only) sample.
-        p = param_marginal(fit.posterior, parameter.name)[0]
+        p = param_marginal(fit, parameter.name)[0]
         shape = p.shape
         expected_shape = parameter.shape
         assert shape == expected_shape
-    assert param_marginal(fit.posterior, 'mu')[0].shape == (N,)
+    assert param_marginal(fit, 'mu')[0].shape == (N,)
 
 
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits', [
