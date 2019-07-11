@@ -62,7 +62,8 @@ Binomial (inc. Bernoulli) distributed responses.
 
 ### Inference
 
-Both the Pyro and NumPyro back ends use NUTS for posterior inference.
+The Pyro back end supports both NUTS and SVI for inference. The
+NumPyro backend supports only NUTS.
 
 The library includes the following functions for working with
 posteriors:
