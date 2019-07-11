@@ -1,7 +1,15 @@
+import time
+
 import numpy as np
 import torch
 
 from pyro.infer.mcmc import MCMC, NUTS
+
+import pyro
+import pyro.poutine as poutine
+from pyro.infer import SVI, Trace_ELBO
+from pyro.contrib.autoguide import AutoDiagonalNormal
+from pyro.optim import Adam
 
 from pyro.contrib.brm.backend import Backend, Model, apply_default_hmc_args
 from pyro.contrib.brm.fit import Posterior
@@ -56,10 +64,13 @@ def get_param(samples, name):
         else:
             return sample.nodes['_RETURN']['value'][name]
 
+    # `detach` is only necessary for SVI.
+
     # Creating this intermediate list is a bit unpleasant -- could
     # fill a pre-allocated array instead.
     #
-    return torch.stack([getp(sample) for sample in samples])
+    return torch.stack([getp(sample).detach() for sample in samples])
+
 
 # This provides a back-end specific method for turning a parameter
 # samples (as returned by `get_param`) into a numpy array.
@@ -103,7 +114,54 @@ def nuts(data, model, iter=None, warmup=None):
 
     return posterior(run)
 
-def svi(*args, **kwargs):
-    raise NotImplementedError
+def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None):
+    assert type(data) == dict
+    assert type(model) == Model
+
+    assert iter is None or type(iter) == int
+    assert num_samples is None or type(num_samples) == int
+    assert autoguide is None or callable(autoguide)
+
+    # TODO: Fix that this interface doesn't work for
+    # `AutoLaplaceApproximation`, which requires different functions
+    # to be used for optimisation / collecting samples.
+    autoguide = AutoDiagonalNormal if autoguide is None else autoguide
+    optim = Adam({'lr': 1e-3}) if optim is None else optim
+
+    guide = autoguide(model.fn)
+    svi = SVI(model.fn, guide, optim, loss=Trace_ELBO())
+    pyro.clear_param_store()
+
+    t0 = time.time()
+    max_iter_str_width = len(str(iter))
+    max_out_len = 0
+    for i in range(iter):
+        loss = svi.step(**data)
+        t1 = time.time()
+        if t1 - t0 > 0.5 or (i+1) == iter:
+            iter_str = str(i+1).rjust(max_iter_str_width)
+            out = 'iter: {} | loss: {:.3f}'.format(iter_str, loss)
+            max_out_len = max(max_out_len, len(out))
+            # Sending the ANSI code to clear the line doesn't seem to
+            # work in notebooks, so instead we pad the output with
+            # enough spaces to ensure we overwrite all previous input.
+            print('\r{}'.format(out.ljust(max_out_len)), end='')
+            t0 = t1
+    print()
+
+    # We run the guide to generate traces from the (approx.)
+    # posterior. We also run the model against those traces in order
+    # to compute transformed parameters, such as `b`, `mu`, etc.
+    def get_model_trace():
+        guide_tr = poutine.trace(guide).get_trace()
+        model_tr = poutine.trace(poutine.replay(model.fn, trace=guide_tr)).get_trace(**data)
+        return model_tr
+
+    # Represent the posterior as a bunch of samples, ignoring the
+    # possibility that we might plausibly be able to figure out e.g.
+    # posterior maginals from the variational parameters.
+    samples = [get_model_trace() for _ in range(num_samples)]
+
+    return Posterior(samples, get_param)
 
 backend = Backend('Pyro', gen, nuts, svi, from_numpy, to_numpy)

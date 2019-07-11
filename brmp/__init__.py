@@ -51,11 +51,35 @@ class DefmResult:
         self.desc = desc
         self.data = data
 
-    def fit(self, backend=pyro_backend, **kwargs):
+    # TODO: I'm not entirely satisfied with this interface. In
+    # particular, I don't like that the args. that this takes can
+    # depend on the backend / algo used. One alternative is something like:
+
+    # model.fit(backend).nuts(...)
+    # model.fit(backend).svi(...)
+
+    # etc.
+
+    # By having separate methods for each inference algo. each can
+    # have its own doc string, which seems useful. This interface also
+    # makes it possible to get at the generated code without running
+    # inference via something like:
+
+    # model.fit(backend).code
+
+    # Perhaps the `fit` method above could be renamed `fitwith` (or
+    # `generate`), and the existing `fit` could wrap that if folk
+    # think it's useful?
+
+    # I'm not convinced we can't do better still, but this is worth
+    # considering.
+
+    def fit(self, backend=pyro_backend, algo='nuts', **kwargs):
         assert type(backend) == Backend
+        assert algo in ['nuts', 'svi']
         model = backend.gen(self.desc)
         data = {k: backend.from_numpy(arr) for k, arr in self.data.items()}
-        posterior = backend.nuts(data, model, **kwargs)
+        posterior = getattr(backend, algo)(data, model, **kwargs)
         return Fit(data, self.desc, model, posterior, backend)
 
     def __repr__(self):
