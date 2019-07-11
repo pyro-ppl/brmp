@@ -84,6 +84,7 @@ def edit(node, path, f):
         # Recursively edit the appropriate child. (Or children, if
         # names are duplicated.)
         name = path[0]
+        assert any(n.name == name for n in node.children), 'Node "{}" not found.'.format(name)
         children = [edit(n, path[1:], f) if n.name == name else n
                     for n in node.children]
         return Node(node.name, node.prior_edit, node.is_param, node.checks, children)
@@ -131,9 +132,6 @@ def default_prior(formula, design_metadata, family):
         Node('sd',   PriorEdit(('sd',),  prior('HalfCauchy', [3.])), False, [chk_support(Type['PosReal']())], sd_children),
         Node('cor',  PriorEdit(('cor',), prior('LKJ', [1.])),        False, [chk_lkj],                        cor_children),
         Node('resp', None,                                           False, [],                               resp_children)])
-
-# TODO: This ought to warn/error when an element of `priors` has a
-# path that doesn't correspond to a node in the tree.
 
 def customize_prior(tree, prior_edits):
     assert type(tree) == Node
