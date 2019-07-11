@@ -25,9 +25,9 @@ def gendist(family, args, shape):
 # setting this is a distribution over an N (num. of rows in the data
 # set) vector of responses/observations. Any parameters of the
 # distribution specified as part of the family will be broadcast (over
-# all N responses) by `gendist`. (TODO: Eventually -- current happens
-# internal to this function.) Other parameters are broadcast here. All
-# such parameters are real values (represented as singleton tensors).
+# all N responses) by `gendist`. Other parameters are broadcast here.
+# All such parameters are real values (represented as singleton
+# tensors).
 
 # The vectorized variant is used only by `expected_response_fn`. In
 # this setting the distribution is over an SxN matrix. Each row is a
