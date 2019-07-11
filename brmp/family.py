@@ -40,12 +40,13 @@ LinkFn = Enum('LinkFn', 'identity logit inverse')
 
 Link = namedtuple('Link', 'param fn')
 
-# TODO: Code generation currently assumes that the parameters here
-# appear in the order expected by Pyro distribution constructors. This
-# is bad, because I'm aiming for a backend agnostic implementation of
-# families. (Because the order it used, it does mean the names doesn't
-# have match, so I can use names here that ensure that the args. you
-# need to give when customising priors is similar to brms.)
+# TODO: Code generation currently assumes that the parameters appear
+# here in the order expected by Pyro + NumPyro distribution
+# constructors. This is bad, because I'm aiming for a backend agnostic
+# implementation of families. Because the order *is* used, it means
+# the names here don't have match those in (Num)Pyro, so I can use
+# names that match brms. (e.g. The sd parameter of a Normal response
+# is called sigma when specifiying priors/inspecting marginals, etc.)
 
 # TODO: Add more response families.
 
