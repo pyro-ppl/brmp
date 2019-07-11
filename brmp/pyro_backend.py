@@ -92,7 +92,7 @@ def from_numpy(arr):
             out = out.type(default_dtype)
         return out
 
-def infer(data, model, iter=None, warmup=None):
+def nuts(data, model, iter=None, warmup=None):
     assert type(data) == dict
     assert type(model) == Model
 
@@ -103,4 +103,7 @@ def infer(data, model, iter=None, warmup=None):
 
     return posterior(run)
 
-backend = Backend('Pyro', gen, infer, from_numpy, to_numpy)
+def svi(*args, **kwargs):
+    raise NotImplementedError
+
+backend = Backend('Pyro', gen, nuts, svi, from_numpy, to_numpy)

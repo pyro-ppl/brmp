@@ -32,7 +32,7 @@ def to_numpy(param_samples):
 def from_numpy(data):
     return data
 
-def infer(data, model, seed=0, iter=None, warmup=None):
+def nuts(data, model, seed=0, iter=None, warmup=None):
     assert type(data) == dict
     assert type(model) == Model
 
@@ -53,6 +53,9 @@ def infer(data, model, seed=0, iter=None, warmup=None):
 
     return Posterior(all_samples, get_param)
 
+def svi(*args, **kwargs):
+    raise NotImplementedError
+
 # TODO: Make it possible to run inference on a gpu.
 
-backend = Backend('NumPyro', gen, infer, from_numpy, to_numpy)
+backend = Backend('NumPyro', gen, nuts, svi, from_numpy, to_numpy)

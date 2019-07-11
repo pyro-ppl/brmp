@@ -55,7 +55,7 @@ class DefmResult:
         assert type(backend) == Backend
         model = backend.gen(self.desc)
         data = {k: backend.from_numpy(arr) for k, arr in self.data.items()}
-        posterior = backend.infer(data, model, **kwargs)
+        posterior = backend.nuts(data, model, **kwargs)
         return Fit(data, self.desc, model, posterior, backend)
 
     def __repr__(self):
