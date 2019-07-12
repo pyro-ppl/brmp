@@ -72,6 +72,53 @@ def get_param(samples, name):
     return torch.stack([getp(sample).detach() for sample in samples])
 
 
+# samples :: bs
+# data    :: is a dict, with values already put through `from_numpy`
+#
+# return  :: ps (i.e. the same kind of thing as `get_param`)
+def location(modelfn, samples, data):
+
+    # In general, we need to re-run the model, taking values from the
+    # given samples at `sample` sites, and using the given data.
+
+    # TODO: For the special case where `data` is the data used for
+    # inference, we can use `get_param` to fetch `mu` from the return
+    # value. (This is back-end specific.)
+
+    # The current strategy is to patch up the trace so that we can
+    # re-run the model as is. One appealing aspect of this is that it
+    # might be easy to adapt to this also sample new values for y.
+    # (Rather than having to add something analogous to
+    # `expected_response_fn` to code gen.) OTOH, it seems like
+    # `expected_response_fn` will stick around, since computing the
+    # expectation as part of the model seems wasteful during
+    # inference, and perhaps it's easy to adapt this to do sampling
+    # with out really adding any new code gen.
+
+    # One alternative would be to add a flag to the model that allows
+    # the plate & response distribution to be skipped. (Or
+    # alternatively generate two versions of the model if avoiding
+    # checking the flag during inference is desirable.)
+
+    # Another option, of course, is to codegen an extra function that
+    # directly implements the requuired functionality. This function
+    # could be vectorized (i.e. operate on multiple samples in
+    # parallel) which is nice.
+
+    def f(sample):
+        trace = sample.copy()
+        trace.remove_node('y')
+        # The length of the vector of indices stored at the plate
+        # will likely not match the number of data points in the
+        # data. (When applying `location` to "new data".) We could
+        # explicitly patch up `trace.node['obs']['value']` but
+        # simply removing the node seems to work just as well.
+        trace.remove_node('obs')
+        return poutine.replay(modelfn, trace)(**data)['mu']
+
+    return torch.stack([f(s) for s in samples])
+
+
 # This provides a back-end specific method for turning a parameter
 # samples (as returned by `get_param`) into a numpy array.
 
@@ -112,7 +159,10 @@ def nuts(data, model, iter=None, warmup=None):
     nuts_kernel = NUTS(model.fn, jit_compile=False, adapt_step_size=True)
     run = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup).run(**data)
 
-    return posterior(run)
+    # TODO: Optimization -- delegate to `location` only when `d` is
+    # not `data`. Otherwise, fetch `mu` from the traces we've already
+    # collected.
+    return Posterior(run.exec_traces, get_param, lambda s, d: location(model.fn, s, d))
 
 def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None):
     assert type(data) == dict

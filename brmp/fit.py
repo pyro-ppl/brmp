@@ -8,7 +8,9 @@ from pyro.contrib.brm.family import free_param_names
 #from pyro.contrib.brm.utils import join
 
 Fit = namedtuple('Fit', 'data model_desc model posterior backend')
-Posterior = namedtuple('Posterior', ['samples', 'get_param'])
+# TODO: Add `location` everywhere a `Posterior` is created. (i.e. Pyro
+# SVI, NumPyro.)
+Posterior = namedtuple('Posterior', ['samples', 'get_param', 'location'])
 
 def param_marginal(fit, parameter_name):
     assert type(fit) == Fit
