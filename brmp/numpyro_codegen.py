@@ -58,7 +58,7 @@ def gen_response_dist(model, vectorize=False):
         elif vectorize:
             return 'np.tile({}, (1, N))'.format(param.name)
         else:
-            return '{}.broadcast([N])'.format(param.name)
+            return 'chk_shape({}.broadcast([N]).reshape(-1), (N,))'.format(param.name)
     response_args = [response_arg(p) for p in model.response.family.params]
     return gendist(model.response.family, response_args, shape=shape)
 
@@ -319,6 +319,9 @@ def eval_method(code):
     import numpy as onp
     import numpyro.distributions as dist
     from numpyro.handlers import sample
+    def chk_shape(arr, expected_shape):
+        assert arr.shape == expected_shape
+        return arr
     g = locals()
     exec(code, g)
     return g[method_name]
