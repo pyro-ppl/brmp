@@ -331,21 +331,6 @@ def test_parameter_shapes(formula_str, metadata, family, prior_edits, expected, 
         expected_shape = parameter.shape
         assert shape == expected_shape
 
-    # TODO: Treating `mu` as a parameter is a hack. It just so happens
-    # that we can fetch it with `get_param`, but the correct way to do
-    # this is now using the `location` method on `Posterior`.
-
-    # `get_param` implementations should probably not support fetching
-    # `mu` to encourage correct use of interfaces.
-
-    # `parameters(model_desc)` should not include `mu`.
-
-    # This check (that we fetch `mu` with the right shape) should be
-    # part of a test of `location`.
-
-    assert param_marginal(fit, 'mu')[0].shape == (N,)
-
-
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits', [
     ('y ~ x', [], getfamily('Bernoulli'), []),
     ('y ~ x', [Integral('y', min=0, max=2)], getfamily('Bernoulli'), []),
