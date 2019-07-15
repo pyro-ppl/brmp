@@ -17,6 +17,7 @@ from pyro.contrib.brm.numpyro_codegen import gen
 
 def get_param(samples, name):
     assert type(samples) == dict
+    assert not name == 'mu', 'mu is not a parameter'
     return samples[name]
 
 # Extract the underlying numpy array (rather than using JAX numpy) to
@@ -31,6 +32,10 @@ def to_numpy(param_samples):
 # identity here.
 def from_numpy(data):
     return data
+
+# TODO: Better name.
+def run_model_on_samples_and_data(modelfn, samples, data):
+    return vmap(lambda sample: substitute(modelfn, sample)(**data))(samples)
 
 def nuts(data, model, seed=0, iter=None, warmup=None):
     assert type(data) == dict
@@ -48,10 +53,13 @@ def nuts(data, model, seed=0, iter=None, warmup=None):
     # Here we re-run the model on the samples in order to collect
     # transformed parameters. (e.g. `b`, `mu`, etc.) Theses are made
     # available via the return value of the model.
-    transformed_samples = vmap(lambda sample: substitute(model.fn, sample)(**data))(samples)
+    transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
     all_samples = dict(samples, **transformed_samples)
 
-    return Posterior(all_samples, get_param)
+    return Posterior(all_samples, get_param,
+                     # TODO: Grab `mu` from `transformed_samples` when
+                     # s == all_samples and d == data.
+                     lambda s, d: run_model_on_samples_and_data(model.fn, s, d)['mu'])
 
 def svi(*args, **kwargs):
     raise NotImplementedError

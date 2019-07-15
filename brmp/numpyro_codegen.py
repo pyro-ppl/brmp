@@ -286,7 +286,14 @@ def genmodel(model):
         body.append(sample(param.name, gendist(param_prior, args(param_prior), [1])))
 
     #body.append('with pyro.plate("obs", N):')
-    body.append(sample('y', gen_response_dist(model), 'y_obs'))
+
+    # TODO: This condition allows us to run the model forward from
+    # within `location` (the function that is part of the backend
+    # interface) without having to worry about threading a RNG. I'd
+    # rather not make this unnecessary check during inference and
+    # might therefore revisit this approach.
+    body.append('if y_obs is not None:')
+    body.append(indent(sample('y', gen_response_dist(model), 'y_obs')))
 
     # Values of interest that are not generated directly by sample
     # statements (such as the `b` vector) are returned from the model
