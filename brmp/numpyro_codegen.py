@@ -5,7 +5,7 @@ from .backend import Model
 
 def gen_expanded_scalar(val, shape):
     assert type(val) in [float, int]
-    return 'np.array({}).broadcast([{}])'.format(val, ', '.join(str(dim) for dim in shape))
+    return 'chk_shape(np.array({}).broadcast([{dims}]), tuple([{dims}]))'.format(val, dims=', '.join(str(dim) for dim in shape))
 
 def gendist(family, args, shape):
     assert type(family) == Family
@@ -56,7 +56,7 @@ def gen_response_dist(model, vectorize=False):
         elif param.value is not None:
             return param.value
         elif vectorize:
-            return 'np.tile({}, (1, N))'.format(param.name)
+            return 'chk_shape(np.tile({}, (1, N)), (S, N))'.format(param.name)
         else:
             return 'chk_shape({}.broadcast([N]).reshape(-1), (N,))'.format(param.name)
     response_args = [response_arg(p) for p in model.response.family.params]
