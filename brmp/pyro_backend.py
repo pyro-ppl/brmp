@@ -128,7 +128,7 @@ def location(modelfn, samples, data):
         trace.remove_node('obs')
         return poutine.replay(modelfn, trace)(**data)['mu']
 
-    return torch.stack([f(s) for s in samples])
+    return torch.stack([f(s).detach() for s in samples])
 
 
 # This provides a back-end specific method for turning a parameter
@@ -224,6 +224,6 @@ def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None):
     # posterior maginals from the variational parameters.
     samples = [get_model_trace() for _ in range(num_samples)]
 
-    return Posterior(samples, get_param)
+    return Posterior(samples, get_param, lambda s, d: location(model.fn, s, d))
 
 backend = Backend('Pyro', gen, nuts, svi, from_numpy, to_numpy)
