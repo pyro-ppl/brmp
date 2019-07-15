@@ -8,6 +8,7 @@ from pyro.contrib.brm.family import getfamily, Family
 from pyro.contrib.brm.priors import build_prior_tree
 from pyro.contrib.brm.model import build_model, model_repr
 from pyro.contrib.brm.pyro_backend import backend as pyro_backend
+from pyro.contrib.brm.backend import data_from_numpy
 
 def makecode(formula, df, family, prior_edits, backend=pyro_backend):
     desc = makedesc(formula, dfmetadata(df), family, prior_edits)
@@ -78,7 +79,7 @@ class DefmResult:
         assert type(backend) == Backend
         assert algo in ['nuts', 'svi']
         model = backend.gen(self.desc)
-        data = {k: backend.from_numpy(arr) for k, arr in self.data.items()}
+        data = data_from_numpy(backend, self.data)
         posterior = getattr(backend, algo)(data, model, **kwargs)
         return Fit(data, self.desc, model, posterior, backend)
 

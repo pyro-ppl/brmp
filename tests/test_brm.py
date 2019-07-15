@@ -20,6 +20,7 @@ from pyro.contrib.brm.model import build_model, parameters
 from pyro.contrib.brm.fit import marginals, fitted, param_marginal
 from pyro.contrib.brm.pyro_backend import backend as pyro_backend
 from pyro.contrib.brm.numpyro_backend import backend as numpyro_backend
+from pyro.contrib.brm.backend import data_from_numpy
 
 from tests.common import assert_equal
 
@@ -224,7 +225,7 @@ def test_pyro_codegen(formula_str, metadata, family, prior_edits, expected):
 
     # Generate model function and data.
     modelfn = pyro_backend.gen(model.desc).fn
-    data = {k: pyro_backend.from_numpy(arr) for k, arr in model.data.items()}
+    data = data_from_numpy(pyro_backend, model.data)
 
     # Check sample sites.
     trace = poutine.trace(modelfn).get_trace(**data)
@@ -255,7 +256,7 @@ def test_numpyro_codegen(formula_str, metadata, family, prior_edits, expected):
 
     # Generate model function and data.
     modelfn = numpyro_backend.gen(model.desc).fn
-    data = {k: numpyro_backend.from_numpy(arr) for k, arr in model.data.items()}
+    data = data_from_numpy(numpyro_backend, model.data)
 
     # Check sample sites.
     rng = random.PRNGKey(0)
