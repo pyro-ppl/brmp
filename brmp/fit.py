@@ -1,13 +1,16 @@
 from collections import namedtuple
 
 import numpy as np
+import pandas as pd
 
 from pyro.contrib.brm.model import model_repr, parameter_names
 from pyro.contrib.brm.family import free_param_names
+from pyro.contrib.brm.design import predictors
+from pyro.contrib.brm.backend import data_from_numpy
 
 #from pyro.contrib.brm.utils import join
 
-Fit = namedtuple('Fit', 'data model_desc model posterior backend')
+Fit = namedtuple('Fit', 'formula data model_desc model posterior backend')
 # TODO: Add `location` everywhere a `Posterior` is created. (i.e. Pyro
 # SVI, NumPyro.)
 Posterior = namedtuple('Posterior', ['samples', 'get_param', 'location'])
@@ -85,9 +88,10 @@ def layout_table(rows):
 
 # https://rdrr.io/cran/brms/man/fitted.brmsfit.html
 
-def fitted(fit, what='expectation'):
+def fitted(fit, what='expectation', data=None):
     assert type(fit) == Fit
     assert what in ['expectation', 'linear', 'response']
+    assert data is None or type(data) is pd.DataFrame
 
     samples           = fit.posterior.samples
     get_param         = fit.posterior.get_param
@@ -96,7 +100,9 @@ def fitted(fit, what='expectation'):
     expected_response = fit.model.expected_response_fn
     inv_link          = fit.model.inv_link_fn
 
-    mu = location(samples, fit.data)
+    mu = location(samples,
+                  fit.data if data is None
+                  else data_from_numpy(fit.backend, predictors(fit.formula, data)))
 
     if what == 'expectation':
         args = [mu if name == 'mu' else get_param(samples, name)

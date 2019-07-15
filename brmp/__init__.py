@@ -43,12 +43,13 @@ def defm(formula_str, df, family=None, prior_edits=None):
     # (i.e. column names) associated with them, as in Patsy. (This
     desc = makedesc(formula, dfmetadata(df), family, prior_edits)
     data = makedata(formula, df)
-    return DefmResult(desc, data)
+    return DefmResult(formula, desc, data)
 
 # A wrapper around a pair of model and data. Has a friendly `repr` and
 # makes it easy to fit the model.
 class DefmResult:
-    def __init__(self, desc, data):
+    def __init__(self, formula, desc, data):
+        self.formula = formula
         self.desc = desc
         self.data = data
 
@@ -81,7 +82,7 @@ class DefmResult:
         model = backend.gen(self.desc)
         data = data_from_numpy(backend, self.data)
         posterior = getattr(backend, algo)(data, model, **kwargs)
-        return Fit(data, self.desc, model, posterior, backend)
+        return Fit(self.formula, data, self.desc, model, posterior, backend)
 
     def __repr__(self):
         return model_repr(self.desc)

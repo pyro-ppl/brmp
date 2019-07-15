@@ -607,10 +607,10 @@ def test_coding(formula_str, expected_coding):
 def test_marginals_fitted_smoke(backend):
     N = 10
     S = 4
-    df = dummy_df(make_metadata_lookup([RealValued('y'),
+    metadata_lu = make_metadata_lookup([RealValued('y'),
                                         RealValued('x'),
-                                        Categorical('a', list('ab'))]),
-                  N)
+                                        Categorical('a', list('ab'))])
+    df = dummy_df(metadata_lu, N)
     fit = defm('y ~ 1 + x + (1 | a)', df).fit(backend=backend, iter=S, warmup=0)
     def chk(arr, expected_shape):
         assert np.all(np.isfinite(arr))
@@ -619,3 +619,7 @@ def test_marginals_fitted_smoke(backend):
     chk(fitted(fit), (S, N))
     chk(fitted(fit, 'linear'), (S, N))
     chk(fitted(fit, 'response'), (S, N))
+    # Applying `fitted` to new data.
+    N2 = 8
+    df2 = dummy_df(metadata_lu, N2)
+    chk(fitted(fit, data=df2), (S, N2))
