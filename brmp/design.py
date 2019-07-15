@@ -433,13 +433,16 @@ def responsevector(column, df):
     assert len(coded) == 1
     return col2numpy(coded[0])
 
-def makedata(formula, df):
+def predictors(formula, df):
     assert type(formula) == Formula
     assert type(df) == pd.DataFrame
     data = {}
     data['X'] = designmatrix(formula.terms, df)
-    data['y_obs'] = responsevector(formula.response, df)
     for i, group in enumerate(formula.groups):
         data['Z_{}'.format(i)] = designmatrix(group.terms, df)
         data['J_{}'.format(i)] = lookupvector(group.column, df)
     return data
+
+def makedata(formula, df):
+    return dict(predictors(formula, df),
+                y_obs=responsevector(formula.response, df))
