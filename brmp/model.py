@@ -145,6 +145,7 @@ def parameter_names(model):
 # parameters available (with the described shapes) via its `get_param`
 # function. (See fit.py.)
 def parameters(model):
+    assert type(model) == ModelDesc
     return ([Parameter('b', (len(model.population.coefs),))] +
             [Parameter('r_{}'.format(i), (len(group.factor.levels), len(group.coefs)))
              for i, group in enumerate(model.groups)] +
