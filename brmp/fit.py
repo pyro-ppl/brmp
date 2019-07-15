@@ -91,18 +91,21 @@ def fitted(fit, what='expectation'):
 
     samples           = fit.posterior.samples
     get_param         = fit.posterior.get_param
+    location          = fit.posterior.location
     to_numpy          = fit.backend.to_numpy
     expected_response = fit.model.expected_response_fn
     inv_link          = fit.model.inv_link_fn
 
+    mu = location(samples, fit.data)
+
     if what == 'expectation':
-        args = [get_param(samples, name)
+        args = [mu if name == 'mu' else get_param(samples, name)
                 for name in free_param_names(fit.model_desc.response.family)]
         return to_numpy(expected_response(*args))
     elif what == 'linear':
-        return to_numpy(get_param(samples, 'mu'))
+        return to_numpy(mu)
     elif what == 'response':
-        return to_numpy(inv_link(get_param(samples, 'mu')))
+        return to_numpy(inv_link(mu))
     else:
         raise 'Unhandled value of the `what` parameter encountered.'
 
