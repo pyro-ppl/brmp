@@ -4,7 +4,7 @@ from collections import namedtuple
 
 # posterior.samples :: bs
 # posterior.get_param :: (bs, string) -> ps
-# posterior.location :: (bs, dict string ps) -> ps
+# posterior.location :: dict string ps -> ps
 # posterior.to_numpy :: ps -> ndarray
 # backend.from_numpy :: ndarray -> ps
 # model.inv_link_fn :: ps -> ps

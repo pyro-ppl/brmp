@@ -1,4 +1,5 @@
 import time
+from functools import partial
 
 import numpy as np
 import torch
@@ -123,7 +124,13 @@ def nuts(data, model, iter=None, warmup=None):
     # TODO: Optimization -- delegate to `location` only when `d` is
     # not `data`. Otherwise, fetch `mu` from the traces we've already
     # collected.
-    return Posterior(run.exec_traces, get_param, lambda s, d: location(model.fn, s, d))
+
+    samples = run.exec_traces
+
+    def loc(data):
+        return location(model.fn, samples, data)
+
+    return Posterior(samples, partial(get_param, samples), loc)
 
 def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None):
     assert type(data) == dict
@@ -173,6 +180,9 @@ def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None):
     # posterior maginals from the variational parameters.
     samples = [get_model_trace() for _ in range(num_samples)]
 
-    return Posterior(samples, get_param, lambda s, d: location(model.fn, s, d))
+    def loc(data):
+        return location(model.fn, samples, data)
+
+    return Posterior(samples, partial(get_param, samples), loc)
 
 backend = Backend('Pyro', gen, nuts, svi, from_numpy, to_numpy)

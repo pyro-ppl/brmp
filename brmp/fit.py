@@ -18,7 +18,7 @@ Posterior = namedtuple('Posterior', ['samples', 'get_param', 'location'])
 def param_marginal(fit, parameter_name):
     assert type(fit) == Fit
     posterior = fit.posterior
-    return fit.backend.to_numpy(posterior.get_param(posterior.samples, parameter_name))
+    return fit.backend.to_numpy(posterior.get_param(parameter_name))
 
 default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
 
@@ -93,19 +93,17 @@ def fitted(fit, what='expectation', data=None):
     assert what in ['expectation', 'linear', 'response']
     assert data is None or type(data) is pd.DataFrame
 
-    samples           = fit.posterior.samples
     get_param         = fit.posterior.get_param
     location          = fit.posterior.location
     to_numpy          = fit.backend.to_numpy
     expected_response = fit.model.expected_response_fn
     inv_link          = fit.model.inv_link_fn
 
-    mu = location(samples,
-                  fit.data if data is None
+    mu = location(fit.data if data is None
                   else data_from_numpy(fit.backend, predictors(fit.formula, data)))
 
     if what == 'expectation':
-        args = [mu if name == 'mu' else get_param(samples, name)
+        args = [mu if name == 'mu' else get_param(name)
                 for name in free_param_names(fit.model_desc.response.family)]
         return to_numpy(expected_response(*args))
     elif what == 'linear':

@@ -1,3 +1,5 @@
+from functools import partial
+
 from jax import random, vmap
 from jax.config import config; config.update("jax_platform_name", "cpu")
 
@@ -56,10 +58,12 @@ def nuts(data, model, seed=0, iter=None, warmup=None):
     transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
     all_samples = dict(samples, **transformed_samples)
 
-    return Posterior(all_samples, get_param,
-                     # TODO: Grab `mu` from `transformed_samples` when
-                     # s == all_samples and d == data.
-                     lambda s, d: run_model_on_samples_and_data(model.fn, s, d)['mu'])
+    # TODO: Grab `mu` from `transformed_samples` when data is that
+    # used for inference.
+    def loc(data):
+        return run_model_on_samples_and_data(model.fn, samples, data)['mu']
+
+    return Posterior(all_samples, partial(get_param, all_samples), loc)
 
 def svi(*args, **kwargs):
     raise NotImplementedError
