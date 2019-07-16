@@ -19,7 +19,8 @@ from pyro.contrib.brm.numpyro_codegen import gen
 
 def get_param(samples, name):
     assert type(samples) == dict
-    assert not name == 'mu', 'mu is not a parameter'
+    # Reminder to use correct interface.
+    assert not name == 'mu', 'Use `location` to fetch `mu`.'
     return samples[name]
 
 # Extract the underlying numpy array (rather than using JAX numpy) to

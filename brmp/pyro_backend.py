@@ -20,17 +20,8 @@ def posterior(run):
     return Posterior(run.exec_traces, get_param)
 
 def get_param(samples, name):
-
-    # TODO: Temp. disallow fetching mu this way. The correct way to do
-    # this generically is to use `location`, and I'd like to know when
-    # that isn't being used, hence the assertion.
-
-    # TODO: Should the interface be that a backend's `get_param`
-    # should *only* work for `parameter_names(model`)? If so, the
-    # ability to grab `mu` out of samples needs preserving, perhaps in
-    # some other method.
-
-    assert not name == 'mu', '`mu` is not a param. Use `location` to fetch `mu`.'
+    # Reminder to use correct interface.
+    assert not name == 'mu', 'Use `location` to fetch `mu`.'
 
     def getp(sample):
         if name in sample.nodes:
