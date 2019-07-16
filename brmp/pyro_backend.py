@@ -19,10 +19,7 @@ from pyro.contrib.brm.pyro_codegen import gen
 def posterior(run):
     return Posterior(run.exec_traces, get_param)
 
-def get_param(samples, name):
-    # Reminder to use correct interface.
-    assert not name == 'mu', 'Use `location` to fetch `mu`.'
-
+def get_node_or_return_value(samples, name):
     def getp(sample):
         if name in sample.nodes:
             return sample.nodes[name]['value']
@@ -36,15 +33,15 @@ def get_param(samples, name):
     #
     return torch.stack([getp(sample).detach() for sample in samples])
 
+def get_param(samples, name):
+    # Reminder to use correct interface.
+    assert not name == 'mu', 'Use `location` to fetch `mu`.'
+    return get_node_or_return_value(samples, name)
 
 def location(modelfn, samples, data):
 
     # In general, we need to re-run the model, taking values from the
     # given samples at `sample` sites, and using the given data.
-
-    # TODO: For the special case where `data` is the data used for
-    # inference, we can use `get_param` to fetch `mu` from the return
-    # value. (This is back-end specific.)
 
     # The current strategy is to patch up the trace so that we can
     # re-run the model as is. One appealing aspect of this is that it
@@ -111,15 +108,16 @@ def nuts(data, model, iter=None, warmup=None):
 
     nuts_kernel = NUTS(model.fn, jit_compile=False, adapt_step_size=True)
     run = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup).run(**data)
-
-    # TODO: Optimization -- delegate to `location` only when `d` is
-    # not `data`. Otherwise, fetch `mu` from the traces we've already
-    # collected.
-
     samples = run.exec_traces
 
-    def loc(data):
-        return location(model.fn, samples, data)
+    def loc(d):
+        # Optimization: For the data used for inference, values for
+        # `mu` are already computed and available from the
+        # traces/samples.
+        if d == data:
+            return get_node_or_return_value(samples, 'mu')
+        else:
+            return location(model.fn, samples, d)
 
     return Posterior(samples, partial(get_param, samples), loc)
 
@@ -171,8 +169,14 @@ def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None):
     # posterior maginals from the variational parameters.
     samples = [get_model_trace() for _ in range(num_samples)]
 
-    def loc(data):
-        return location(model.fn, samples, data)
+    def loc(d):
+        # Optimization: For the data used for inference, values for
+        # `mu` are already computed and available from the
+        # traces/samples.
+        if d == data:
+            return get_node_or_return_value(samples, 'mu')
+        else:
+            return location(model.fn, samples, d)
 
     return Posterior(samples, partial(get_param, samples), loc)
 

@@ -59,10 +59,14 @@ def nuts(data, model, seed=0, iter=None, warmup=None):
     transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
     all_samples = dict(samples, **transformed_samples)
 
-    # TODO: Grab `mu` from `transformed_samples` when data is that
-    # used for inference.
-    def loc(data):
-        return run_model_on_samples_and_data(model.fn, samples, data)['mu']
+    def loc(d):
+        # Optimization: For the data used for inference, values for
+        # `mu` are already computed and available from
+        # `transformed_samples`.
+        if d == data:
+            return transformed_samples['mu']
+        else:
+            return run_model_on_samples_and_data(model.fn, samples, d)['mu']
 
     return Posterior(all_samples, partial(get_param, all_samples), loc)
 
