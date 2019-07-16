@@ -306,14 +306,15 @@ def test_expected_response_codegen(response_meta, family, args, expected, backen
     assert_equal(expected_response(*args), expected)
 
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', codegen_cases)
-@pytest.mark.parametrize('backend', [
-    pyro_backend,
+@pytest.mark.parametrize('fitargs', [
+    dict(backend=pyro_backend, iter=1, warmup=0),
     # Set environment variable `RUN_SLOW=1` to run against the NumPyro
     # back end.
-    pytest.param(numpyro_backend,
-                 marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow'))
+    pytest.param(
+        dict(backend=numpyro_backend, iter=1, warmup=0),
+        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow'))
 ])
-def test_parameter_shapes(formula_str, metadata, family, prior_edits, expected, backend):
+def test_parameter_shapes(formula_str, metadata, family, prior_edits, expected, fitargs):
     # Make dummy data.
     N = 5
     formula = parse(formula_str)
@@ -322,12 +323,14 @@ def test_parameter_shapes(formula_str, metadata, family, prior_edits, expected, 
 
     # Define model, and generate a single posterior sample.
     model = defm(formula_str, df, family, prior_edits)
-    fit = model.fit(backend=backend, iter=1, warmup=0)
+    fit = model.fit(**fitargs)
 
     # Check parameter sizes.
     for parameter in parameters(model.desc):
         # Get the first (and only) sample.
-        p = param_marginal(fit, parameter.name)[0]
+        samples = param_marginal(fit, parameter.name)
+        assert samples.shape[0] == 1 # Check the test spec. only generated one sample.
+        p = samples[0]
         shape = p.shape
         expected_shape = parameter.shape
         assert shape == expected_shape
@@ -597,21 +600,22 @@ def test_coding(formula_str, expected_coding):
 
 # I expect these to also pass with PYRO_TENSOR_TYPE='torch.FloatTensor'.
 
-@pytest.mark.parametrize('backend', [
-    pyro_backend,
+@pytest.mark.parametrize('fitargs', [
+    lambda S: dict(backend=pyro_backend, iter=S, warmup=0),
     # Set environment variable `RUN_SLOW=1` to run against the NumPyro
     # back end.
-    pytest.param(numpyro_backend,
-                 marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow'))
+    pytest.param(
+        lambda S: dict(backend=numpyro_backend, iter=S, warmup=0),
+        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow'))
 ])
-def test_marginals_fitted_smoke(backend):
+def test_marginals_fitted_smoke(fitargs):
     N = 10
     S = 4
     metadata_lu = make_metadata_lookup([RealValued('y'),
                                         RealValued('x'),
                                         Categorical('a', list('ab'))])
     df = dummy_df(metadata_lu, N)
-    fit = defm('y ~ 1 + x + (1 | a)', df).fit(backend=backend, iter=S, warmup=0)
+    fit = defm('y ~ 1 + x + (1 | a)', df).fit(**fitargs(S))
     def chk(arr, expected_shape):
         assert np.all(np.isfinite(arr))
         assert arr.shape == expected_shape
