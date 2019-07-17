@@ -17,9 +17,6 @@ from pyro.contrib.brm.backend import Backend, Model, apply_default_hmc_args
 from pyro.contrib.brm.fit import Posterior
 from pyro.contrib.brm.pyro_codegen import gen
 
-def posterior(run):
-    return Posterior(run.exec_traces, get_param)
-
 def get_node_or_return_value(samples, name):
     def getp(sample):
         if name in sample.nodes:
