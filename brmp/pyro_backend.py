@@ -4,7 +4,8 @@ from functools import partial
 import numpy as np
 import torch
 
-from pyro.infer.mcmc import MCMC, NUTS
+from pyro.infer.mcmc import NUTS
+from pyro.infer.mcmc.api import MCMC
 
 import pyro
 import pyro.poutine as poutine
@@ -100,6 +101,39 @@ def from_numpy(arr):
             out = out.type(default_dtype)
         return out
 
+# TODO: Ideally this would be vectorized. (i.e. We'd compute the
+# model's return value for all samples in parallel.) Pyro's
+# `predictive` helper does this by wrapping the model in a `plate`.
+# This doesn't work here though because, as written, the model
+# includes operations (e.g. `torch.mv`, indexing) that don't
+# automatically vectorize. It's likely possible to rewrite the model
+# so that such a strategy would work. (e.g. Using Pyro's `vindex` for
+# indexing.) Another option is to have the backend generate entirely
+# differenent code for both vectorized and non-vectorized variants of
+# the model.
+def run_model_on_samples_and_data(modelfn, samples, data):
+    assert type(samples) == dict
+    assert len(samples) > 0
+    S = list(samples.values())[0].shape[0]
+    assert all(arr.shape[0] == S for _, arr in samples.items())
+
+    def run(i):
+        sample = {k: arr[i] for k, arr in samples.items()}
+        return poutine.condition(modelfn, sample)(**data)
+
+    return_values = [run(i) for i in range(S)]
+
+    # TODO: It would probably be better to allocate output arrays and
+    # fill them as we run the model. However, I'm holding off on
+    # making this change since this is good enough, and it's possible
+    # this whole approach may be replaced by something vectorized.
+
+    # We know the model structure is static, so names don't change
+    # across executions.
+    names = return_values[0].keys()
+    return {name: torch.stack([retval[name] for retval in return_values])
+            for name in names}
+
 def nuts(data, model, iter=None, warmup=None):
     assert type(data) == dict
     assert type(model) == Model
@@ -107,19 +141,26 @@ def nuts(data, model, iter=None, warmup=None):
     iter, warmup = apply_default_hmc_args(iter, warmup)
 
     nuts_kernel = NUTS(model.fn, jit_compile=False, adapt_step_size=True)
-    run = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup).run(**data)
-    samples = run.exec_traces
+    mcmc = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup)
+    mcmc.run(**data)
+    samples = mcmc.get_samples()
+    transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
 
     def loc(d):
         # Optimization: For the data used for inference, values for
-        # `mu` are already computed and available from the
-        # traces/samples.
+        # `mu` are already computed and available from
+        # `transformed_samples`.
         if d == data:
-            return get_node_or_return_value(samples, 'mu')
+            return transformed_samples['mu']
         else:
-            return location(model.fn, samples, d)
+            # TODO: This computes more than is necessary. (i.e. It
+            # build additional tensors we immediately throw away.)
+            # This is minor, but might be worth addressing eventually.
+            return run_model_on_samples_and_data(model.fn, samples, d)['mu']
 
-    return Posterior(samples, partial(get_param, samples), loc)
+    all_samples = dict(samples, **transformed_samples)
+
+    return Posterior(all_samples, lambda name: all_samples[name], loc)
 
 def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None):
     assert type(data) == dict
