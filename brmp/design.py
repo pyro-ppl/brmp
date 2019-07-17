@@ -351,19 +351,33 @@ def designmatrix(terms, df):
     return X
 
 # --------------------------------------------------
-# Experimenting with design matrix metadata:
-#
-# `designmatrix_metadata` computes a list of readable design matrix
-# column names. The idea is that (following brms) this information has
-# a number of uses:
-#
-# - Improve readability of e.g. `Fit` summary. e.g. Instead of just
-#   showing the `b` vector, we can use this information to identify
-#   each coefficient.
-#
-# - Users need to be able to specify their own priors for individual
-#   coefficients. I think this information is used as the basis of
-#   that, allowing priors to be specified by coefficient name?
+
+# TODO: Rename the "design matrix metadata" bits.
+
+# It's a misnomer to call this design matrix metadata, a name I've
+# long found confusing. I think a better name would pre/proto model
+# (desc) or similar. That's because this an intermediate step towards
+# a full `ModelDesc`. (`DesignMeta` is pretty much just a stripped
+# down `ModelDesc`.) We start with a formula and some (meta)data, and
+# from that we build one of these (pre/proto models). At this stage we
+# know how the data will be coded, and therefore know what coefs
+# appear in the model, but we don't yet have priors specified.
+
+# Serving as the basis for prior specification is the only purpose of
+# this structure -- once priors are specifed, the formula, prior tree
+# and (meta)data carry enough information to build the `ModelDesc`. (I
+# originally imagined this would be used in e.g. `marginals` but
+# `ModelDesc` plays that role.)
+
+# It might be possible to extend this structure to simplify some key
+# functions. For example, `default_prior` currently takes formula,
+# design matrix meta data and family argument, but if this pre/proto
+# model were fleshed out with a little more information, it alone
+# might be sufficient to build the default prior. Similarly,
+# `build_model` requires a bunch or arguments, but one might expect
+# that that just a pre/proto model and the prior tree would be
+# sufficient to build a `ModelDesc`. (This function would then clearly
+# be taking one model description to a second, richer, description.)
 
 def numeric_metadata(code):
     return [code.name]
