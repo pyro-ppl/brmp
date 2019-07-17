@@ -8,11 +8,7 @@ from pyro.contrib.brm.family import free_param_names
 from pyro.contrib.brm.design import predictors
 from pyro.contrib.brm.backend import data_from_numpy
 
-#from pyro.contrib.brm.utils import join
-
 Fit = namedtuple('Fit', 'formula data model_desc model posterior backend')
-# TODO: Add `location` everywhere a `Posterior` is created. (i.e. Pyro
-# SVI, NumPyro.)
 Posterior = namedtuple('Posterior', ['samples', 'get_param', 'location'])
 
 def param_marginal(fit, parameter_name):
