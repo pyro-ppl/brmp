@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import namedtuple, OrderedDict
 import itertools
 from functools import reduce
 import operator as op
@@ -42,6 +42,10 @@ Integral = namedtuple('Integral',
                        'max'])
 
 RealValued = namedtuple('RealValued', ['name'])
+
+def is_numeric_col(col):
+    assert type(col) in [Categorical, Integral, RealValued]
+    return not type(col) == Categorical
 
 # Extract metadata from a pandas dataframe.
 def dfmetadata(df):
@@ -288,6 +292,18 @@ def coding(terms, metadata):
 
     c_terms = sorted(c_terms, key=lambda term: len(term.factors))
 
+    # It's possible to figure out c_terms and n_terms using the new
+    # logic, but doing so clunky.
+    # groups = partition_terms(terms, metadata)
+    # if len(groups) == 0:
+    #     c_terms = n_terms = []
+    # elif groups[0][0] == OrderedSet():
+    #     c_terms = sort_terms(groups[0][1])
+    #     n_terms = [g[1][0] for g in groups[1:]]
+    # else:
+    #     c_terms = []
+    #     n_terms = [g[1][0] for g in groups]
+
     def coded_factor_to_coding(tup):
         assert type(tup) == tuple
         # This is guaranteed by the check made on `terms` when
@@ -307,6 +323,56 @@ def coding(terms, metadata):
     # Following Patsy numeric terms come after categorical terms. This
     # is not what happens in R.
     return c_coded + n_coded
+
+
+
+# [('a', 100), ('b', 200), ('a', 300)] =>
+# {'a': [100, 300], 'b': [200]}
+def group(pairs):
+    assert type(pairs) == list
+    assert all(type(pair) == tuple and len(pair) == 2 for pair in pairs)
+    # Remember insertion order. i.e. The returned dictionary captures
+    # the order in which the groups were first encountered in the
+    # input list.
+    out = OrderedDict()
+    for (k, v) in pairs:
+        if not k in out:
+            out[k] = []
+        out[k].append(v)
+    return out
+
+
+# Partition terms by the numeric factors they contain, and sort the
+# resulting groups.
+def partition_terms(terms, metadata):
+    assert type(terms) == OrderedSet
+    assert type(metadata) == dict
+
+    def numeric_factors(term):
+        factors = [f for f in term.factors if is_numeric_col(metadata[f])]
+        return OrderedSet(*factors)
+
+    # The idea here is to store the full term (including the numeric
+    # factors) as a way of remembering the order in which the numeric
+    # and numeric factors originally appeared. I think Patsy does
+    # something like this.
+    groups = group([(numeric_factors(term), term) for term in terms])
+    # Sort the groups. First comes the group containing no numeric
+    # factors. The remaining groups appear in the order in which a
+    # term containing exactly those numeric factors associated with
+    # the group first appears in `terms`. (The latter is guaranteed by
+    # the fact that `group` is order aware.
+    empty_set = OrderedSet()
+    first, rest = partition(lambda kv: kv[0] != empty_set, groups.items())
+    return list(first) + list(rest)
+
+# Terms with in a group are ordered by their order, i.e. the number of
+# factors they contain.
+def sort_terms(terms):
+    assert type(terms) == list
+    assert all(type(term) == Term for term in terms)
+    return sorted(terms, key=lambda term: len(term.factors))
+
 
 def width(coding):
     return sum(widthC(c) for c in coding)
