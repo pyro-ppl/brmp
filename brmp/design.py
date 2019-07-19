@@ -325,6 +325,52 @@ def coding(terms, metadata):
     return c_coded + n_coded
 
 
+NumericC2 = namedtuple('NumericC2', ['factor'])
+CategoricalC2 = namedtuple('CategoricalC2', ['factor', 'reduced'])
+
+# Codes a group of terms that all share a common set of numeric factors.
+
+# Returns a list of coded interactions.
+
+def code_group_of_terms(shared_numeric_factors, terms):
+    assert type(shared_numeric_factors) == OrderedSet
+    assert type(terms) == list
+    assert all(type(term) == Term for term in terms)
+    # It's also the case that each term should contain no numeric
+    # factors not mentions in `shared_numeric_factors`, but that is
+    # not checked here.
+    assert all(all((factor in term.factors) for factor in shared_numeric_factors) for term in terms)
+
+    def drop_numeric_factors(term):
+        factors = [f for f in term.factors if not f in shared_numeric_factors]
+        return Term(OrderedSet(*factors))
+
+    categorical_terms = [drop_numeric_factors(term) for term in terms]
+
+    # TODO: I think Patsy might respect the position of the numeric
+    # factors in the source term here. This isn't trivial to implement
+    # because `n` terms can generate more than `n` coding
+    # descriptions. e.g. 1 + a:b yields something like [(), (a-,),
+    # (a-,b)] or similar. I guess that a necessary first step towards
+    # this would be keep track of which term gave rise to each coding
+    # description. e.g. x2:a:x1:b gave rise to (a-,). From that it
+    # should be possible see where to insert the numeric factors.
+
+    # TODO: Here I map a CodedFactor to a CategoricalC2. These
+    # structures are identical upto naming and it makes sense to
+    # combine them. I think CodedFactor should be renamed to
+    # CategoricalCoding or similar, and it's `repr` retained. NumericC
+    # should be called something similar, and might also have a
+    # similar `repr`. (If categoricalCoding always includes a + or -,
+    # then numeric cols can just show the factor name.)
+
+    numeric_codings = [NumericC2(f) for f in shared_numeric_factors]
+    def go(tup):
+        return [CategoricalC2(cf.factor, cf.reduced) for cf in tup] + numeric_codings
+
+    # TODO: Consider renaming categorical_coding to `code_categorical_terms`.
+    return [go(tup) for tup in categorical_coding(categorical_terms)]
+
 
 # [('a', 100), ('b', 200), ('a', 300)] =>
 # {'a': [100, 300], 'b': [200]}
@@ -416,6 +462,108 @@ def designmatrix(terms, df):
         print('WARNING: Design matrix may not be full rank.')
     return X
 
+
+# Take an ordered set of terms (e.g. from a formula) to a list of
+# coded interctions.
+# e.g. code_terms(parse('y ~ 1 + a:b').terms, metadata) => .?.
+
+# TODO: Introduce wrapper for CodedInteraction. (Maybe... lists/tuples
+# may be more convenient.)
+
+def code_terms(terms, metadata):
+    # TODO: Perhaps sort_terms ought to be pushed into `partition_terms`.
+    groups = [(nfact, sort_terms(terms)) for (nfact,terms) in partition_terms(terms, metadata)]
+    return join(code_group_of_terms(shared_num_factors, terms)
+                for shared_num_factors, terms in groups)
+
+
+# TODO: Arg. checks for these named tuples?
+
+IndicatorCol = namedtuple('IndicatorCol', ['factor', 'level'])
+IndicatorCol.__repr__ = lambda self: 'I[{}={}]'.format(self.factor, self.level)
+
+NumericCol = namedtuple('NumericCol', ['factor'])
+NumericCol.__repr__ = lambda self: 'Num({})'.format(self.factor)
+
+# Represents the product of zero of more columns.
+ProductCol = namedtuple('ProductCol', ['cols']) # `cols` is expected to be a list
+
+
+def coded_interaction_to_product_cols(things, metadata):
+    assert type(things) == list
+    assert type(metadata) == dict
+    assert all(type(entry) in [CategoricalC2, NumericC2] for entry in things)
+
+    # TODO: clean up list forcing here.
+    cs, ns = partition(lambda cf: type(cf) == NumericC2, things)
+    cs = list(cs)
+    ns = list(ns)
+
+    def coded_levels(c):
+        levels = metadata[c.factor].levels
+        return levels[1:] if c.reduced else levels
+
+    interactions = product([tuple((c.factor, l)
+                                  for l in coded_levels(c)) for c in cs])
+
+    ncols = [NumericCol(n.factor) for n in ns]
+    cols = [tuple(IndicatorCol(factor, level) for factor, level in col) for col in interactions]
+    cols = [ProductCol(list(col) + ncols) for col in cols]
+    return cols
+
+
+# TODO: Add tests for product_col_to_coef_name and execute_product_col.
+
+def product_col_to_coef_name(product_col):
+    assert type(product_col) == ProductCol
+
+    def dispatch(col):
+        if type(col) == IndicatorCol:
+            return '{}[{}]'.format(col.factor, col.level)
+        elif type(col) == NumericCol:
+            return col.factor
+        else:
+            raise Exception('unknown column type')
+
+    if len(product_col.cols) == 0:
+        return 'intercept'
+    else:
+        return ':'.join(dispatch(col) for col in product_col.cols)
+
+
+def execute_product_col(product_col, df):
+    assert type(product_col) == ProductCol
+    assert type(df) == pd.DataFrame
+
+    def dispatch(col):
+        # TODO: Check that columns of `df` have the expected types?
+        # That the value specified by an IndicatorCol is in the
+        # `level` of a Categorical column?
+        if type(col) == IndicatorCol:
+            return (df[col.factor] == col.level).to_numpy()
+        elif type(col) == NumericCol:
+            return df[col.factor].to_numpy()
+        else:
+            raise Exception('unknown column type')
+
+    # We use a vector of ones are initial value of reduction. This is
+    # inefficient, but OK for now. This gives the correct behaviour of
+    # the intercept column and will also ensure that indicator columns
+    # are returned at floats even when there are no numeric columsn in
+    # the product.
+
+    N = len(df)
+    init = np.ones(N)
+    arr = reduce(op.mul, (dispatch(col) for col in product_col.cols), init)
+    assert arr.dtype == np.float64
+    assert len(arr.shape) == 1
+    assert arr.shape[0] == N
+    return arr
+
+# TODO: Reimplement designmatrix and designmatrix_metadata in terms of
+# product_col_to_coef_name and execute_product_col.
+
+
 # --------------------------------------------------
 
 # TODO: Rename the "design matrix metadata" bits.
@@ -448,6 +596,10 @@ def designmatrix(terms, df):
 def numeric_metadata(code):
     return [code.name]
 
+# TODO: I wonder if more of this logic ought to be shared with
+# `codeinteraction` both compute a product, and both know what to do
+# when a categorical factor is reduced. Perhaps this logic can be
+# captured abstractly?
 def interaction_metadata(code):
     assert type(code) == InteractionC
     assert all(type(c) == CategoricalC for c in code.codes)
