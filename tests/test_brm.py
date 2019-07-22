@@ -13,7 +13,7 @@ import numpyro.handlers as numpyro
 
 from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CategoricalCoding, code_categorical_terms, dummy_df
+from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CategoricalCoding, code_terms, dummy_df
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
 from pyro.contrib.brm.model import build_model, parameters
@@ -562,42 +562,70 @@ def test_parser(formula_str, expected_formula):
     formula = parse(formula_str)
     assert formula == expected_formula
 
-@pytest.mark.parametrize('formula_str, expected_coding', [
-    ('y ~ 1', [tuple()]),
-    ('y ~ x', [(CategoricalCoding('x', False),)]),
-    ('y ~ 1 + x', [tuple(), (CategoricalCoding('x', True),)]),
-    ('y ~ a:b', [
-        (CategoricalCoding('a', False), CategoricalCoding('b', False)) # a:b
-    ]),
-    ('y ~ 1 + a:b', [
-        tuple(),                                                       # Intercept
-        (CategoricalCoding('b', True),),                               # b-
-        (CategoricalCoding('a', True), CategoricalCoding('b', False))  # a-:b
-    ]),
-    ('y ~ 1 + a + a:b', [
-        tuple(),                                                       # Intercept
-        (CategoricalCoding('a', True),),                               # a-
-        (CategoricalCoding('a', False), CategoricalCoding('b', True))  # a:b-
-    ]),
-    ('y ~ 1 + b + a:b', [
-        tuple(),                                                       # Intercept
-        (CategoricalCoding('b', True),),                               # b-
-        (CategoricalCoding('a', True), CategoricalCoding('b', False))  # a-:b
-    ]),
-    ('y ~ 1 + a + b + a:b', [
-        tuple(),                                                       # Intercept
-        (CategoricalCoding('a', True),),                               # a-
-        (CategoricalCoding('b', True),),                               # b-
-        (CategoricalCoding('a', True), CategoricalCoding('b', True))   # a-:b-
-    ]),
-    ('y ~ a:b + a:b:c', [
-        (CategoricalCoding('a', False), CategoricalCoding('b', False)),                               # a:b
-        (CategoricalCoding('a', False), CategoricalCoding('b', False), CategoricalCoding('c', True)), # a:b:c-
-    ]),
+def mkcat(factor, num_levels):
+    return Categorical(factor, levels=['{}{}'.format(factor, i+1) for i in range(num_levels)])
+
+@pytest.mark.parametrize('formula_str, metadata, expected_coding', [
+    ('y ~ 1', [],
+     [
+         [] # intercept
+     ]),
+    ('y ~ x',
+     [mkcat('x', 2)],
+     [
+         [CategoricalCoding('x', False)]
+     ]),
+    ('y ~ 1 + x',
+     [mkcat('x', 2)],
+     [
+         [],
+         [CategoricalCoding('x', True)]
+     ]),
+    ('y ~ a:b',
+     [mkcat('a', 2), mkcat('b', 2)],
+     [
+         [CategoricalCoding('a', False), CategoricalCoding('b', False)] # a:b
+     ]),
+    ('y ~ 1 + a:b',
+     [mkcat('a', 2), mkcat('b', 2)],
+     [
+         [],
+         [CategoricalCoding('b', True)],                                # b-
+         [CategoricalCoding('a', True), CategoricalCoding('b', False)]  # a-:b
+     ]),
+    ('y ~ 1 + a + a:b',
+     [mkcat('a', 2), mkcat('b', 2)],
+     [
+         [],                                                            # Intercept
+         [CategoricalCoding('a', True)],                                # a-
+         [CategoricalCoding('a', False), CategoricalCoding('b', True)]  # a:b-
+     ]),
+    ('y ~ 1 + b + a:b',
+     [mkcat('a', 2), mkcat('b', 2)],
+     [
+         [],                                                            # Intercept
+         [CategoricalCoding('b', True)],                                # b-
+         [CategoricalCoding('a', True), CategoricalCoding('b', False)]  # a-:b
+     ]),
+    ('y ~ 1 + a + b + a:b',
+     [mkcat('a', 2), mkcat('b', 2)],
+     [
+         [],                                                            # Intercept
+         [CategoricalCoding('a', True)],                                # a-
+         [CategoricalCoding('b', True)],                                # b-
+         [CategoricalCoding('a', True), CategoricalCoding('b', True)]   # a-:b-
+     ]),
+    ('y ~ a:b + a:b:c',
+     [mkcat('a', 2), mkcat('b', 2), mkcat('c', 2)],
+     [
+         [CategoricalCoding('a', False), CategoricalCoding('b', False)],                               # a:b
+         [CategoricalCoding('a', False), CategoricalCoding('b', False), CategoricalCoding('c', True)], # a:b:c-
+     ]),
 ])
-def test_coding(formula_str, expected_coding):
+def test_coding(formula_str, metadata, expected_coding):
     formula = parse(formula_str)
-    assert code_categorical_terms(formula.terms) == expected_coding
+    metadata = build_metadata(formula, metadata)
+    assert code_terms(formula.terms, metadata) == expected_coding
 
 # I expect these to also pass with PYRO_TENSOR_TYPE='torch.FloatTensor'.
 
