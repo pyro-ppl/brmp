@@ -440,7 +440,7 @@ def width(coding):
 # take a dictionary that gives access to the columns (iterables full
 # of floats, ints, or level values?) and the existing dataframe
 # metadata structure to describe the types of the columns, etc.
-def designmatrix(terms, df):
+def designmatrix_old(terms, df):
     assert type(terms) == OrderedSet
     N = len(df)
     def dispatch(code):
@@ -458,6 +458,20 @@ def designmatrix(terms, df):
     coded_cols = join([dispatch(c) for c in coding_desc])
     X = np.stack([col2numpy(col) for col in coded_cols], axis=1) if coded_cols else np.empty((N, 0))
     assert X.shape == (N, width(coding_desc))
+    if X.shape[1] > 0 and np.linalg.matrix_rank(X) != X.shape[1]:
+        print('WARNING: Design matrix may not be full rank.')
+    return X
+
+def designmatrix(terms, df):
+    assert type(terms) == OrderedSet
+    metadata = make_metadata_lookup(dfmetadata(df))
+    coded_interactions = code_terms(terms, metadata)
+    product_cols = join(coded_interaction_to_product_cols(code, metadata)
+                        for code in coded_interactions)
+    N = len(df)
+    arrs = [execute_product_col(pcol, df) for pcol in product_cols]
+    X = np.stack(arrs, axis=1) if arrs else np.empty((N, 0))
+    assert X.shape[0] == N
     if X.shape[1] > 0 and np.linalg.matrix_rank(X) != X.shape[1]:
         print('WARNING: Design matrix may not be full rank.')
     return X
@@ -560,10 +574,6 @@ def execute_product_col(product_col, df):
     assert arr.shape[0] == N
     return arr
 
-# TODO: Reimplement designmatrix and designmatrix_metadata in terms of
-# product_col_to_coef_name and execute_product_col.
-
-
 # --------------------------------------------------
 
 # TODO: Rename the "design matrix metadata" bits.
@@ -612,7 +622,7 @@ def interaction_metadata(code):
             for interaction in interactions]
 
 
-def designmatrix_metadata(terms, metadata):
+def designmatrix_metadata_old(terms, metadata):
     assert type(terms) == OrderedSet
     def dispatch(code):
         if type(code) == InterceptC:
@@ -625,6 +635,15 @@ def designmatrix_metadata(terms, metadata):
             raise Exception('Unknown coding type.')
     coding_desc = coding(terms, metadata)
     return join([dispatch(c) for c in coding_desc])
+
+
+def designmatrix_metadata(terms, metadata):
+    assert type(terms) == OrderedSet
+    coded_interactions = code_terms(terms, metadata)
+    product_cols = join(coded_interaction_to_product_cols(code, metadata)
+                        for code in coded_interactions)
+    return [product_col_to_coef_name(pcol) for pcol in product_cols]
+
 
 DesignMeta = namedtuple('DesignMeta', 'population groups')
 PopulationMeta = namedtuple('PopulationMeta', 'coefs')
