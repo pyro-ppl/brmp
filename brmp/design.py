@@ -330,9 +330,6 @@ def designmatrix(terms, df):
 # coded interctions.
 # e.g. code_terms(parse('y ~ 1 + a:b').terms, metadata) => .?.
 
-# TODO: Introduce wrapper for CodedInteraction. (Maybe... lists/tuples
-# may be more convenient.)
-
 # Terms with in a group are ordered by their order, i.e. the number of
 # factors they contain.
 def sort_by_order(terms):
