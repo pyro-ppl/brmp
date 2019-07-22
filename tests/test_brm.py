@@ -13,7 +13,7 @@ import numpyro.handlers as numpyro
 
 from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CategoricalCoding, code_terms, dummy_df
+from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CategoricalCoding, NumericCoding, code_terms, dummy_df
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
 from pyro.contrib.brm.model import build_model, parameters
@@ -621,6 +621,19 @@ def mkcat(factor, num_levels):
          [CategoricalCoding('a', False), CategoricalCoding('b', False)],                               # a:b
          [CategoricalCoding('a', False), CategoricalCoding('b', False), CategoricalCoding('c', True)], # a:b:c-
      ]),
+    # This is based in an example in the Patsy docs:
+    # https://patsy.readthedocs.io/en/latest/formulas.html#from-terms-to-matrices
+    ('y ~ 1 + x1:x2 + a:b + b + x1:a:b + a + x2:a:x1',
+     [mkcat('a', 2), mkcat('b', 2)],
+     [
+         [],
+         [CategoricalCoding('b', True)],
+         [CategoricalCoding('a', True)],
+         [CategoricalCoding('a', True), CategoricalCoding('b', True)],
+         [NumericCoding('x1'), NumericCoding('x2')],
+         [CategoricalCoding('a', True), NumericCoding('x1'), NumericCoding('x2')],
+         [CategoricalCoding('a', False), CategoricalCoding('b', False), NumericCoding('x1')],
+     ])
 ])
 def test_coding(formula_str, metadata, expected_coding):
     formula = parse(formula_str)
