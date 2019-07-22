@@ -372,24 +372,22 @@ NumericCol.__repr__ = lambda self: 'Num({})'.format(self.factor)
 ProductCol = namedtuple('ProductCol', ['cols']) # `cols` is expected to be a list
 
 
-def coded_interaction_to_product_cols(things, metadata):
-    assert type(things) == list
+def coded_interaction_to_product_cols(coded_interaction, metadata):
+    assert type(coded_interaction) == list
     assert type(metadata) == dict
-    assert all(type(entry) in [CategoricalC2, NumericC2] for entry in things)
+    assert all(type(c) in [CategoricalC2, NumericC2] for c in coded_interaction)
 
-    cs, ns = partition(lambda cf: type(cf) == NumericC2, things)
+    cs, ns = partition(lambda cf: type(cf) == NumericC2, coded_interaction)
 
-    def coded_levels(c):
-        levels = metadata[c.factor].levels
-        return levels[1:] if c.reduced else levels
+    def levels(c):
+        all_levels = metadata[c.factor].levels
+        return all_levels[1:] if c.reduced else all_levels
 
-    interactions = product([tuple((c.factor, l)
-                                  for l in coded_levels(c)) for c in cs])
-
+    interactions = product([[IndicatorCol(c.factor, level) for level in levels(c)] for c in cs])
     ncols = [NumericCol(n.factor) for n in ns]
-    cols = [tuple(IndicatorCol(factor, level) for factor, level in col) for col in interactions]
-    cols = [ProductCol(list(col) + ncols) for col in cols]
-    return cols
+    pcols = [ProductCol(list(ccols) + ncols) for ccols in interactions]
+
+    return pcols
 
 
 # TODO: Add tests for product_col_to_coef_name and execute_product_col.
