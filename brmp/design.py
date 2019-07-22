@@ -673,16 +673,18 @@ def responsevector(column, df):
     assert column in df
     dfcol = df[column]
     if is_float_dtype(dfcol) or is_integer_dtype(dfcol):
-        coded = codenumeric(dfcol)
+        code = NumericC2(column)
     elif is_categorical_dtype(dfcol) and len(dfcol.cat.categories) == 2:
         # TODO: How does a user know how this was coded? For design
         # matrices this is revealed by the column names in the design
         # metadata, but we don't have the here.
-        coded = codefactor(dfcol, reduced=True)
+        code = CategoricalC2(column, True)
     else:
         raise Exception('Don\'t know how to code a response of this type.')
-    assert len(coded) == 1
-    return col2numpy(coded[0])
+    metadata = make_metadata_lookup(dfmetadata(df))
+    pcols = coded_interaction_to_product_cols([code], metadata)
+    assert len(pcols) == 1
+    return execute_product_col(pcols[0], df)
 
 def predictors(formula, df):
     assert type(formula) == Formula
