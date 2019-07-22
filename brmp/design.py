@@ -96,12 +96,6 @@ def dummy_design(formula, metadata, N):
 def product(iterables):
     return [tuple(reversed(t)) for t in itertools.product(*reversed(iterables))]
 
-InterceptC = namedtuple('InterceptC', [])
-InteractionC = namedtuple('InteractionC', ['codes']) # codes is a list of CategoricalCs
-CategoricalC = namedtuple('CategoricalC', ['factor', 'reduced'])
-# Represents coding of either integer or real-valued columns.
-NumericC = namedtuple('NumericC', ['name'])
-
 CodedFactor = namedtuple('CodedFactor', 'factor reduced')
 CodedFactor.__repr__ = lambda self: '{}{}'.format(self.factor, '-' if self.reduced else '')
 
