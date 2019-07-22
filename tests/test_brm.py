@@ -13,7 +13,7 @@ import numpyro.handlers as numpyro
 
 from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, code_categorical_terms, dummy_df
+from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CategoricalCoding, code_categorical_terms, dummy_df
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
 from pyro.contrib.brm.model import build_model, parameters
@@ -564,35 +564,35 @@ def test_parser(formula_str, expected_formula):
 
 @pytest.mark.parametrize('formula_str, expected_coding', [
     ('y ~ 1', [tuple()]),
-    ('y ~ x', [(CodedFactor('x', False),)]),
-    ('y ~ 1 + x', [tuple(), (CodedFactor('x', True),)]),
+    ('y ~ x', [(CategoricalCoding('x', False),)]),
+    ('y ~ 1 + x', [tuple(), (CategoricalCoding('x', True),)]),
     ('y ~ a:b', [
-        (CodedFactor('a', False), CodedFactor('b', False)) # a:b
+        (CategoricalCoding('a', False), CategoricalCoding('b', False)) # a:b
     ]),
     ('y ~ 1 + a:b', [
-        tuple(),                                          # Intercept
-        (CodedFactor('b', True),),                        # b-
-        (CodedFactor('a', True), CodedFactor('b', False)) # a-:b
+        tuple(),                                                       # Intercept
+        (CategoricalCoding('b', True),),                               # b-
+        (CategoricalCoding('a', True), CategoricalCoding('b', False))  # a-:b
     ]),
     ('y ~ 1 + a + a:b', [
-        tuple(),                                          # Intercept
-        (CodedFactor('a', True),),                        # a-
-        (CodedFactor('a', False), CodedFactor('b', True)) # a:b-
+        tuple(),                                                       # Intercept
+        (CategoricalCoding('a', True),),                               # a-
+        (CategoricalCoding('a', False), CategoricalCoding('b', True))  # a:b-
     ]),
     ('y ~ 1 + b + a:b', [
-        tuple(),                                          # Intercept
-        (CodedFactor('b', True),),                        # b-
-        (CodedFactor('a', True), CodedFactor('b', False)) # a-:b
+        tuple(),                                                       # Intercept
+        (CategoricalCoding('b', True),),                               # b-
+        (CategoricalCoding('a', True), CategoricalCoding('b', False))  # a-:b
     ]),
     ('y ~ 1 + a + b + a:b', [
-        tuple(),                                          # Intercept
-        (CodedFactor('a', True),),                        # a-
-        (CodedFactor('b', True),),                        # b-
-        (CodedFactor('a', True), CodedFactor('b', True))  # a-:b-
+        tuple(),                                                       # Intercept
+        (CategoricalCoding('a', True),),                               # a-
+        (CategoricalCoding('b', True),),                               # b-
+        (CategoricalCoding('a', True), CategoricalCoding('b', True))   # a-:b-
     ]),
     ('y ~ a:b + a:b:c', [
-        (CodedFactor('a', False), CodedFactor('b', False)),                         # a:b
-        (CodedFactor('a', False), CodedFactor('b', False), CodedFactor('c', True)), # a:b:c-
+        (CategoricalCoding('a', False), CategoricalCoding('b', False)),                               # a:b
+        (CategoricalCoding('a', False), CategoricalCoding('b', False), CategoricalCoding('c', True)), # a:b:c-
     ]),
 ])
 def test_coding(formula_str, expected_coding):

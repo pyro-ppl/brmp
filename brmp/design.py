@@ -96,9 +96,6 @@ def dummy_design(formula, metadata, N):
 def product(iterables):
     return [tuple(reversed(t)) for t in itertools.product(*reversed(iterables))]
 
-CodedFactor = namedtuple('CodedFactor', 'factor reduced')
-CodedFactor.__repr__ = lambda self: '{}{}'.format(self.factor, '-' if self.reduced else '')
-
 # Taken from the itertools documentation.
 def powerset(iterable):
     s = list(iterable)
@@ -114,7 +111,7 @@ def powerset(iterable):
 
 def decompose(term):
     assert type(term) == Term
-    return [tuple(CodedFactor(factor, True) for factor in subset) for subset in powerset(term.factors)]
+    return [tuple(CategoricalCoding(factor, True) for factor in subset) for subset in powerset(term.factors)]
 
 
 # Attempt to absorb t2 into t1. If this is possible the result of
@@ -149,7 +146,7 @@ def decompose(term):
 # can be seen when printing a design matrix. Doing so might show
 # something like "'a:b' (columns 0:4), 'a:b:c' (columns 4:8)" for
 # example. So, even though `_Subterm` (the analogue of one of my
-# tuples of CodedFactors) is set based, it's possible that this is
+# tuples of CategoricalCodings) is set based, it's possible that this is
 # used to recover the original order.
 
 # TODO: Would it be clearer or more efficient to use OrderedSet rather
@@ -157,9 +154,9 @@ def decompose(term):
 
 def absorb(t1, t2):
     assert type(t1) == tuple
-    assert all(type(p) == CodedFactor for p in t1)
+    assert all(type(p) == CategoricalCoding for p in t1)
     assert type(t2) == tuple
-    assert all(type(p) == CodedFactor for p in t2)
+    assert all(type(p) == CategoricalCoding for p in t2)
     s1 = set(t1)
     s2 = set(t2)
     if s2.issubset(s1) and len(s1) - len(s2) == 1:
@@ -167,12 +164,12 @@ def absorb(t1, t2):
         assert len(diff) == 1
         extra_factor = list(diff)[0]
         if extra_factor.reduced:
-            factor = CodedFactor(extra_factor.factor, False)
+            factor = CategoricalCoding(extra_factor.factor, False)
             return tuple((factor if f == extra_factor else f) for f in t1)
 
 def simplify_one(termcoding):
     assert type(termcoding) == list
-    assert all(type(t) == tuple and all(type(p) == CodedFactor for p in t) for t in termcoding)
+    assert all(type(t) == tuple and all(type(p) == CategoricalCoding for p in t) for t in termcoding)
     for i, j in itertools.permutations(range(len(termcoding)), 2):
         newterm = absorb(termcoding[i], termcoding[j])
         if newterm:
@@ -183,7 +180,7 @@ def simplify_one(termcoding):
 
 def simplify(termcoding):
     assert type(termcoding) == list
-    assert all(type(t) == tuple and all(type(p) == CodedFactor for p in t) for t in termcoding)
+    assert all(type(t) == tuple and all(type(p) == CategoricalCoding for p in t) for t in termcoding)
     while True:
         maybe_termcoding = simplify_one(termcoding)
         if maybe_termcoding is None:
@@ -215,8 +212,11 @@ def partition(pred, iterable):
     t1, t2 = itertools.tee(iterable)
     return list(itertools.filterfalse(pred, t1)), list(filter(pred, t2))
 
-NumericC2 = namedtuple('NumericC2', ['factor'])
-CategoricalC2 = namedtuple('CategoricalC2', ['factor', 'reduced'])
+CategoricalCoding = namedtuple('CategoricalCoding', 'factor reduced')
+CategoricalCoding.__repr__ = lambda self: '{}{}'.format(self.factor, '-' if self.reduced else '+')
+
+NumericCoding = namedtuple('NumericCoding', ['factor'])
+NumericCoding.__repr__ = lambda self: self.factor
 
 # Codes a group of terms that all share a common set of numeric factors.
 
@@ -247,19 +247,9 @@ def code_group_of_terms(terms, shared_numeric_factors):
     # description. e.g. x2:a:x1:b gave rise to (a-,). From that it
     # should be possible see where to insert the numeric factors.
 
-    # TODO: Here I map a CodedFactor to a CategoricalC2. These
-    # structures are identical upto naming and it makes sense to
-    # combine them. I think CodedFactor should be renamed to
-    # CategoricalCoding or similar, and it's `repr` retained. NumericC
-    # should be called something similar, and might also have a
-    # similar `repr`. (If categoricalCoding always includes a + or -,
-    # then numeric cols can just show the factor name.)
+    numeric_codings = [NumericCoding(f) for f in shared_numeric_factors]
 
-    numeric_codings = [NumericC2(f) for f in shared_numeric_factors]
-    def go(tup):
-        return [CategoricalC2(cf.factor, cf.reduced) for cf in tup] + numeric_codings
-
-    return [go(tup) for tup in code_categorical_terms(categorical_terms)]
+    return [list(tup) + numeric_codings for tup in code_categorical_terms(categorical_terms)]
 
 
 # [('a', 100), ('b', 200), ('a', 300)] =>
@@ -369,9 +359,9 @@ ProductCol = namedtuple('ProductCol', ['cols']) # `cols` is expected to be a lis
 def coded_interaction_to_product_cols(coded_interaction, metadata):
     assert type(coded_interaction) == list
     assert type(metadata) == dict
-    assert all(type(c) in [CategoricalC2, NumericC2] for c in coded_interaction)
+    assert all(type(c) in [CategoricalCoding, NumericCoding] for c in coded_interaction)
 
-    cs, ns = partition(lambda cf: type(cf) == NumericC2, coded_interaction)
+    cs, ns = partition(lambda cf: type(cf) == NumericCoding, coded_interaction)
 
     def levels(c):
         all_levels = metadata[c.factor].levels
@@ -501,12 +491,12 @@ def responsevector(column, df):
     assert column in df
     dfcol = df[column]
     if is_float_dtype(dfcol) or is_integer_dtype(dfcol):
-        code = NumericC2(column)
+        code = NumericCoding(column)
     elif is_categorical_dtype(dfcol) and len(dfcol.cat.categories) == 2:
         # TODO: How does a user know how this was coded? For design
         # matrices this is revealed by the column names in the design
         # metadata, but we don't have the here.
-        code = CategoricalC2(column, True)
+        code = CategoricalCoding(column, True)
     else:
         raise Exception('Don\'t know how to code a response of this type.')
     metadata = make_metadata_lookup(dfmetadata(df))
