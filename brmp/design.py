@@ -228,10 +228,11 @@ CategoricalC2 = namedtuple('CategoricalC2', ['factor', 'reduced'])
 
 # Returns a list of coded interactions.
 
-def code_group_of_terms(shared_numeric_factors, terms):
-    assert type(shared_numeric_factors) == OrderedSet
+def code_group_of_terms(terms, shared_numeric_factors):
     assert type(terms) == list
     assert all(type(term) == Term for term in terms)
+    assert type(shared_numeric_factors) == OrderedSet
+
     # It's also the case that each term should contain no numeric
     # factors not mentions in `shared_numeric_factors`, but that is
     # not checked here.
@@ -307,13 +308,6 @@ def partition_terms(terms, metadata):
     first, rest = partition(lambda kv: kv[0] != empty_set, groups.items())
     return list(first) + list(rest)
 
-# Terms with in a group are ordered by their order, i.e. the number of
-# factors they contain.
-def sort_terms(terms):
-    assert type(terms) == list
-    assert all(type(term) == Term for term in terms)
-    return sorted(terms, key=lambda term: len(term.factors))
-
 
 # Build a simple design matrix (as a torch tensor) from columns of a
 # pandas data frame.
@@ -355,10 +349,14 @@ def designmatrix(terms, df):
 # TODO: Introduce wrapper for CodedInteraction. (Maybe... lists/tuples
 # may be more convenient.)
 
+# Terms with in a group are ordered by their order, i.e. the number of
+# factors they contain.
+def sort_by_order(terms):
+    return sorted(terms, key=lambda term: len(term.factors))
+
 def code_terms(terms, metadata):
-    # TODO: Perhaps sort_terms ought to be pushed into `partition_terms`.
-    groups = [(nfact, sort_terms(terms)) for (nfact,terms) in partition_terms(terms, metadata)]
-    return join(code_group_of_terms(shared_num_factors, terms)
+    groups = partition_terms(terms, metadata)
+    return join(code_group_of_terms(sort_by_order(terms), shared_num_factors)
                 for shared_num_factors, terms in groups)
 
 
