@@ -13,7 +13,7 @@ import numpyro.handlers as numpyro
 
 from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, categorical_coding, dummy_df
+from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CodedFactor, code_categorical_terms, dummy_df
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
 from pyro.contrib.brm.model import build_model, parameters
@@ -597,7 +597,7 @@ def test_parser(formula_str, expected_formula):
 ])
 def test_coding(formula_str, expected_coding):
     formula = parse(formula_str)
-    assert categorical_coding(formula.terms) == expected_coding
+    assert code_categorical_terms(formula.terms) == expected_coding
 
 # I expect these to also pass with PYRO_TENSOR_TYPE='torch.FloatTensor'.
 

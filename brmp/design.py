@@ -208,7 +208,7 @@ def all_previous(xss):
 # This is an attempt to implement the algorithm described here:
 # https://patsy.readthedocs.io/en/latest/formulas.html#technical-details
 
-def categorical_coding(terms):
+def code_categorical_terms(terms):
     # It is assumed that each element of `terms` describes an
     # interaction between zero or more categorical factors.
     decomposed = [decompose(t) for t in terms]
@@ -264,8 +264,7 @@ def code_group_of_terms(shared_numeric_factors, terms):
     def go(tup):
         return [CategoricalC2(cf.factor, cf.reduced) for cf in tup] + numeric_codings
 
-    # TODO: Consider renaming categorical_coding to `code_categorical_terms`.
-    return [go(tup) for tup in categorical_coding(categorical_terms)]
+    return [go(tup) for tup in code_categorical_terms(categorical_terms)]
 
 
 # [('a', 100), ('b', 200), ('a', 300)] =>
