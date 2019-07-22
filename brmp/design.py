@@ -219,7 +219,7 @@ def code_categorical_terms(terms):
 
 def partition(pred, iterable):
     t1, t2 = itertools.tee(iterable)
-    return itertools.filterfalse(pred, t1), filter(pred, t2)
+    return list(itertools.filterfalse(pred, t1)), list(filter(pred, t2))
 
 NumericC2 = namedtuple('NumericC2', ['factor'])
 CategoricalC2 = namedtuple('CategoricalC2', ['factor', 'reduced'])
@@ -306,7 +306,7 @@ def partition_terms(terms, metadata):
     # the fact that `group` is order aware.
     empty_set = OrderedSet()
     first, rest = partition(lambda kv: kv[0] != empty_set, groups.items())
-    return list(first) + list(rest)
+    return first + rest
 
 
 # Build a simple design matrix (as a torch tensor) from columns of a
@@ -377,10 +377,7 @@ def coded_interaction_to_product_cols(things, metadata):
     assert type(metadata) == dict
     assert all(type(entry) in [CategoricalC2, NumericC2] for entry in things)
 
-    # TODO: clean up list forcing here.
     cs, ns = partition(lambda cf: type(cf) == NumericC2, things)
-    cs = list(cs)
-    ns = list(ns)
 
     def coded_levels(c):
         levels = metadata[c.factor].levels
