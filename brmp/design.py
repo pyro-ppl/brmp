@@ -90,71 +90,17 @@ def dummy_design(formula, metadata, N):
 # Design matrix coding
 # --------------------
 
-def codenumeric(dfcol):
-    assert is_float_dtype(dfcol) or is_integer_dtype(dfcol)
-    return [dfcol]
-
-
 # A version of product in which earlier elements of the returned
 # tuples vary more rapidly than later ones. This matches the way
 # interactions are coded in R.
 def product(iterables):
     return [tuple(reversed(t)) for t in itertools.product(*reversed(iterables))]
 
-def codeindicator(dfcols, values):
-    assert len(dfcols) == len(values)
-    return reduce(op.and_,
-                  (dfcol == value
-                   for (dfcol, value) in zip(dfcols, values)))
-
-
-def codeinteraction(dfcols, reduced_flags):
-    assert type(dfcols) == list
-    assert type(reduced_flags) == list
-    assert len(dfcols) == len(reduced_flags)
-    assert all(is_categorical_dtype(dfcol) for dfcol in dfcols)
-    assert all(type(reduced) == bool for reduced in reduced_flags)
-
-    # e.g. [('a1', 'b1'), ('a2', 'b1'), ...]
-    #
-    # where the first element of a tuple is a level from dfcol[0],
-    # etc.
-    cols = product([dfcol.cat.categories[1:] if reduced else dfcol.cat.categories
-                    for dfcol, reduced in zip(dfcols, reduced_flags)])
-
-    return [codeindicator(dfcols, values) for values in cols]
-
-def codefactor(dfcol, reduced):
-    return codeinteraction([dfcol], [reduced])
-
-def col2numpy(col):
-    default_dtype = np.float64
-    if type(col) == np.ndarray:
-        assert col.dtype == default_dtype
-        return col
-    else:
-        return col.to_numpy(default_dtype)
-
 InterceptC = namedtuple('InterceptC', [])
 InteractionC = namedtuple('InteractionC', ['codes']) # codes is a list of CategoricalCs
 CategoricalC = namedtuple('CategoricalC', ['factor', 'reduced'])
 # Represents coding of either integer or real-valued columns.
 NumericC = namedtuple('NumericC', ['name'])
-
-# TODO: I do similar dispatching on type in `designmatrix` and
-# `designmatrix_metadata`. It would be more Pythonic to turn
-# InterceptC etc. into classes with `width` and `code` methods.
-
-def widthC(c):
-    if type(c) in [InterceptC, NumericC]:
-        return 1
-    elif type(c) == InteractionC:
-        return reduce(
-            op.mul,
-            (len(code.factor.levels) - (1 if code.reduced else 0)
-             for code in c.codes))
-    else:
-        raise Exception('Unknown coding type.')
 
 CodedFactor = namedtuple('CodedFactor', 'factor reduced')
 CodedFactor.__repr__ = lambda self: '{}{}'.format(self.factor, '-' if self.reduced else '')
@@ -275,56 +221,6 @@ def partition(pred, iterable):
     t1, t2 = itertools.tee(iterable)
     return itertools.filterfalse(pred, t1), filter(pred, t2)
 
-# Generates a description of how the given terms ought to be coded
-# into a design matrix.
-def coding(terms, metadata):
-    assert type(terms) == OrderedSet
-    assert all(type(term) == Term for term in terms)
-    assert type(metadata) == dict
-
-    if not all(len(term.factors) < 2 or
-               all(type(metadata[factor]) == Categorical for factor in term.factors) for term in terms):
-        raise Exception('Interactions supported between categorical factors only.')
-
-    def is_numeric_term(term):
-        return len(term.factors) == 1 and not type(metadata[term.factors[0]]) == Categorical
-    c_terms, n_terms = partition(is_numeric_term, terms)
-
-    c_terms = sorted(c_terms, key=lambda term: len(term.factors))
-
-    # It's possible to figure out c_terms and n_terms using the new
-    # logic, but doing so clunky.
-    # groups = partition_terms(terms, metadata)
-    # if len(groups) == 0:
-    #     c_terms = n_terms = []
-    # elif groups[0][0] == OrderedSet():
-    #     c_terms = sort_terms(groups[0][1])
-    #     n_terms = [g[1][0] for g in groups[1:]]
-    # else:
-    #     c_terms = []
-    #     n_terms = [g[1][0] for g in groups]
-
-    def coded_factor_to_coding(tup):
-        assert type(tup) == tuple
-        # This is guaranteed by the check made on `terms` when
-        # entering `coding`.
-        assert all(type(cf) == CodedFactor and cf.factor in metadata for cf in tup)
-        if len(tup) == 0:
-            return InterceptC()
-        else:
-            # If there is more than one CodedFactor in tup, then this
-            # represents the interaction between one or more
-            # categorical facts. The coding of this is described by
-            # `InteractionC`.
-            return InteractionC([CategoricalC(metadata[cf.factor], cf.reduced) for cf in tup])
-
-    c_coded = [coded_factor_to_coding(tup) for tup in categorical_coding(c_terms)]
-    n_coded = [NumericC(term.factors[0]) for term in n_terms]
-    # Following Patsy numeric terms come after categorical terms. This
-    # is not what happens in R.
-    return c_coded + n_coded
-
-
 NumericC2 = namedtuple('NumericC2', ['factor'])
 CategoricalC2 = namedtuple('CategoricalC2', ['factor', 'reduced'])
 
@@ -420,9 +316,6 @@ def sort_terms(terms):
     return sorted(terms, key=lambda term: len(term.factors))
 
 
-def width(coding):
-    return sum(widthC(c) for c in coding)
-
 # Build a simple design matrix (as a torch tensor) from columns of a
 # pandas data frame.
 
@@ -440,27 +333,6 @@ def width(coding):
 # take a dictionary that gives access to the columns (iterables full
 # of floats, ints, or level values?) and the existing dataframe
 # metadata structure to describe the types of the columns, etc.
-def designmatrix_old(terms, df):
-    assert type(terms) == OrderedSet
-    N = len(df)
-    def dispatch(code):
-        if type(code) == InterceptC:
-            return [np.ones(N)]
-        elif type(code) == InteractionC:
-            return codeinteraction([df[c.factor.name] for c in code.codes],
-                                   [c.reduced for c in code.codes])
-        elif type(code) == NumericC:
-            return codenumeric(df[code.name])
-        else:
-            raise Exception('Unknown coding type.')
-    metadata = make_metadata_lookup(dfmetadata(df))
-    coding_desc = coding(terms, metadata)
-    coded_cols = join([dispatch(c) for c in coding_desc])
-    X = np.stack([col2numpy(col) for col in coded_cols], axis=1) if coded_cols else np.empty((N, 0))
-    assert X.shape == (N, width(coding_desc))
-    if X.shape[1] > 0 and np.linalg.matrix_rank(X) != X.shape[1]:
-        print('WARNING: Design matrix may not be full rank.')
-    return X
 
 def designmatrix(terms, df):
     assert type(terms) == OrderedSet
@@ -530,6 +402,10 @@ def coded_interaction_to_product_cols(things, metadata):
 
 def product_col_to_coef_name(product_col):
     assert type(product_col) == ProductCol
+
+    # TODO: I do similar dispatching elsewhere. It would be more
+    # Pythonic to turn `IndicatorCol` etc. into classes appropriate
+    # methods. e.g. `coef_name` in this case.
 
     def dispatch(col):
         if type(col) == IndicatorCol:
@@ -602,40 +478,6 @@ def execute_product_col(product_col, df):
 # that that just a pre/proto model and the prior tree would be
 # sufficient to build a `ModelDesc`. (This function would then clearly
 # be taking one model description to a second, richer, description.)
-
-def numeric_metadata(code):
-    return [code.name]
-
-# TODO: I wonder if more of this logic ought to be shared with
-# `codeinteraction` both compute a product, and both know what to do
-# when a categorical factor is reduced. Perhaps this logic can be
-# captured abstractly?
-def interaction_metadata(code):
-    assert type(code) == InteractionC
-    assert all(type(c) == CategoricalC for c in code.codes)
-    def coded_levels(c):
-        return c.factor.levels[1:] if c.reduced else c.factor.levels
-    interactions = product([tuple((c.factor.name, l)
-                                  for l in coded_levels(c)) for c in code.codes])
-    return [':'.join('{}[{}]'.format(factor, val)
-                     for factor, val in interaction)
-            for interaction in interactions]
-
-
-def designmatrix_metadata_old(terms, metadata):
-    assert type(terms) == OrderedSet
-    def dispatch(code):
-        if type(code) == InterceptC:
-            return ['intercept']
-        elif type(code) == InteractionC:
-            return interaction_metadata(code)
-        elif type(code) == NumericC:
-            return numeric_metadata(code)
-        else:
-            raise Exception('Unknown coding type.')
-    coding_desc = coding(terms, metadata)
-    return join([dispatch(c) for c in coding_desc])
-
 
 def designmatrix_metadata(terms, metadata):
     assert type(terms) == OrderedSet
