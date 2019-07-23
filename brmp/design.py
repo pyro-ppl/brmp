@@ -409,11 +409,11 @@ def execute_product_col(product_col, df):
         else:
             raise Exception('unknown column type')
 
-    # We use a vector of ones are initial value of reduction. This is
-    # inefficient, but OK for now. This gives the correct behaviour of
-    # the intercept column and will also ensure that indicator columns
-    # are returned at floats even when there are no numeric columsn in
-    # the product.
+    # We use a vector of ones as the initial value of the reduction.
+    # This is inefficient, but OK for now. This gives the correct
+    # behaviour of the intercept column and will also ensure that
+    # indicator columns are returned at floats even when there are no
+    # numeric columsn in the product.
 
     N = len(df)
     init = np.ones(N)

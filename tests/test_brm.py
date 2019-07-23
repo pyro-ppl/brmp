@@ -667,7 +667,7 @@ def mkcat(factor, num_levels):
          [CategoricalCoding('a', False), CategoricalCoding('b', False)],                               # a:b
          [CategoricalCoding('a', False), CategoricalCoding('b', False), CategoricalCoding('c', True)], # a:b:c-
      ]),
-    # This is based in an example in the Patsy docs:
+    # This is based on an example in the Patsy docs:
     # https://patsy.readthedocs.io/en/latest/formulas.html#from-terms-to-matrices
     ('y ~ 1 + x1:x2 + a:b + b + x1:a:b + a + x2:a:x1',
      [mkcat('a', 2), mkcat('b', 2)],
