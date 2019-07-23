@@ -421,13 +421,14 @@ def execute_product_col(product_col, df):
     assert type(df) == pd.DataFrame
 
     def dispatch(col):
-        # TODO: Check that columns of `df` have the expected types?
-        # That the value specified by an IndicatorCol is in the
-        # `level` of a Categorical column?
+        dfcol = df[col.factor]
         if type(col) == IndicatorCol:
-            return (df[col.factor] == col.level).to_numpy()
+            assert is_categorical_dtype(dfcol)
+            assert col.level in dfcol.cat.categories
+            return (dfcol == col.level).to_numpy()
         elif type(col) == NumericCol:
-            return df[col.factor].to_numpy()
+            assert is_float_dtype(dfcol) or is_integer_dtype(dfcol)
+            return dfcol.to_numpy()
         else:
             raise Exception('unknown column type')
 
