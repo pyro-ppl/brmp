@@ -677,8 +677,8 @@ def mkcat(factor, num_levels):
          [CategoricalCoding('a', True)],
          [CategoricalCoding('a', True), CategoricalCoding('b', True)],
          [NumericCoding('x1'), NumericCoding('x2')],
-         [CategoricalCoding('a', True), NumericCoding('x1'), NumericCoding('x2')],
-         [CategoricalCoding('a', False), CategoricalCoding('b', False), NumericCoding('x1')],
+         [NumericCoding('x2'), CategoricalCoding('a', True), NumericCoding('x1')],
+         [NumericCoding('x1'), CategoricalCoding('a', False), CategoricalCoding('b', False)],
      ])
 ])
 def test_coding(formula_str, metadata, expected_coding):

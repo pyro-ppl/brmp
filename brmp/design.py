@@ -205,7 +205,7 @@ def code_categorical_terms(terms):
     decomposed = [decompose(t) for t in terms]
     non_redundant = [[t for t in term if not t in previous]
                      for term, previous in zip(decomposed, all_previous(decomposed))]
-    return join(simplify(t) for t in non_redundant)
+    return [simplify(t) for t in non_redundant]
 
 
 def partition(pred, iterable):
@@ -237,19 +237,36 @@ def code_group_of_terms(terms, shared_numeric_factors):
         return Term(OrderedSet(*factors))
 
     categorical_terms = [drop_numeric_factors(term) for term in terms]
+    codings_for_terms = code_categorical_terms(categorical_terms)
 
-    # TODO: I think Patsy might respect the position of the numeric
-    # factors in the source term here. This isn't trivial to implement
-    # because `n` terms can generate more than `n` coding
-    # descriptions. e.g. 1 + a:b yields something like [(), (a-,),
-    # (a-,b)] or similar. I guess that a necessary first step towards
-    # this would be keep track of which term gave rise to each coding
-    # description. e.g. x2:a:x1:b gave rise to (a-,). From that it
-    # should be possible see where to insert the numeric factors.
+    num_codings_dict = {f: NumericCoding(f) for f in shared_numeric_factors}
 
-    numeric_codings = [NumericCoding(f) for f in shared_numeric_factors]
+    # This adds codings for the shared numeric factors to the coding
+    # of a categorical interaction, respecting the factor order in the
+    # source term.
+    #
+    # e.g. term   = Term(<a,x,b>)
+    #      coding = (b+,)
+    # Returns:
+    #      (x,b+)
+    # (Assuming shared numeric factors is ['x'].)
+    #
+    def extend_with_numeric_factors(term, coding):
+        cat_codings_dict = {c.factor: c for c in coding}
+        # This gives us a dictionary that maps from factor names
+        # (factors in coding U shared numeric factors) to codings
+        # (e.g. CategoricalCoding, NumericCoding).
+        codings_dict = dict(cat_codings_dict, **num_codings_dict)
+        # We then grab all of these codings following the factor order
+        # in the term. (Note that some factors in the term may not
+        # appear in the coding.)
+        out = [codings_dict[f] for f in term.factors if f in codings_dict]
+        assert len(out) == len(codings_dict)
+        return out
 
-    return [list(tup) + numeric_codings for tup in code_categorical_terms(categorical_terms)]
+    assert len(terms) == len(codings_for_terms) # complain if zip will drop things
+    return join([[extend_with_numeric_factors(term, coding) for coding in codings]
+                 for (term, codings) in zip(terms, codings_for_terms)])
 
 
 # [('a', 100), ('b', 200), ('a', 300)] =>
