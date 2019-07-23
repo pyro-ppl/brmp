@@ -382,10 +382,19 @@ def coded_interaction_to_product_cols(coded_interaction, metadata):
         return all_levels[1:] if c.reduced else all_levels
 
     interactions = product([[IndicatorCol(c.factor, level) for level in levels(c)] for c in cs])
-    ncols = [NumericCol(n.factor) for n in ns]
-    pcols = [ProductCol(list(ccols) + ncols) for ccols in interactions]
 
-    return pcols
+    ncols_dict = {n.factor: NumericCol(n.factor) for n in ns}
+    def extend_with_numeric_cols(ccols):
+        ccols_dict = {ccol.factor: ccol for ccol in ccols}
+        cols_dict = dict(ccols_dict, **ncols_dict)
+        # Make a list of both the indicator and numeric columns,
+        # ordered by the factor order in the coded interaction given
+        # as input.
+        out = [cols_dict[ci.factor] for ci in coded_interaction]
+        assert len(out) == len(coded_interaction)
+        return out
+
+    return [ProductCol(extend_with_numeric_cols(ccols)) for ccols in interactions]
 
 
 # TODO: Add tests for product_col_to_coef_name and execute_product_col.

@@ -13,7 +13,7 @@ import numpyro.handlers as numpyro
 
 from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrices_metadata, CategoricalCoding, NumericCoding, code_terms, dummy_df
+from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrix_metadata, designmatrices_metadata, CategoricalCoding, NumericCoding, code_terms, dummy_df
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
 from pyro.contrib.brm.model import build_model, parameters
@@ -685,6 +685,21 @@ def test_coding(formula_str, metadata, expected_coding):
     formula = parse(formula_str)
     metadata = build_metadata(formula, metadata)
     assert code_terms(formula.terms, metadata) == expected_coding
+
+
+@pytest.mark.parametrize('formula_str, metadata, expected_names', [
+    # This is based on an example in the Patsy docs:
+    # https://patsy.readthedocs.io/en/latest/formulas.html#from-terms-to-matrices
+    ('y ~ 1 + x1:x2 + a:b + b + x1:a:b + a + x2:a:x1',
+     [mkcat('a', 2), mkcat('b', 2)],
+     ['intercept', 'b[b2]', 'a[a2]', 'a[a2]:b[b2]', 'x1:x2', 'x2:a[a2]:x1',
+      'x1:a[a1]:b[b1]', 'x1:a[a2]:b[b1]', 'x1:a[a1]:b[b2]', 'x1:a[a2]:b[b2]'])
+])
+def test_coef_names(formula_str, metadata, expected_names):
+    formula = parse(formula_str)
+    metadata = build_metadata(formula, metadata)
+    assert designmatrix_metadata(formula.terms, metadata) == expected_names
+
 
 # I expect these to also pass with PYRO_TENSOR_TYPE='torch.FloatTensor'.
 
