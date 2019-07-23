@@ -13,8 +13,6 @@ from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula, OrderedSet, Term, allfactors
 
 
-# TODO: Refer to dataframe metadata as 'schema' in order to avoid
-# confusion with the similarly named design matrix metadata?
 def make_metadata_lookup(metadata):
     assert type(metadata) == list
     assert all(type(factor) in [Categorical, Integral, RealValued] for factor in metadata)
@@ -396,8 +394,6 @@ def coded_interaction_to_product_cols(coded_interaction, metadata):
 
     return [ProductCol(extend_with_numeric_cols(ccols)) for ccols in interactions]
 
-
-# TODO: Add tests for product_col_to_coef_name and execute_product_col.
 
 def product_col_to_coef_name(product_col):
     assert type(product_col) == ProductCol
