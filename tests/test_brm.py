@@ -518,6 +518,52 @@ def test_prior_checks(formula_str, metadata, family, prior_edits, expected_error
                           [1., 1., 1., 1.]]),
           y_obs=np.array([1., 2., 3., 4.]))),
 
+    # real-real
+    ('y ~ x1:x2',
+     pd.DataFrame(dict(y=[1., 2., 3., 4.],
+                       x1=np.array([1., 2., 1., 2.]),
+                       x2=np.array([-10., 0., 10., 20.]))),
+     dict(X=np.array([[-10.],
+                      [  0.],
+                      [ 10.],
+                      [ 40.]]),
+          y_obs=np.array([1., 2., 3., 4.]))),
+
+    # real-int
+    ('y ~ x1:x2',
+     pd.DataFrame(dict(y=[1., 2., 3., 4.],
+                       x1=np.array([1., 2., 1., 2.]),
+                       x2=np.array([-10, 0, 10, 20]))),
+     dict(X=np.array([[-10.],
+                      [  0.],
+                      [ 10.],
+                      [ 40.]]),
+          y_obs=np.array([1., 2., 3., 4.]))),
+
+    # real-categorical
+    ('y ~ x1:x2',
+     pd.DataFrame(dict(y=[1., 2., 3., 4.],
+                       x1=np.array([1., 2., 3., 4.]),
+                       x2=pd.Categorical(list('ABAB')))),
+     dict(X=np.array([[1., 0.],
+                      [0., 2.],
+                      [3., 0.],
+                      [0., 4.]]),
+          y_obs=np.array([1., 2., 3., 4.]))),
+
+    # This example is taken from here:
+    # https://patsy.readthedocs.io/en/latest/R-comparison.html
+    ('y ~ a:x + a:b',
+     pd.DataFrame(dict(y=[1., 2., 3., 4.],
+                       a=pd.Categorical(list('ABAB')),
+                       b=pd.Categorical(list('CCDD')),
+                       x=np.array([1., 2., 3., 4.]))),
+     dict(X=np.array([[1., 0., 0., 0., 1., 0.],
+                      [0., 1., 0., 0., 0., 2.],
+                      [0., 0., 1., 0., 3., 0.],
+                      [0., 0., 0., 1., 0., 4.]]),
+          y_obs=np.array([1., 2., 3., 4.]))),
+
     # Integer-valued Factors
     # --------------------------------------------------
     ('y ~ x1 + x2',
