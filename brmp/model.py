@@ -151,3 +151,26 @@ def parameters(model):
             [Parameter('L_{}'.format(i), (len(group.coefs), len(group.coefs)))
              for i, group in enumerate(model.groups) if not group.corr_prior is None] +
             [Parameter(param.name, (1,)) for param in model.response.nonlocparams])
+
+# [ (scalar_param_name, (param_name, (ix0, ix1, ...)), ... ]
+
+# (ix0, ix1, ...) is an index into that the parameter (picked out by
+# `param_name`) once put through `to_numpy`. This is a tuple because
+# parameters are not necessarily vectors.
+
+def scalar_parameter_map(model):
+    assert type(model) == ModelDesc
+    out = [('b_{}'.format(coef), ('b', (i,)))
+           for i, coef in enumerate(model.population.coefs)]
+    for ix, group in enumerate(model.groups):
+        out.extend([('sd_{}__{}'.format(group.factor.name, coef), ('sd_{}'.format(ix), (i,)))
+                    for i, coef in enumerate(group.coefs)])
+        out.extend([('r_{}[{},{}]'.format(group.factor.name, level, coef), ('r_{}'.format(ix), (i, j)))
+                    for i, level in enumerate(group.factor.levels)
+                    for j, coef in enumerate(group.coefs)])
+    for param in model.response.nonlocparams:
+        out.append((param.name, (param.name, (0,))))
+    return out
+
+def scalar_parameter_names(model):
+    return [name for (name, _) in scalar_parameter_map(model)]

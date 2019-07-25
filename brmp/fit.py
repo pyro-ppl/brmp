@@ -3,7 +3,7 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 
-from pyro.contrib.brm.model import model_repr, parameter_names
+from pyro.contrib.brm.model import model_repr, parameter_names, scalar_parameter_map, scalar_parameter_names
 from pyro.contrib.brm.family import free_param_names
 from pyro.contrib.brm.design import predictors
 from pyro.contrib.brm.backend import data_from_numpy
@@ -152,5 +152,41 @@ def marginals(fit, qs=default_quantiles):
         row_labels.append(param.name)
     return ArrReprWrapper(np.vstack(arrs), row_labels, col_labels)
 
+# TODO: This produces the same output as `marginal`, though it's less
+# efficient. Can this be recovered? The problem is that we pull out
+# each individual scalar parameter as a vector and then stack those,
+# rather than just stack entire parameters as in `marginal`. One
+# thought is that such an optimisation might be best pushed into
+# `get_scalar_param`. i.e. This might accept a list of a parameter
+# names and return the corresponding scalar parameters stacked into a
+# matrix. The aim would be to do this without performing any
+# unnecessary slicing.
+def marginals2(fit, qs=default_quantiles):
+    assert type(fit) == Fit
+    names = scalar_parameter_names(fit.model_desc)
+    # TODO: Every call to `get_scalar_param` rebuilds the scalar
+    # parameter map.
+    vecs = [get_scalar_param(fit, name) for name in names]
+    col_labels = ['mean', 'sd'] + format_quantiles(qs)
+    arr = marginal_stats(np.stack(vecs, axis=1), qs)
+    return ArrReprWrapper(arr, names, col_labels)
+
 def print_model(fit):
     print(model_repr(fit.model_desc))
+
+# TODO: This should eventually be presented in a similar way to
+# `get_param` to avoid confusion. e.g. They might both me methods in
+# `fit.posterior`. If parameter and scalar parameter names never
+# clash, perhaps having a single lookup method would be convenient.
+# Perhaps this could be wired up to `fit.posterior[...]`?
+def get_scalar_param(fit, name):
+    assert type(fit) == Fit
+    m = scalar_parameter_map(fit.model_desc)
+    res = [p for (n, p) in m if n == name]
+    assert len(res) < 2
+    if len(res) == 0:
+        raise KeyError('unknown parameter name: {}'.format(name))
+    param_name, index = res[0]
+    # Construct a slice to pick out the given index at all rows.
+    slc = (slice(None, None, None),) + index
+    return fit.backend.to_numpy(fit.posterior.get_param(param_name))[slc]
