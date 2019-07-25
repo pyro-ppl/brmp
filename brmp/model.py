@@ -132,9 +132,6 @@ def model_repr(model):
     return '\n'.join(out)
 
 
-# TODO: Are these really best called parameters, or is there something
-# better? Should `mu` be included here?
-
 Parameter = namedtuple('Parameter', ['name', 'shape'])
 
 def parameter_names(model):
