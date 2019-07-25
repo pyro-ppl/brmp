@@ -75,12 +75,13 @@ def layout_table(rows):
     fmt = ' '.join('{{:>{}}}'.format(mw) for mw in max_widths)
     return '\n'.join(fmt.format(*row) for row in rows)
 
-# brms                                | brmp
-# -------------------------------------------------------------
-# fitted(fit)                         | fitted(fit)
-# fitted(fit, summary=TRUE)           | summary(fitted(fir))
-# fitted(dpar='mu', scale='linear')   | fitted(fit, 'linear')
-# fitted(dpar='mu', scale='response') | fitted(fit, 'response')
+# brms                                               | brmp
+# ----------------------------------------------------------------------------
+# fitted(fit, summary=FALSE)                         | fitted(fit)
+# fitted(dpar='mu', scale='linear', summary=FALSE)   | fitted(fit, 'linear')
+# fitted(dpar='mu', scale='response', summary=FALSE) | fitted(fit, 'response')
+# fitted(fit, newdata=..., summary=FALSE)            | fitted(fit, data=...)
+# fitted(fit, ..., summary=TRUE)                     | summary(fitted(fit, ...))
 
 # https://rdrr.io/cran/brms/man/fitted.brmsfit.html
 
