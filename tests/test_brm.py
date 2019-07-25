@@ -727,6 +727,7 @@ def test_marginals_fitted_smoke(fitargs):
     chk(fitted(fit), (S, N))
     chk(fitted(fit, 'linear'), (S, N))
     chk(fitted(fit, 'response'), (S, N))
+    chk(fitted(fit, 'sample'), (S, N))
     # Applying `fitted` to new data.
     N2 = 8
     df2 = dummy_df(metadata_lu, N2)

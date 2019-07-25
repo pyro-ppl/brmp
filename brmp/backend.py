@@ -56,6 +56,7 @@ Model = namedtuple('Model', [
     'fn', 'code',
     'inv_link_fn', 'inv_link_code',
     'expected_response_fn', 'expected_response_code',
+    'sample_response_fn', 'sample_response_code',
 ])
 
 def apply_default_hmc_args(iter, warmup):

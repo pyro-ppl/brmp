@@ -75,34 +75,41 @@ def layout_table(rows):
     fmt = ' '.join('{{:>{}}}'.format(mw) for mw in max_widths)
     return '\n'.join(fmt.format(*row) for row in rows)
 
+# TODO: This doesn't match the brms interface, but the deviation
+# aren't improvements either. Figure out what to do about that.
+
 # brms                                               | brmp
-# ----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------
 # fitted(fit, summary=FALSE)                         | fitted(fit)
 # fitted(dpar='mu', scale='linear', summary=FALSE)   | fitted(fit, 'linear')
 # fitted(dpar='mu', scale='response', summary=FALSE) | fitted(fit, 'response')
 # fitted(fit, newdata=..., summary=FALSE)            | fitted(fit, data=...)
 # fitted(fit, ..., summary=TRUE)                     | summary(fitted(fit, ...))
+# predict(fit, summary=FALSE)                        | fitted(fit, 'sample')
+# predict(fit, summary=TRUE)                         | summary(fitted(fit, 'sample'))
 
 # https://rdrr.io/cran/brms/man/fitted.brmsfit.html
 
 def fitted(fit, what='expectation', data=None):
     assert type(fit) == Fit
-    assert what in ['expectation', 'linear', 'response']
+    assert what in ['sample', 'expectation', 'linear', 'response']
     assert data is None or type(data) is pd.DataFrame
 
     get_param         = fit.posterior.get_param
     location          = fit.posterior.location
     to_numpy          = fit.backend.to_numpy
     expected_response = fit.model.expected_response_fn
+    sample_response   = fit.model.sample_response_fn
     inv_link          = fit.model.inv_link_fn
 
     mu = location(fit.data if data is None
                   else data_from_numpy(fit.backend, predictors(fit.formula, data)))
 
-    if what == 'expectation':
+    if what == 'sample' or 'expectation':
         args = [mu if name == 'mu' else get_param(name)
                 for name in free_param_names(fit.model_desc.response.family)]
-        return to_numpy(expected_response(*args))
+        response_fn = sample_response if what == 'sample' else expected_response
+        return to_numpy(response_fn(*args))
     elif what == 'linear':
         return to_numpy(mu)
     elif what == 'response':

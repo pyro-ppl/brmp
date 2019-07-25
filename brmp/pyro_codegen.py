@@ -209,11 +209,14 @@ def geninvlinkfn(model):
     body = geninvlinkbody(model.response.family.link.fn, 'x')
     return '\n'.join(method('invlink', ['x'], ['return {}'.format(body)]))
 
-def gen_expected_response_fn(model):
-    distcode = gen_response_dist(model, vectorize=True)
+def gen_response_fn(model, mode):
+    assert mode in ['expectation', 'sample']
+    distcode = 'dist.{}'.format(gen_response_dist(model, vectorize=True))
     args = free_param_names(model.response.family)
+    retvalfmt = 'pyro.sample("y", {})' if mode == 'sample' else '{}.mean'
+    retval = retvalfmt.format(distcode)
     body = ["S, N = mu.shape",
-            "return dist.{}.mean".format(distcode)]
+            "return {}".format(retval)]
     return '\n'.join(method('expected_response', args, body))
 
 # TODO: I'm missing opportunities to vectorise here. Adjacent segments
@@ -311,8 +314,11 @@ def gen(model_desc):
     fn = eval_method(code)
     inv_link_code = geninvlinkfn(model_desc)
     inv_link_fn = eval_method(inv_link_code)
-    expected_response_code = gen_expected_response_fn(model_desc)
+    expected_response_code = gen_response_fn(model_desc, mode='expectation')
     expected_response_fn = eval_method(expected_response_code)
+    sample_response_code = gen_response_fn(model_desc, mode='sample')
+    sample_response_fn = eval_method(sample_response_code)
     return Model(fn, code,
                  inv_link_fn, inv_link_code,
-                 expected_response_fn, expected_response_code)
+                 expected_response_fn, expected_response_code,
+                 sample_response_fn, sample_response_code)
