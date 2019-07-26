@@ -22,7 +22,7 @@ Here are some example formulae that the system can handle:
 |----|----|
 | `y ~ x`                                      | Population-level effects |
 | `y ~ 1 + x`                                  ||
-| `y ~ x1:x2`                                  | Interaction between categorical variables |
+| `y ~ x1:x2`                                  | Interaction between variables |
 | `y ~ 1 + x0 + (x1 \| z)`                     | Group-level effects |
 | `y ~ 1 + x0 + (1 + x1 \| z)`                 ||
 | `y ~ 1 + x0 + (1 + x1 \|\| z)`               | No correlation between group coefficients |
@@ -70,11 +70,13 @@ posteriors:
 
 * `marginals(...)`: This produces a model summary similar to that
   obtained by doing `fit <- brm(...) ; fit$fit` in brms.
-* `fitted(...)`: This is analogous to
+* `fitted(...)`: This implements some of the functionality available
+  in brms through
   the [`fitted`](https://rdrr.io/cran/brms/man/fitted.brmsfit.html)
-  method in brms.
+  and [`predict`](https://rdrr.io/cran/brms/man/predict.brmsfit.html)
+  methods.
 
-See the baseball notebook (linked below) for example usage.
+See the baseball and Africa notebooks (linked below) for example usage.
 
 ### Examples
 
@@ -84,7 +86,6 @@ examples of using the system to fit some simple models.
 
 ## Limitations
 
-* Interactions between numeric variables are not supported.
 * All formula terms must be column names. Expressions such as
   `sin(x1)` or `I(x1*x2)` are not supported.
 * The group syntax `g1:g2` and `g1/g2` is not supported.
