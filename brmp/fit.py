@@ -126,42 +126,18 @@ def summary(arr, qs=default_quantiles, row_labels=None):
 
 # Similar to the following:
 # https://rdrr.io/cran/rstan/man/stanfit-method-summary.html
-def marginals(fit, qs=default_quantiles):
-    arrs = []
-    row_labels = []
-    col_labels = ['mean', 'sd'] + format_quantiles(qs)
-    def flatten(arr):
-        return arr.reshape((arr.shape[0], -1))
-    def param_stats(name):
-        return marginal_stats(flatten(param_marginal(fit, name)), qs)
-    # Population coefs.
-    arrs.append(param_stats('b'))
-    row_labels.extend('b_{}'.format(coef) for coef in fit.model_desc.population.coefs)
-    # Groups.
-    for ix, group in enumerate(fit.model_desc.groups):
-        arrs.append(param_stats('sd_{}'.format(ix)))
-        row_labels.extend('sd_{}__{}'.format(group.factor.name, coef)
-                          for coef in group.coefs)
-        arrs.append(param_stats('r_{}'.format(ix)))
-        row_labels.extend('r_{}[{},{}]'.format(group.factor.name, level, coef)
-                          for level in group.factor.levels
-                          for coef in group.coefs)
-    # Response parameters.
-    for param in fit.model_desc.response.nonlocparams:
-        arrs.append(param_stats(param.name))
-        row_labels.append(param.name)
-    return ArrReprWrapper(np.vstack(arrs), row_labels, col_labels)
 
-# TODO: This produces the same output as `marginal`, though it's less
-# efficient. Can this be recovered? The problem is that we pull out
-# each individual scalar parameter as a vector and then stack those,
-# rather than just stack entire parameters as in `marginal`. One
-# thought is that such an optimisation might be best pushed into
-# `get_scalar_param`. i.e. This might accept a list of a parameter
-# names and return the corresponding scalar parameters stacked into a
-# matrix. The aim would be to do this without performing any
-# unnecessary slicing.
-def marginals2(fit, qs=default_quantiles):
+# TODO: This produces the same output as the old implementation of
+# `marginal`, though it's less efficient. Can the previous efficiency
+# be recovered? The problem is that we pull out each individual scalar
+# parameter as a vector and then stack those, rather than just stack
+# entire parameters as before. One thought is that such an
+# optimisation might be best pushed into `get_scalar_param`. i.e. This
+# might accept a list of a parameter names and return the
+# corresponding scalar parameters stacked into a matrix. The aim would
+# be to do this without performing any unnecessary slicing. (Though
+# this sounds fiddly.)
+def marginals(fit, qs=default_quantiles):
     assert type(fit) == Fit
     names = scalar_parameter_names(fit.model_desc)
     # TODO: Every call to `get_scalar_param` rebuilds the scalar
