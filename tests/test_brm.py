@@ -16,7 +16,7 @@ from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfa
 from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrix_metadata, designmatrices_metadata, CategoricalCoding, NumericCoding, code_terms, dummy_df
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
-from pyro.contrib.brm.model import build_model, parameters
+from pyro.contrib.brm.model import build_model, parameters, scalar_parameter_map
 from pyro.contrib.brm.fit import marginals, fitted, param_marginal
 from pyro.contrib.brm.pyro_backend import backend as pyro_backend
 from pyro.contrib.brm.numpyro_backend import backend as numpyro_backend
@@ -335,6 +335,45 @@ def test_parameter_shapes(formula_str, metadata, family, prior_edits, expected, 
         shape = p.shape
         expected_shape = parameter.shape
         assert shape == expected_shape
+
+
+def test_scalar_param_map_consistency():
+    formula = parse('y ~ 1 + x1 + (1 + x2 + b | a)')
+    metadata = [
+        Categorical('a', ['a1', 'a2', 'a3']),
+        Categorical('b', ['b1', 'b2', 'b3']),
+    ]
+    metadata = build_metadata(formula, metadata)
+    desc = makedesc(formula, list(metadata.values()), getfamily('Normal'), [])
+    params = parameters(desc)
+    spmap = scalar_parameter_map(desc)
+
+    # Check that each entry in the map points to a unique parameter
+    # position.
+    param_and_indices_set = set(param_and_indices
+                                for (_, param_and_indices) in spmap)
+    assert len(param_and_indices_set) == len(spmap)
+
+    # Ensure that we have enough entries in the map to cover all of
+    # the scalar parameters. (The L_i parameters have a funny status.
+    # We consider them to be parameters, but not scalar parameters.
+    # This is not planned, rather things just evolved this way. It
+    # does makes some sense though, since we usually look at R_i
+    # instead.)
+    num_scalar_params = sum(np.product(shape)
+                            for name, shape in params
+                            if not name.startswith('L_'))
+    assert num_scalar_params == len(spmap)
+
+    # Check that all indices are valid. (i.e. Within the shape of the
+    # parameter.)
+    for scalar_param_name, (param_name, indices) in spmap:
+        ss = [shape for (name, shape) in params if name == param_name]
+        assert len(ss) == 1
+        param_shape = ss[0]
+        assert len(indices) == len(param_shape)
+        assert all(i < s for (i, s) in zip(indices, param_shape))
+
 
 @pytest.mark.parametrize('formula_str, metadata, family, prior_edits', [
     ('y ~ x', [], getfamily('Bernoulli'), []),
