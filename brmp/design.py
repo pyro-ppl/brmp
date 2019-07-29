@@ -485,14 +485,14 @@ def designmatrix_metadata(terms, metadata):
 
 DesignMeta = namedtuple('DesignMeta', 'population groups')
 PopulationMeta = namedtuple('PopulationMeta', 'coefs')
-GroupMeta = namedtuple('GroupMeta', 'name coefs')
+GroupMeta = namedtuple('GroupMeta', 'columns coefs')
 
 def designmatrices_metadata(formula, metadata):
     assert type(formula) == Formula
     assert type(metadata) == dict
     assert set(allfactors(formula)).issubset(set(metadata.keys()))
     p = PopulationMeta(designmatrix_metadata(formula.terms, metadata))
-    gs = [GroupMeta(group.column, designmatrix_metadata(group.terms, metadata))
+    gs = [GroupMeta(group.columns, designmatrix_metadata(group.terms, metadata))
           for group in formula.groups]
     return DesignMeta(p, gs)
 
@@ -531,7 +531,8 @@ def predictors(formula, df):
     data['X'] = designmatrix(formula.terms, df)
     for i, group in enumerate(formula.groups):
         data['Z_{}'.format(i)] = designmatrix(group.terms, df)
-        data['J_{}'.format(i)] = lookupvector(group.column, df)
+        assert len(group.columns) == 1, 'grouping on multiple factors not supported'
+        data['J_{}'.format(i)] = lookupvector(group.columns[0], df)
     return data
 
 def makedata(formula, df):

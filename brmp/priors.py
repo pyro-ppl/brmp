@@ -113,12 +113,12 @@ def default_prior(formula, design_metadata, family):
     # `metadata` s.t.:
     # `design_metadata = designmatrices_metadata(formula, metadata)`
     # This sanity checks the these two agree about which groups are present.
-    assert all(meta.name == group.column
+    assert all(meta.columns == group.columns
                for (meta, group)
                in zip(design_metadata.groups, formula.groups))
     b_children = [leaf(name) for name in design_metadata.population.coefs]
-    cor_children = [leaf(group.column) for group in formula.groups if group.corr and len(group.terms) > 1]
-    sd_children = [Node(gm.name, None, False, [], [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
+    cor_children = [leaf(cols2str(group.columns)) for group in formula.groups if group.corr and len(group.terms) > 1]
+    sd_children = [Node(cols2str(gm.columns), None, False, [], [leaf(name) for name in gm.coefs]) for gm in design_metadata.groups]
 
     def mk_resp_prior_edit(param_name, family_name):
         prior = get_response_prior(family_name, param_name)
@@ -132,6 +132,10 @@ def default_prior(formula, design_metadata, family):
         Node('sd',   PriorEdit(('sd',),  prior('HalfCauchy', [3.])), False, [chk_support(Type['PosReal']())], sd_children),
         Node('cor',  PriorEdit(('cor',), prior('LKJ', [1.])),        False, [chk_lkj],                        cor_children),
         Node('resp', None,                                           False, [],                               resp_children)])
+
+def cols2str(cols):
+    return ':'.join(cols)
+
 
 def customize_prior(tree, prior_edits):
     assert type(tree) == Node

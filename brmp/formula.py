@@ -81,7 +81,7 @@ Formula = namedtuple('Formula',
 
 Group = namedtuple('Group',
                    ['terms',        # an OrderedSet of group-level terms
-                    'column',       # name of grouping column
+                    'columns',      # names of grouping columns
                     'corr'])        # model correlation between coeffs?
 
 
@@ -97,7 +97,7 @@ def allfactors(formula):
         return join(list(term.factors) for term in terms)
     return ([formula.response] +
             all_from_terms(formula.terms) +
-            join(all_from_terms(group.terms) + [group.column] for group in formula.groups))
+            join(all_from_terms(group.terms) + group.columns for group in formula.groups))
 
 def tokenize(inp):
     return [str2token(s) for s in re.findall(r'\b\w+\b|[()~+:]|\|\|?', inp)]
@@ -185,17 +185,27 @@ def eval_rhs(ast, allow_groups=True):
                  for tl, tr in itertools.product(termsl, termsr)]
         return OrderedSet(*terms), []
     elif type(ast) == Node and ast.op in ['|', '||'] and allow_groups:
-        # This fails when the rhs is not a single variable/term.
-        # TODO: This can fail in regular use. Turn into friendly error msg.
-        assert type(ast.r) == Leaf
-        group_factor = ast.r.value
+        group_factors = eval_group_rhs(ast.r)
         # Nesting of groups is not allowed.
         terms, groups = eval_rhs(ast.l, allow_groups=False)
         assert len(groups) == 0
-        return OrderedSet(), [Group(terms, group_factor, ast.op == '|')]
+        return OrderedSet(), [Group(terms, group_factors, ast.op == '|')]
     else:
         # This if/else is not exhaustive, this can occur in regular
         # use. e.g. When nested groups are present.
+        raise Exception('unhandled ast')
+
+# Evaluate the expression to the right of the `|` or `||` in a group
+# to a list of factor names.
+# e.g. `a:b:c` -> ['a', 'b', 'c']
+def eval_group_rhs(ast):
+    if type(ast) == Leaf:
+        return [ast.value]
+    elif type(ast) == Node and ast.op == ':':
+        return eval_group_rhs(ast.l) + eval_group_rhs(ast.r)
+    else:
+        # TODO: Better error. Catch and re-throw within `eval_rhs` so
+        # that the whole group can be included in the message?
         raise Exception('unhandled ast')
 
 # Evaluate a formula of the form `y ~ <rhs>`, where the rhs is a sum
