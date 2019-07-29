@@ -522,6 +522,18 @@ def test_prior_checks(formula_str, metadata, family, prior_edits, expected_error
                             [1., 0.],
                             [1., 1.]]))),
 
+    # The matches brms modulo 0 vs. 1 based indexing.
+    ('y ~ 1 | a:b:c',
+     pd.DataFrame(dict(y=[1., 2., 3.],
+                       a=pd.Categorical([0, 0, 1]),
+                       b=pd.Categorical([2, 1, 0]),
+                       c=pd.Categorical([0, 1, 2]))),
+     dict(X=np.array([[], [], []]),
+          y_obs=np.array([1., 2., 3.]),
+          J_0=np.array([1, 0, 2]),
+          Z_0=np.array([[1.], [1.], [1.]]))),
+
+
     # Interactions
     # --------------------------------------------------
     ('y ~ x1:x2',
