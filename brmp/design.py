@@ -562,21 +562,14 @@ def lookupvector(columns, df):
     assert type(columns) == list
     assert all(type(col) == str for col in columns)
     assert type(df) == pd.DataFrame
-    assert all(col in df and is_categorical_dtype(df[col]) for col in columns)
-    all_possible_vals = list(itertools.product(*[df[col].cat.categories for col in columns]))
-    vals = [tuple(row) for _,row in df[columns].iterrows()]
-    present = set(vals)
-    # A list of those combinations of grouping column values that
-    # actually appear in the data. (Ordered according to the Cartesian
-    # product.)
-    #
+    metadata = metadata_from_df(df)
     # TODO: Perhaps better to use a dictionary in case the number of
     # combinations present in the data becomes large.
-    table = [val for val in all_possible_vals if val in present]
+    table = metadata.levels(columns)
     # For each row in the data, look up its combination of grouping
     # columns values in the table, using the position of the matching
     # row as the index.
-    indices = [table.index(val) for val in vals]
+    indices = [table.index(tuple(row)) for _,row in df[columns].iterrows()]
     return np.array(indices, dtype=np.int64)
 
 def responsevector(column, df):
