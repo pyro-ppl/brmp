@@ -47,7 +47,7 @@ def check_family_matches_response(formula, metadata, family):
 # Abstract model description.
 ModelDesc = namedtuple('ModelDesc', 'population groups response')
 Population = namedtuple('Population', 'coefs priors')
-Group = namedtuple('Group', 'factor coefs sd_priors corr_prior')
+Group = namedtuple('Group', 'factor_names levels coefs sd_priors corr_prior')
 Response = namedtuple('Response', 'family nonlocparams priors')
 
 def build_model(formula, prior_tree, family, metadata):
@@ -75,16 +75,26 @@ def build_model(formula, prior_tree, family, metadata):
     # Groups
     groups = []
 
+
     for node in select(prior_tree, ('sd',)).children:
 
-        assert type(metadata.column(node.name)) == Categorical, 'group column must be a factor'
+        # TODO: It's unpleasant to have to do this deserializaton.
+        # (Splitting on ":".) The problem is that we only get the
+        # prior tree here, and the prior tree needs to serialize the
+        # factor names in order to allow priors to be specified. Once
+        # design meta data is renamed to `ModelDescPre` or similar, it
+        # will it seem natural to pass that in here (along with the
+        # prior tree), at which point it will be more convenient to
+        # grab the group's factor names from there.
+        cols = node.name.split(':')
+        assert all(type(metadata.column(col)) == Categorical for col in cols), 'grouping columns must be a factor'
 
         sd_coefs, sd_priors = unzip([(n.name, n.prior_edit.prior) for n in node.children])
 
         corr_node = tryselect(prior_tree, ('cor', node.name))
         corr_prior = None if corr_node is None else corr_node.prior_edit.prior
 
-        group = Group(metadata.column(node.name), sd_coefs, sd_priors, corr_prior)
+        group = Group(cols, metadata.levels(cols), sd_coefs, sd_priors, corr_prior)
         # Assert invariants.
         assert len(group.coefs) == len(group.sd_priors)
         assert group.corr_prior is None or type(group.corr_prior) == Family
@@ -114,7 +124,7 @@ def model_repr(model):
         write('=' * 40)
         write('Group {}'.format(i))
         write('-' * 40)
-        write('Factor: {}\nNum Levels: {}'.format(group.factor.name, len(group.factor.levels)))
+        write('Factors: {}\nNum Levels: {}'.format(', '.join(group.factor_names), len(group.levels)))
         write('Corr. Prior: {}'.format(None if group.corr_prior is None else family_repr(group.corr_prior)))
         write('S.D. Priors:')
         for (coef, sd_prior) in zip(group.coefs, group.sd_priors):
@@ -145,7 +155,7 @@ def parameter_names(model):
 def parameters(model):
     assert type(model) == ModelDesc
     return ([Parameter('b', (len(model.population.coefs),))] +
-            [Parameter('r_{}'.format(i), (len(group.factor.levels), len(group.coefs)))
+            [Parameter('r_{}'.format(i), (len(group.levels), len(group.coefs)))
              for i, group in enumerate(model.groups)] +
             [Parameter('sd_{}'.format(i), (len(group.coefs),))
              for i, group in enumerate(model.groups)] +
@@ -164,10 +174,10 @@ def scalar_parameter_map(model):
     out = [('b_{}'.format(coef), ('b', (i,)))
            for i, coef in enumerate(model.population.coefs)]
     for ix, group in enumerate(model.groups):
-        out.extend([('sd_{}__{}'.format(group.factor.name, coef), ('sd_{}'.format(ix), (i,)))
+        out.extend([('sd_{}__{}'.format(':'.join(group.factor_names), coef), ('sd_{}'.format(ix), (i,)))
                     for i, coef in enumerate(group.coefs)])
-        out.extend([('r_{}[{},{}]'.format(group.factor.name, level, coef), ('r_{}'.format(ix), (i, j)))
-                    for i, level in enumerate(group.factor.levels)
+        out.extend([('r_{}[{},{}]'.format(':'.join(group.factor_names), '_'.join(level), coef), ('r_{}'.format(ix), (i, j)))
+                    for i, level in enumerate(group.levels)
                     for j, coef in enumerate(group.coefs)])
     for param in model.response.nonlocparams:
         out.append((param.name, (param.name, (0,))))

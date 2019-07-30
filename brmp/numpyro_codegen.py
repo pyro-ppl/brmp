@@ -124,13 +124,13 @@ def gengroup(i, group):
     assert type(group) == Group
 
     code = ['']
-    code.append(comment('Group {}: factor={}'.format(i, group.factor.name)))
+    code.append(comment('Group {}: factor={}'.format(i, ':'.join(group.factor_names))))
 
     # The number of coefficients per level.
     M_i = len(group.coefs)
 
     # The number of levels.
-    N_i = len(group.factor.levels)
+    N_i = len(group.levels)
 
     # This follows the names used in brms.
     code.append('M_{} = {} # Number of coeffs'.format(i, M_i))
