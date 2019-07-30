@@ -2,13 +2,13 @@ from collections import namedtuple
 
 from pyro.contrib.brm.utils import unzip
 from .formula import Formula
-from .design import RealValued, Categorical, Integral
+from .design import Metadata, RealValued, Categorical, Integral
 from .family import Family, Type, nonlocparams, support_depends_on_args, args, family_repr
 from .priors import select, tryselect, Node
 
 def family_matches_response(formula, metadata, family):
     assert type(formula) == Formula
-    assert type(metadata) == dict
+    assert type(metadata) == Metadata
     assert type(family) == Family
     # I don't think there is any way for this not to hold with the
     # present system. However, it /could/ arise if it were possible to
@@ -16,7 +16,7 @@ def family_matches_response(formula, metadata, family):
     # for example. Because this holds we know we can safely
     # call`family.support` with zero args below.
     assert not support_depends_on_args(family)
-    factor = metadata[formula.response]
+    factor = metadata.column(formula.response)
     if type(family.support()) == Type['Real']:
         return type(factor) == RealValued
     elif type(family.support()) == Type['Boolean']:
@@ -27,7 +27,7 @@ def family_matches_response(formula, metadata, family):
         else:
             return False
     elif (type(family.support()) == Type['IntegerRange']):
-        factor = metadata[formula.response]
+        factor = metadata.column(formula.response)
         return (type(factor) == Integral and
                 (family.support().lb is None or factor.min >= family.support().lb) and
                 (family.support().ub is None or factor.max <= family.support().ub))
@@ -35,6 +35,7 @@ def family_matches_response(formula, metadata, family):
         return False
 
 def check_family_matches_response(formula, metadata, family):
+    assert type(metadata) == Metadata
     if not family_matches_response(formula, metadata, family):
         # TODO: This could be more informative. e.g. If choosing
         # Bernoulli fails, is the problem that the response is
@@ -49,11 +50,11 @@ Population = namedtuple('Population', 'coefs priors')
 Group = namedtuple('Group', 'factor coefs sd_priors corr_prior')
 Response = namedtuple('Response', 'family nonlocparams priors')
 
-def build_model(formula, prior_tree, family, dfmetadata):
+def build_model(formula, prior_tree, family, metadata):
     assert type(formula) == Formula
     assert type(prior_tree) == Node
     assert type(family) == Family
-    assert type(dfmetadata) == dict
+    assert type(metadata) == Metadata
 
     # TODO: `formula` is only used in order to perform the following
     # check. Internally, the information about the response column
@@ -62,7 +63,7 @@ def build_model(formula, prior_tree, family, dfmetadata):
     # Alternatively, perhaps it makes sense for this information could
     # be incorporated in design meta, or otherwise included in one of
     # the args. already received.
-    check_family_matches_response(formula, dfmetadata, family)
+    check_family_matches_response(formula, metadata, family)
 
     # Population-level
     node = select(prior_tree, ('b',))
@@ -76,14 +77,14 @@ def build_model(formula, prior_tree, family, dfmetadata):
 
     for node in select(prior_tree, ('sd',)).children:
 
-        assert node.name in dfmetadata, 'group column must be a factor'
+        assert type(metadata.column(node.name)) == Categorical, 'group column must be a factor'
 
         sd_coefs, sd_priors = unzip([(n.name, n.prior_edit.prior) for n in node.children])
 
         corr_node = tryselect(prior_tree, ('cor', node.name))
         corr_prior = None if corr_node is None else corr_node.prior_edit.prior
 
-        group = Group(dfmetadata[node.name], sd_coefs, sd_priors, corr_prior)
+        group = Group(metadata.column(node.name), sd_coefs, sd_priors, corr_prior)
         # Assert invariants.
         assert len(group.coefs) == len(group.sd_priors)
         assert group.corr_prior is None or type(group.corr_prior) == Family

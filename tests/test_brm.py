@@ -13,7 +13,7 @@ import numpyro.handlers as numpyro
 
 from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.design import dummy_design, Categorical, RealValued, Integral, makedata, make_metadata_lookup, designmatrix_metadata, designmatrices_metadata, CategoricalCoding, NumericCoding, code_terms, dummy_df
+from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata, designmatrix_metadata, designmatrices_metadata, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_cols, make_column_lookup
 from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
 from pyro.contrib.brm.model import build_model, parameters, scalar_parameter_map
@@ -32,11 +32,13 @@ default_params = dict(
     LKJ        = dict(eta=1.),
 )
 
-def build_metadata(formula, metadata):
-    # Helper that assumes that any factors not mentioned in the
-    # metadata given with the test definition are real-valued.
-    default_metadata = make_metadata_lookup([RealValued(factor) for factor in allfactors(formula)])
-    return dict(default_metadata, **make_metadata_lookup(metadata))
+# Makes list of columns metadata that includes an entry for every
+# factor in `formula`. Any column not already in `cols` is assumed to
+# be `RealValued`.
+def expand_columns(formula, cols):
+    lookup = make_column_lookup(cols)
+    return [lookup.get(factor, RealValued(factor))
+            for factor in allfactors(formula)]
 
 codegen_cases = [
     # TODO: This (and similar examples below) can't be expressed with
@@ -212,13 +214,13 @@ codegen_cases = [
 ]
 
 # TODO: Extend this. Could check that the response is observed?
-@pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', codegen_cases)
-def test_pyro_codegen(formula_str, metadata, family, prior_edits, expected):
+@pytest.mark.parametrize('formula_str, non_real_cols, family, prior_edits, expected', codegen_cases)
+def test_pyro_codegen(formula_str, non_real_cols, family, prior_edits, expected):
     # Make dummy data.
     N = 5
     formula = parse(formula_str)
-    metadata = build_metadata(formula, metadata)
-    df = dummy_df(metadata, N)
+    cols = expand_columns(formula, non_real_cols)
+    df = dummy_df(cols, N)
 
     # Define model.
     model = defm(formula_str, df, family, prior_edits)
@@ -243,13 +245,13 @@ def test_pyro_codegen(formula_str, metadata, family, prior_edits, expected):
 def unwrapfn(fn):
     return unwrapfn(fn.base_dist) if type(fn) == Independent else fn
 
-@pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', codegen_cases)
-def test_numpyro_codegen(formula_str, metadata, family, prior_edits, expected):
+@pytest.mark.parametrize('formula_str, non_real_cols, family, prior_edits, expected', codegen_cases)
+def test_numpyro_codegen(formula_str, non_real_cols, family, prior_edits, expected):
     # Make dummy data.
     N = 5
     formula = parse(formula_str)
-    metadata = build_metadata(formula, metadata)
-    df = dummy_df(metadata, N)
+    cols = expand_columns(formula, non_real_cols)
+    df = dummy_df(cols, N)
 
     # Define model.
     model = defm(formula_str, df, family, prior_edits)
@@ -298,14 +300,14 @@ def test_numpyro_codegen(formula_str, metadata, family, prior_edits, expected):
 @pytest.mark.parametrize('backend', [pyro_backend, numpyro_backend])
 def test_expected_response_codegen(response_meta, family, args, expected, backend):
     formula = parse('y ~ 1')
-    desc = makedesc(formula, [response_meta], family, [])
+    desc = makedesc(formula, metadata_from_cols([response_meta]), family, [])
     def expected_response(*args):
         backend_args = [backend.from_numpy(arg) for arg in args]
         fn = backend.gen(desc).expected_response_fn
         return backend.to_numpy(fn(*backend_args))
     assert_equal(expected_response(*args), expected)
 
-@pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected', codegen_cases)
+@pytest.mark.parametrize('formula_str, non_real_cols, family, prior_edits, expected', codegen_cases)
 @pytest.mark.parametrize('fitargs', [
     dict(backend=pyro_backend, iter=1, warmup=0),
     dict(backend=pyro_backend, algo='svi', iter=1, num_samples=1),
@@ -315,12 +317,12 @@ def test_expected_response_codegen(response_meta, family, args, expected, backen
         dict(backend=numpyro_backend, iter=1, warmup=0),
         marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow'))
 ])
-def test_parameter_shapes(formula_str, metadata, family, prior_edits, expected, fitargs):
+def test_parameter_shapes(formula_str, non_real_cols, family, prior_edits, expected, fitargs):
     # Make dummy data.
     N = 5
     formula = parse(formula_str)
-    metadata = build_metadata(formula, metadata)
-    df = dummy_df(metadata, N)
+    cols = expand_columns(formula, non_real_cols)
+    df = dummy_df(cols, N)
 
     # Define model, and generate a single posterior sample.
     model = defm(formula_str, df, family, prior_edits)
@@ -339,12 +341,12 @@ def test_parameter_shapes(formula_str, metadata, family, prior_edits, expected, 
 
 def test_scalar_param_map_consistency():
     formula = parse('y ~ 1 + x1 + (1 + x2 + b | a)')
-    metadata = [
+    non_real_cols = [
         Categorical('a', ['a1', 'a2', 'a3']),
         Categorical('b', ['b1', 'b2', 'b3']),
     ]
-    metadata = build_metadata(formula, metadata)
-    desc = makedesc(formula, list(metadata.values()), getfamily('Normal'), [])
+    cols = expand_columns(formula, non_real_cols)
+    desc = makedesc(formula, metadata_from_cols(cols), getfamily('Normal'), [])
     params = parameters(desc)
     spmap = scalar_parameter_map(desc)
 
@@ -375,7 +377,7 @@ def test_scalar_param_map_consistency():
         assert all(i < s for (i, s) in zip(indices, param_shape))
 
 
-@pytest.mark.parametrize('formula_str, metadata, family, prior_edits', [
+@pytest.mark.parametrize('formula_str, non_real_cols, family, prior_edits', [
     ('y ~ x', [], getfamily('Bernoulli'), []),
     ('y ~ x', [Integral('y', min=0, max=2)], getfamily('Bernoulli'), []),
     ('y ~ x', [Categorical('y', list('abc'))], getfamily('Bernoulli'), []),
@@ -389,16 +391,17 @@ def test_scalar_param_map_consistency():
      []),
     ('y ~ x', [Categorical('y', list('abc'))], apply(getfamily('Binomial'), num_trials=1), []),
 ])
-def test_family_and_response_type_checks(formula_str, metadata, family, prior_edits):
+def test_family_and_response_type_checks(formula_str, non_real_cols, family, prior_edits):
     formula = parse(formula_str)
-    metadata = build_metadata(formula, metadata)
+    cols = expand_columns(formula, non_real_cols)
+    metadata = metadata_from_cols(cols)
     design_metadata = designmatrices_metadata(formula, metadata)
     prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
     with pytest.raises(Exception, match='not compatible'):
         model = build_model(formula, prior_tree, family, metadata)
 
 
-@pytest.mark.parametrize('formula_str, metadata, family, prior_edits, expected_error', [
+@pytest.mark.parametrize('formula_str, non_real_cols, family, prior_edits, expected_error', [
     ('y ~ x',
      [],
      getfamily('Normal'),
@@ -425,9 +428,10 @@ def test_family_and_response_type_checks(formula_str, metadata, family, prior_ed
      [],
      r'(?i)prior missing'),
 ])
-def test_prior_checks(formula_str, metadata, family, prior_edits, expected_error):
+def test_prior_checks(formula_str, non_real_cols, family, prior_edits, expected_error):
     formula = parse(formula_str)
-    metadata = build_metadata(formula, metadata)
+    cols = expand_columns(formula, non_real_cols)
+    metadata = metadata_from_cols(cols)
     design_metadata = designmatrices_metadata(formula, metadata)
     with pytest.raises(Exception, match=expected_error):
         build_prior_tree(formula, design_metadata, family, prior_edits)
@@ -662,7 +666,7 @@ def test_parser(formula_str, expected_formula):
 def mkcat(factor, num_levels):
     return Categorical(factor, levels=['{}{}'.format(factor, i+1) for i in range(num_levels)])
 
-@pytest.mark.parametrize('formula_str, metadata, expected_coding', [
+@pytest.mark.parametrize('formula_str, non_real_cols, expected_coding', [
     ('y ~ 1', [],
      [
          [] # intercept
@@ -732,13 +736,14 @@ def mkcat(factor, num_levels):
          [NumericCoding('x1'), CategoricalCoding('a', False), CategoricalCoding('b', False)],
      ])
 ])
-def test_coding(formula_str, metadata, expected_coding):
+def test_coding(formula_str, non_real_cols, expected_coding):
     formula = parse(formula_str)
-    metadata = build_metadata(formula, metadata)
+    cols = expand_columns(formula, non_real_cols)
+    metadata = metadata_from_cols(cols)
     assert code_terms(formula.terms, metadata) == expected_coding
 
 
-@pytest.mark.parametrize('formula_str, metadata, expected_names', [
+@pytest.mark.parametrize('formula_str, non_real_cols, expected_names', [
     # This is based on an example in the Patsy docs:
     # https://patsy.readthedocs.io/en/latest/formulas.html#from-terms-to-matrices
     ('y ~ 1 + x1:x2 + a:b + b + x1:a:b + a + x2:a:x1',
@@ -746,9 +751,10 @@ def test_coding(formula_str, metadata, expected_coding):
      ['intercept', 'b[b2]', 'a[a2]', 'a[a2]:b[b2]', 'x1:x2', 'x2:a[a2]:x1',
       'x1:a[a1]:b[b1]', 'x1:a[a2]:b[b1]', 'x1:a[a1]:b[b2]', 'x1:a[a2]:b[b2]'])
 ])
-def test_coef_names(formula_str, metadata, expected_names):
+def test_coef_names(formula_str, non_real_cols, expected_names):
     formula = parse(formula_str)
-    metadata = build_metadata(formula, metadata)
+    cols = expand_columns(formula, non_real_cols)
+    metadata = metadata_from_cols(cols)
     assert designmatrix_metadata(formula.terms, metadata) == expected_names
 
 
@@ -766,10 +772,10 @@ def test_coef_names(formula_str, metadata, expected_names):
 def test_marginals_fitted_smoke(fitargs):
     N = 10
     S = 4
-    metadata_lu = make_metadata_lookup([RealValued('y'),
-                                        RealValued('x'),
-                                        Categorical('a', list('ab'))])
-    df = dummy_df(metadata_lu, N)
+    cols = [RealValued('y'),
+            RealValued('x'),
+            Categorical('a', list('ab'))]
+    df = dummy_df(cols, N)
     fit = defm('y ~ 1 + x + (1 | a)', df).fit(**fitargs(S))
     def chk(arr, expected_shape):
         assert np.all(np.isfinite(arr))
@@ -781,5 +787,5 @@ def test_marginals_fitted_smoke(fitargs):
     chk(fitted(fit, 'sample'), (S, N))
     # Applying `fitted` to new data.
     N2 = 8
-    df2 = dummy_df(metadata_lu, N2)
+    df2 = dummy_df(cols, N2)
     chk(fitted(fit, data=df2), (S, N2))

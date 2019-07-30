@@ -13,13 +13,6 @@ from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula, OrderedSet, Term, allfactors
 
 
-def make_metadata_lookup(metadata):
-    assert type(metadata) == list
-    assert all(type(factor) in [Categorical, Integral, RealValued] for factor in metadata)
-    # Turn a list of factors into a dictionary keyed by column name.
-    return dict((factor.name, factor) for factor in metadata)
-
-
 # TODO: Levels of pandas categorical columns can be any hashable type
 # I think. Is our implementation flexible enough to handle the same?
 # If not, we ought to check the type here and throw an error when it's
@@ -58,25 +51,90 @@ def dfmetadata(df):
             raise Exception('unhandled column type encountered for column "{}"'.format(dfcol.name))
     return [dfcol2meta(df[c]) for c in df]
 
-def dummy_df(metadata, N):
-    assert type(metadata) == dict
+# TODO: This is rather a long way from idiomatic Python code.
+# Re-implement Metadata as a class, perhaps with subclasses for
+# instances from df vs. manually specified columns.
+
+# I only know for sure that I'll need the *number* of levels, and not
+# a list of the all of the levels themselves. However, I suspect this
+# *will* be useful when it comes to checking that and "new data" given
+# to `fitted` is compatible with the model/previous data. If this
+# turns out not to be the case, I might want to change this.
+
+# columns: A list of RealValued, Categorical, Integral values.
+#
+# column: Find a single column from columns by name.
+#
+# levels: Given a list of categorical column names, returns all of the
+# combinations of the individual column levels that actually appear in
+# the data. These are ordered according to the Cartesian product of
+# the individual column levels.
+#
+Metadata = namedtuple('Metadata', 'columns column levels')
+
+def make_column_lookup(columns):
+    assert type(columns) == list
+    assert all(type(col) in [Categorical, Integral, RealValued] for col in columns)
+    # Turn a list of columns into a dictionary keyed by column name.
+    return dict((col.name, col) for col in columns)
+
+def df_levels(columns, df):
+    assert type(columns) == list
+    assert all(type(col) == str for col in columns)
+    assert type(df) == pd.DataFrame
+    assert all(col in df and is_categorical_dtype(df[col]) for col in columns)
+    vals = [tuple(row) for _,row in df[columns].iterrows()]
+    present = set(vals)
+    all_possible_vals = list(itertools.product(*[df[col].cat.categories for col in columns]))
+    table = [val for val in all_possible_vals if val in present]
+    return table
+
+def metadata_from_df(df):
+    assert type(df) == pd.DataFrame
+    cols = dfmetadata(df)
+    lu = make_column_lookup(cols)
+    return Metadata(cols, lambda name: lu[name], lambda names: df_levels(names, df))
+
+def all_levels(names, metadata_lookup):
+    assert type(names) == list
+    assert all(type(name) == str for name in names)
+    assert type(metadata_lookup) == dict
+    assert all(name in metadata_lookup and type(metadata_lookup[name]) == Categorical for name in names)
+    all_possible_vals = list(itertools.product(*[metadata_lookup[name].levels for name in names]))
+    return all_possible_vals
+
+# Makes the assumption that all possible levels are present. The idea
+# is that this is sufficient to allow us to generate model code from
+# only a description of the columns, even when there's a `g1:g2` like
+# grouping term in the model. However, there's no gaurentee that a
+# random data frame generated from this will contain all of these
+# levels.
+def metadata_from_cols(cols):
+    assert type(cols) == list
+    assert all(type(col) in [RealValued, Integral, Categorical] for col in cols)
+    lu = make_column_lookup(cols)
+    return Metadata(cols, lambda name: lu[name], lambda names: all_levels(names, lu))
+
+
+def dummy_df(cols, N):
+    assert type(cols) == list
+    assert all(type(col) in [RealValued, Categorical, Integral] for col in cols)
     def gen_numeric_col():
         return np.random.rand(N)
     def gen_categorical_col(levels):
         return pd.Categorical(random.choices(levels, k=N))
     def gen_integral_col(factor):
         return np.random.randint(factor.min, factor.max + 1, N)
-    def dispatch(factor):
-        if type(metadata[factor]) == RealValued:
+    def dispatch(col):
+        if type(col) == RealValued:
             return gen_numeric_col()
-        elif type(metadata[factor]) == Categorical:
-            return gen_categorical_col(metadata[factor].levels)
-        elif type(metadata[factor]) == Integral:
-            return gen_integral_col(metadata[factor])
+        elif type(col) == Categorical:
+            return gen_categorical_col(col.levels)
+        elif type(col) == Integral:
+            return gen_integral_col(col)
         else:
             raise Exception('unknown factor type')
-    cols = {factor: dispatch(factor) for factor in metadata}
-    return pd.DataFrame(cols)
+    return pd.DataFrame({col.name: dispatch(col) for col in cols})
 
 def dummy_design(formula, metadata, N):
     assert type(formula) == Formula
@@ -287,10 +345,10 @@ def group(pairs):
 # resulting groups.
 def partition_terms(terms, metadata):
     assert type(terms) == OrderedSet
-    assert type(metadata) == dict
+    assert type(metadata) == Metadata
 
     def numeric_factors(term):
-        factors = [f for f in term.factors if is_numeric_col(metadata[f])]
+        factors = [f for f in term.factors if is_numeric_col(metadata.column(f))]
         return OrderedSet(*factors)
 
     # The idea here is to store the full term (including the numeric
@@ -328,7 +386,7 @@ def partition_terms(terms, metadata):
 
 def designmatrix(terms, df):
     assert type(terms) == OrderedSet
-    metadata = make_metadata_lookup(dfmetadata(df))
+    metadata = metadata_from_df(df)
     coded_interactions = code_terms(terms, metadata)
     product_cols = join(coded_interaction_to_product_cols(code, metadata)
                         for code in coded_interactions)
@@ -351,6 +409,7 @@ def sort_by_order(terms):
     return sorted(terms, key=lambda term: len(term.factors))
 
 def code_terms(terms, metadata):
+    assert type(metadata) == Metadata
     groups = partition_terms(terms, metadata)
     return join(code_group_of_terms(sort_by_order(terms), shared_num_factors)
                 for shared_num_factors, terms in groups)
@@ -370,13 +429,13 @@ ProductCol = namedtuple('ProductCol', ['cols']) # `cols` is expected to be a lis
 
 def coded_interaction_to_product_cols(coded_interaction, metadata):
     assert type(coded_interaction) == list
-    assert type(metadata) == dict
+    assert type(metadata) == Metadata
     assert all(type(c) in [CategoricalCoding, NumericCoding] for c in coded_interaction)
 
     cs, ns = partition(lambda cf: type(cf) == NumericCoding, coded_interaction)
 
     def levels(c):
-        all_levels = metadata[c.factor].levels
+        all_levels = metadata.column(c.factor).levels
         return all_levels[1:] if c.reduced else all_levels
 
     interactions = product([[IndicatorCol(c.factor, level) for level in levels(c)] for c in cs])
@@ -477,6 +536,7 @@ def execute_product_col(product_col, df):
 
 def designmatrix_metadata(terms, metadata):
     assert type(terms) == OrderedSet
+    assert type(metadata) == Metadata
     coded_interactions = code_terms(terms, metadata)
     product_cols = join(coded_interaction_to_product_cols(code, metadata)
                         for code in coded_interactions)
@@ -489,8 +549,8 @@ GroupMeta = namedtuple('GroupMeta', 'columns coefs')
 
 def designmatrices_metadata(formula, metadata):
     assert type(formula) == Formula
-    assert type(metadata) == dict
-    assert set(allfactors(formula)).issubset(set(metadata.keys()))
+    assert type(metadata) == Metadata
+    assert set(allfactors(formula)).issubset(set(col.name for col in metadata.columns))
     p = PopulationMeta(designmatrix_metadata(formula.terms, metadata))
     gs = [GroupMeta(group.columns, designmatrix_metadata(group.terms, metadata))
           for group in formula.groups]
@@ -533,7 +593,7 @@ def responsevector(column, df):
         code = CategoricalCoding(column, True)
     else:
         raise Exception('Don\'t know how to code a response of this type.')
-    metadata = make_metadata_lookup(dfmetadata(df))
+    metadata = metadata_from_df(df)
     pcols = coded_interaction_to_product_cols([code], metadata)
     assert len(pcols) == 1
     return execute_product_col(pcols[0], df)

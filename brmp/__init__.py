@@ -1,7 +1,7 @@
 import pandas as pd
 
 from pyro.contrib.brm.formula import parse, Formula
-from pyro.contrib.brm.design import makedata, dfmetadata, make_metadata_lookup, designmatrices_metadata
+from pyro.contrib.brm.design import makedata, Metadata, metadata_from_df, designmatrices_metadata
 from pyro.contrib.brm.fit import Fit
 from pyro.contrib.brm.backend import Backend
 from pyro.contrib.brm.family import getfamily, Family
@@ -11,18 +11,17 @@ from pyro.contrib.brm.pyro_backend import backend as pyro_backend
 from pyro.contrib.brm.backend import data_from_numpy
 
 def makecode(formula, df, family, prior_edits, backend=pyro_backend):
-    desc = makedesc(formula, dfmetadata(df), family, prior_edits)
+    desc = makedesc(formula, metadata_from_df(df), family, prior_edits)
     return backend.gen(desc).code
 
-def makedesc(formula, df_metadata, family, prior_edits):
+def makedesc(formula, metadata, family, prior_edits):
     assert type(formula) == Formula
-    assert type(df_metadata) == list
+    assert type(metadata) == Metadata
     assert type(family) == Family
     assert type(prior_edits) == list
-    df_metadata_lu = make_metadata_lookup(df_metadata)
-    design_metadata = designmatrices_metadata(formula, df_metadata_lu)
+    design_metadata = designmatrices_metadata(formula, metadata)
     prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
-    return build_model(formula, prior_tree, family, df_metadata_lu)
+    return build_model(formula, prior_tree, family, metadata)
 
 def defm(formula_str, df, family=None, prior_edits=None):
     assert type(formula_str) == str
@@ -41,7 +40,7 @@ def defm(formula_str, df, family=None, prior_edits=None):
     #
     # Related: Perhaps design matrices ought to always have metadata
     # (i.e. column names) associated with them, as in Patsy. (This
-    desc = makedesc(formula, dfmetadata(df), family, prior_edits)
+    desc = makedesc(formula, metadata_from_df(df), family, prior_edits)
     data = makedata(formula, df)
     return DefmResult(formula, desc, data)
 
