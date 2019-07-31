@@ -105,6 +105,14 @@ codegen_cases = [
       ('sd_1_0', 'HalfCauchy', {}),
       ('L_1', 'LKJ', {})]),
 
+    ('y ~ 1 | a:b',
+     [Categorical('a', ['a1', 'a2']), Categorical('b', ['b1', 'b2'])],
+     getfamily('Normal'),
+     [],
+     [('sigma', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('sd_0_0', 'HalfCauchy', {})]),
+
     # Custom priors.
     ('y ~ 1 + x1 + x2',
      [],
@@ -169,6 +177,15 @@ codegen_cases = [
       ('sd_0_1', 'HalfCauchy', {}),
       ('z_0', 'Normal', {})]),
 
+    ('y ~ 1 + x || a:b',
+     [Categorical('a', ['a1', 'a2']), Categorical('b', ['b1', 'b2'])],
+     getfamily('Normal'),
+     [PriorEdit(('sd', 'a:b', 'intercept'), prior('HalfNormal', [4.]))],
+     [('sigma', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('sd_0_0', 'HalfNormal', {'scale': 4.}),
+      ('sd_0_1', 'HalfCauchy', {})]),
+
     # Prior on L.
     ('y ~ 1 + x2 | x1',
      [Categorical('x1', list('ab'))],
@@ -177,6 +194,15 @@ codegen_cases = [
      [('sigma', 'HalfCauchy', {}),
       ('sd_0_0', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
+      ('L_0', 'LKJ', {'eta': 2.})]),
+
+    ('y ~ 1 + x | a:b',
+     [Categorical('a', ['a1', 'a2']), Categorical('b', ['b1', 'b2'])],
+     getfamily('Normal'),
+     [PriorEdit(('cor', 'a:b'), prior('LKJ', [2.]))],
+     [('sigma', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('sd_0_0', 'HalfCauchy', {}),
       ('L_0', 'LKJ', {'eta': 2.})]),
 
     # Prior on parameter of response distribution.
@@ -340,7 +366,7 @@ def test_parameter_shapes(formula_str, non_real_cols, family, prior_edits, expec
 
 
 def test_scalar_param_map_consistency():
-    formula = parse('y ~ 1 + x1 + (1 + x2 + b | a)')
+    formula = parse('y ~ 1 + x1 + (1 + x2 + b | a) + (1 + x1 | a:b)')
     non_real_cols = [
         Categorical('a', ['a1', 'a2', 'a3']),
         Categorical('b', ['b1', 'b2', 'b3']),
