@@ -38,19 +38,6 @@ def is_numeric_col(col):
     assert type(col) in [Categorical, Integral, RealValued]
     return not type(col) == Categorical
 
-# Extract metadata from a pandas dataframe.
-def dfmetadata(df):
-    def dfcol2meta(dfcol):
-        if is_categorical_dtype(dfcol):
-            return Categorical(dfcol.name, list(dfcol.dtype.categories))
-        elif is_integer_dtype(dfcol):
-            return Integral(dfcol.name, min(dfcol), max(dfcol))
-        elif is_float_dtype(dfcol):
-            return RealValued(dfcol.name)
-        else:
-            raise Exception('unhandled column type encountered for column "{}"'.format(dfcol.name))
-    return [dfcol2meta(df[c]) for c in df]
-
 # TODO: This is rather a long way from idiomatic Python code.
 # Re-implement Metadata as a class, perhaps with subclasses for
 # instances from df vs. manually specified columns.
@@ -89,9 +76,22 @@ def df_levels(columns, df):
     table = [val for val in all_possible_vals if val in present]
     return table
 
+# Extract column information from a pandas dataframe.
+def dfcols(df):
+    def dispatch(dfcol):
+        if is_categorical_dtype(dfcol):
+            return Categorical(dfcol.name, list(dfcol.dtype.categories))
+        elif is_integer_dtype(dfcol):
+            return Integral(dfcol.name, min(dfcol), max(dfcol))
+        elif is_float_dtype(dfcol):
+            return RealValued(dfcol.name)
+        else:
+            raise Exception('unhandled column type encountered for column "{}"'.format(dfcol.name))
+    return [dispatch(df[c]) for c in df]
+
 def metadata_from_df(df):
     assert type(df) == pd.DataFrame
-    cols = dfmetadata(df)
+    cols = dfcols(df)
     lu = make_column_lookup(cols)
     return Metadata(cols, lambda name: lu[name], lambda names: df_levels(names, df))
 
