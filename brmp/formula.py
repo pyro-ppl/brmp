@@ -198,6 +198,8 @@ def eval_rhs(ast, allow_groups=True):
 # Evaluate the expression to the right of the `|` or `||` in a group
 # to a list of factor names.
 # e.g. `a:b:c` -> ['a', 'b', 'c']
+
+# TODO: Have `a:a` evaluate to `a`. (By using OrderedSet?)
 def eval_group_rhs(ast):
     if type(ast) == Leaf:
         return [ast.value]
