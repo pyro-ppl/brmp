@@ -26,6 +26,7 @@ Here are some example formulae that the system can handle:
 | `y ~ 1 + x0 + (x1 \| z)`                     | Group-level effects |
 | `y ~ 1 + x0 + (1 + x1 \| z)`                 ||
 | `y ~ 1 + x0 + (1 + x1 \|\| z)`               | No correlation between group coefficients |
+| `y ~ 1 + x0 + (1 + x1 \| z1:z2)`             | Grouping by multiple factors (untested) |
 | `y ~ 1 + x0 + (x1 \| z0) + (1 + x2 \|\| z1)` | Combinations of the above |
 
 
@@ -88,9 +89,11 @@ examples of using the system to fit some simple models.
 
 * All formula terms must be column names. Expressions such as
   `sin(x1)` or `I(x1*x2)` are not supported.
-* The group syntax `g1:g2` and `g1/g2` is not supported.
 * The `*` operator is not supported. (Though the model `y ~ 1 + x1*x2`
   can be specified with the formula `y ~ 1 + x1 + x2 + x1:x2`.)
+* The `/` operator is not supported. (Though the model `y ~ ... |
+  g1/g2` can be specified with the formula `y ~ (... | g1) + (... |
+  g1:g2)`.)
 * The syntax for removing columns is not supported. e.g. `y ~ x - 1`
 * The response is always uni-variate.
 * Parameters of the response distribution cannot take their values
