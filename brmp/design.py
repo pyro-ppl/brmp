@@ -369,15 +369,6 @@ def partition_terms(terms, metadata):
 # Build a simple design matrix (as a torch tensor) from columns of a
 # pandas data frame.
 
-# TODO: There ought to be a check somewhere to ensure that all terms
-# are either numeric or categorical. We're making this assumption in
-# `coding`, where anything not mentioned in dfmetadata(df) is assumed
-# to be numeric. But we can't check it there because we don't have a
-# concreate dataframe at that point. Here we have a list of terms and
-# the df, so this seems like a good place. An alternative is to do
-# this in makedata, but we'd need to do so for population and group
-# levels.
-
 # TODO: This could be generalised to work with a wider range of data
 # representation. Rather than expecting a pandas dataframe, it could
 # take a dictionary that gives access to the columns (iterables full
