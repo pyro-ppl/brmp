@@ -1,3 +1,4 @@
+from sys import stderr
 import time
 from functools import partial
 
@@ -190,9 +191,9 @@ def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None):
             # Sending the ANSI code to clear the line doesn't seem to
             # work in notebooks, so instead we pad the output with
             # enough spaces to ensure we overwrite all previous input.
-            print('\r{}'.format(out.ljust(max_out_len)), end='')
+            print('\r{}'.format(out.ljust(max_out_len)), end='', file=stderr)
             t0 = t1
-    print()
+    print(file=stderr)
 
     # We run the guide to generate traces from the (approx.)
     # posterior. We also run the model against those traces in order
