@@ -105,7 +105,7 @@ def fitted(fit, what='expectation', data=None):
     mu = location(fit.data if data is None
                   else data_from_numpy(fit.backend, predictors(fit.formula, data)))
 
-    if what == 'sample' or 'expectation':
+    if what == 'sample' or what == 'expectation':
         args = [mu if name == 'mu' else get_param(name)
                 for name in free_param_names(fit.model_desc.response.family)]
         response_fn = sample_response if what == 'sample' else expected_response
