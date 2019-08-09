@@ -4,7 +4,7 @@ from pyro.contrib.brm.formula import parse, Formula
 from pyro.contrib.brm.design import makedata, Metadata, metadata_from_df, designmatrices_metadata
 from pyro.contrib.brm.fit import Fit
 from pyro.contrib.brm.backend import Backend
-from pyro.contrib.brm.family import getfamily, Family
+from pyro.contrib.brm.family import Family, Normal
 from pyro.contrib.brm.priors import build_prior_tree
 from pyro.contrib.brm.model import build_model, model_repr
 from pyro.contrib.brm.pyro_backend import backend as pyro_backend
@@ -30,7 +30,7 @@ def defm(formula_str, df, family=None, prior_edits=None):
     assert type(df) == pd.DataFrame
     assert family is None or type(family) == Family
     assert prior_edits is None or type(prior_edits) == list
-    family = family or getfamily('Normal')
+    family = family or Normal
     prior_edits = prior_edits or []
     formula = parse(formula_str)
     # TODO: Both `makedata` and `designmatrices_metadata` call

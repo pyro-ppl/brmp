@@ -4,8 +4,8 @@ import pandas as pd
 from pyro.contrib.brm import makecode
 from pyro.contrib.brm.formula import parse
 from pyro.contrib.brm.design import makedata
-from pyro.contrib.brm.priors import prior, PriorEdit
-from pyro.contrib.brm.family import getfamily
+from pyro.contrib.brm.priors import PriorEdit
+from pyro.contrib.brm.family import Normal, Cauchy
 
 # --------------------------------------------------
 # Ex 1. Population-level effects only
@@ -20,7 +20,7 @@ df1a = pd.DataFrame(dict(y=[0., 1., 2.],
 
 # ... we can generate model code and a design matrix:
 
-print(makecode(parse(f1), df1a, getfamily('Normal'), []))
+print(makecode(parse(f1), df1a, Normal, []))
 # def model(X, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
@@ -49,7 +49,7 @@ print(makedata(parse(f1), df1a))
 df1b = pd.DataFrame(dict(y=[0., 0., 0.],
                          x=pd.Categorical(['a', 'b', 'c'])))
 
-print(makecode(parse(f1), df1b, getfamily('Normal'), []))
+print(makecode(parse(f1), df1b, Normal, []))
 # def model(X, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
@@ -84,7 +84,7 @@ df2 = pd.DataFrame(dict(y=[0., 1., 2.],
 
 # And the generated model code and design matrices etc.:
 
-print(makecode(parse(f2), df2, getfamily('Normal'), []))
+print(makecode(parse(f2), df2, Normal, []))
 # def model(X, Z_0, J_0, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]
@@ -154,15 +154,15 @@ df1a = pd.DataFrame(dict(y=[0., 1., 2.],
 priors3 = [
     # All population-level coefficients should use a `Normal(0, 10)`
     # prior.
-    PriorEdit(('b',), prior('Normal', [0., 10.])),
+    PriorEdit(('b',), Normal(0., 10.)),
     # The intercept coefficient should use a `Cauchy(0, 100)` prior.
     # This takes precedence over the less specific request above.
-    PriorEdit(('b', 'intercept'), prior('Cauchy', [0., 100.])),
+    PriorEdit(('b', 'intercept'), Cauchy(0., 100.)),
 ]
 
 # Here's the code this generates:
 
-print(makecode(parse(f3), df1a, getfamily('Normal'), priors3))
+print(makecode(parse(f3), df1a, Normal, priors3))
 # def model(X, y_obs=None):
 #     assert type(X) == torch.Tensor
 #     N = X.shape[0]

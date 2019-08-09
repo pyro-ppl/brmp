@@ -14,8 +14,8 @@ import numpyro.handlers as numpyro
 from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
 from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata, designmatrix_metadata, designmatrices_metadata, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_cols, make_column_lookup
-from pyro.contrib.brm.priors import prior, PriorEdit, get_response_prior, build_prior_tree
-from pyro.contrib.brm.family import Family, getfamily, FAMILIES, Type, apply
+from pyro.contrib.brm.priors import PriorEdit, get_response_prior, build_prior_tree
+from pyro.contrib.brm.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ
 from pyro.contrib.brm.model import build_model, parameters, scalar_parameter_map
 from pyro.contrib.brm.fit import marginals, fitted, param_marginal
 from pyro.contrib.brm.pyro_backend import backend as pyro_backend
@@ -46,22 +46,22 @@ codegen_cases = [
     # these be dropped?
     #(Formula('y', [], []), [], [], ['sigma']),
 
-    ('y ~ 1 + x', [], getfamily('Normal'), [],
+    ('y ~ 1 + x', [], Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {})]),
 
     # Integer valued predictor.
-    ('y ~ 1 + x', [Integral('x', min=0, max=10)], getfamily('Normal'), [],
+    ('y ~ 1 + x', [Integral('x', min=0, max=10)], Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {})]),
 
-    ('y ~ 1 + x1 + x2', [], getfamily('Normal'), [],
+    ('y ~ 1 + x1 + x2', [], Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {})]),
 
     ('y ~ x1:x2',
      [Categorical('x1', list('ab')), Categorical('x2', list('cd'))],
-     getfamily('Normal'), [],
+     Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {})]),
 
@@ -69,24 +69,24 @@ codegen_cases = [
     # Groups with fewer than two terms don't sample the (Cholesky
     # decomp. of the) correlation matrix.
     #(Formula('y', [], [Group([], 'z', True)]), [Categorical('z', list('ab'))], [], ['sigma', 'z_1']),
-    ('y ~ 1 | z', [Categorical('z', list('ab'))], getfamily('Normal'), [],
+    ('y ~ 1 | z', [Categorical('z', list('ab'))], Normal, [],
      [('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
       ('sd_0_0', 'HalfCauchy', {})]),
 
-    ('y ~ x | z', [Categorical('z', list('ab'))], getfamily('Normal'), [],
+    ('y ~ x | z', [Categorical('z', list('ab'))], Normal, [],
      [('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
       ('sd_0_0', 'HalfCauchy', {})]),
 
-    ('y ~ 1 + x1 + x2 + (1 + x3 | z)', [Categorical('z', list('ab'))], getfamily('Normal'), [],
+    ('y ~ 1 + x1 + x2 + (1 + x3 | z)', [Categorical('z', list('ab'))], Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
       ('sd_0_0', 'HalfCauchy', {}),
       ('L_0', 'LKJ', {})]),
 
-    ('y ~ 1 + x1 + x2 + (1 + x3 || z)', [Categorical('z', list('ab'))], getfamily('Normal'), [],
+    ('y ~ 1 + x1 + x2 + (1 + x3 || z)', [Categorical('z', list('ab'))], Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
@@ -94,7 +94,7 @@ codegen_cases = [
 
     ('y ~ 1 + x1 + x2 + (1 + x3 + x4 | z1) + (1 + x5 | z2)',
      [Categorical('z1', list('ab')), Categorical('z2', list('ab'))],
-     getfamily('Normal'),
+     Normal,
      [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {}),
@@ -107,7 +107,7 @@ codegen_cases = [
 
     ('y ~ 1 | a:b',
      [Categorical('a', ['a1', 'a2']), Categorical('b', ['b1', 'b2'])],
-     getfamily('Normal'),
+     Normal,
      [],
      [('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
@@ -116,23 +116,23 @@ codegen_cases = [
     # Custom priors.
     ('y ~ 1 + x1 + x2',
      [],
-     getfamily('Normal'),
-     [PriorEdit(('b',), prior('Normal', [0., 100.]))],
+     Normal,
+     [PriorEdit(('b',), Normal(0., 100.))],
      [('b_0', 'Normal', {'loc': 0., 'scale': 100.}),
       ('sigma', 'HalfCauchy', {})]),
 
     ('y ~ 1 + x1 + x2',
      [],
-     getfamily('Normal'),
-     [PriorEdit(('b', 'intercept'), prior('Normal', [0., 100.]))],
+     Normal,
+     [PriorEdit(('b', 'intercept'), Normal(0., 100.))],
      [('b_0', 'Normal', {'loc': 0., 'scale': 100.}),
       ('b_1', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {})]),
 
     ('y ~ 1 + x1 + x2',
      [],
-     getfamily('Normal'),
-     [PriorEdit(('b', 'x1'), prior('Normal', [0., 100.]))],
+     Normal,
+     [PriorEdit(('b', 'x1'), Normal(0., 100.))],
      [('b_0', 'Cauchy', {}),
       ('b_1', 'Normal', {'loc': 0., 'scale': 100.}),
       ('b_2', 'Cauchy', {}),
@@ -141,8 +141,8 @@ codegen_cases = [
     # Prior on coef of a factor.
     ('y ~ 1 + x',
      [Categorical('x', list('ab'))],
-     getfamily('Normal'),
-     [PriorEdit(('b', 'x[b]'), prior('Normal', [0., 100.]))],
+     Normal,
+     [PriorEdit(('b', 'x[b]'), Normal(0., 100.))],
      [('b_0', 'Cauchy', {}),
       ('b_1', 'Normal', {'loc': 0., 'scale': 100.}),
       ('sigma', 'HalfCauchy', {})]),
@@ -150,8 +150,8 @@ codegen_cases = [
     # Prior on coef of an interaction.
     ('y ~ x1:x2',
      [Categorical('x1', list('ab')), Categorical('x2', list('cd'))],
-     getfamily('Normal'),
-     [PriorEdit(('b', 'x1[b]:x2[c]'), prior('Normal', [0., 100.]))],
+     Normal,
+     [PriorEdit(('b', 'x1[b]:x2[c]'), Normal(0., 100.))],
      [('b_0', 'Cauchy', {}),
       ('b_1', 'Normal', {'loc': 0., 'scale': 100.}),
       ('b_2', 'Cauchy', {}),
@@ -160,8 +160,8 @@ codegen_cases = [
     # Prior on group level `sd` choice.
     ('y ~ 1 + x2 + x3 | x1',
      [Categorical('x1', list('ab'))],
-     getfamily('Normal'),
-     [PriorEdit(('sd', 'x1', 'intercept'), prior('HalfCauchy', [4.]))],
+     Normal,
+     [PriorEdit(('sd', 'x1', 'intercept'), HalfCauchy(4.))],
      [('sigma', 'HalfCauchy', {}),
       ('sd_0_0', 'HalfCauchy', {'scale': 4.}),
       ('sd_0_1', 'HalfCauchy', {}),
@@ -170,8 +170,8 @@ codegen_cases = [
 
     ('y ~ 1 + x2 + x3 || x1',
      [Categorical('x1', list('ab'))],
-     getfamily('Normal'),
-     [PriorEdit(('sd', 'x1', 'intercept'), prior('HalfNormal', [4.]))],
+     Normal,
+     [PriorEdit(('sd', 'x1', 'intercept'), HalfNormal(4.))],
      [('sigma', 'HalfCauchy', {}),
       ('sd_0_0', 'HalfNormal', {'scale': 4.}),
       ('sd_0_1', 'HalfCauchy', {}),
@@ -179,8 +179,8 @@ codegen_cases = [
 
     ('y ~ 1 + x || a:b',
      [Categorical('a', ['a1', 'a2']), Categorical('b', ['b1', 'b2'])],
-     getfamily('Normal'),
-     [PriorEdit(('sd', 'a:b', 'intercept'), prior('HalfNormal', [4.]))],
+     Normal,
+     [PriorEdit(('sd', 'a:b', 'intercept'), HalfNormal(4.))],
      [('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
       ('sd_0_0', 'HalfNormal', {'scale': 4.}),
@@ -189,8 +189,8 @@ codegen_cases = [
     # Prior on L.
     ('y ~ 1 + x2 | x1',
      [Categorical('x1', list('ab'))],
-     getfamily('Normal'),
-     [PriorEdit(('cor',), prior('LKJ', [2.]))],
+     Normal,
+     [PriorEdit(('cor',), LKJ(2.))],
      [('sigma', 'HalfCauchy', {}),
       ('sd_0_0', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
@@ -198,8 +198,8 @@ codegen_cases = [
 
     ('y ~ 1 + x | a:b',
      [Categorical('a', ['a1', 'a2']), Categorical('b', ['b1', 'b2'])],
-     getfamily('Normal'),
-     [PriorEdit(('cor', 'a:b'), prior('LKJ', [2.]))],
+     Normal,
+     [PriorEdit(('cor', 'a:b'), LKJ(2.))],
      [('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
       ('sd_0_0', 'HalfCauchy', {}),
@@ -208,33 +208,33 @@ codegen_cases = [
     # Prior on parameter of response distribution.
     ('y ~ x',
      [],
-     getfamily('Normal'),
-     [PriorEdit(('resp', 'sigma'), prior('HalfCauchy', [4.]))],
+     Normal,
+     [PriorEdit(('resp', 'sigma'), HalfCauchy(4.))],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {'scale': 4.})]),
 
     # Custom response family.
     ('y ~ x',
      [],
-     apply(getfamily('Normal'), sigma=0.5),
+     Normal(sigma=0.5),
      [],
      [('b_0', 'Cauchy', {})]),
 
     ('y ~ x',
      [Categorical('y', list('AB'))],
-     getfamily('Bernoulli'),
+     Bernoulli,
      [],
      [('b_0', 'Cauchy', {})]),
 
     ('y ~ x',
      [Integral('y', min=0, max=1)],
-     getfamily('Bernoulli'),
+     Bernoulli,
      [],
      [('b_0', 'Cauchy', {})]),
 
     ('y ~ x',
      [Integral('y', min=0, max=10)],
-     apply(getfamily('Binomial'), num_trials=10),
+     Binomial(num_trials=10),
      [],
      [('b_0', 'Cauchy', {})]),
 ]
@@ -308,7 +308,7 @@ def test_numpyro_codegen(formula_str, non_real_cols, family, prior_edits, expect
 # function does something sensible for some common families.
 @pytest.mark.parametrize('response_meta, family, args, expected', [
     (RealValued('y'),
-     getfamily('Normal'),
+     Normal,
      [
          np.array([[1., 2., 3.], [4., 5., 6.]]), # mean
          np.array([[0.1], [0.2]]),               # sd
@@ -316,7 +316,7 @@ def test_numpyro_codegen(formula_str, non_real_cols, family, prior_edits, expect
      np.array([[1., 2., 3.], [4., 5., 6.]])),    # mean
 
     (Integral('y', min=0, max=5),
-     apply(getfamily('Binomial'), num_trials=5),
+     Binomial(num_trials=5),
      [
          np.array([[-2., 0., 2.], [-1., 0., 1.]]), # logits
      ],
@@ -373,7 +373,7 @@ def test_scalar_param_map_consistency():
         Categorical('b', ['b1', 'b2', 'b3']),
     ]
     cols = expand_columns(formula, non_real_cols)
-    desc = makedesc(formula, metadata_from_cols(cols), getfamily('Normal'), [])
+    desc = makedesc(formula, metadata_from_cols(cols), Normal, [])
     params = parameters(desc)
     spmap = scalar_parameter_map(desc)
 
@@ -405,18 +405,18 @@ def test_scalar_param_map_consistency():
 
 
 @pytest.mark.parametrize('formula_str, non_real_cols, family, prior_edits', [
-    ('y ~ x', [], getfamily('Bernoulli'), []),
-    ('y ~ x', [Integral('y', min=0, max=2)], getfamily('Bernoulli'), []),
-    ('y ~ x', [Categorical('y', list('abc'))], getfamily('Bernoulli'), []),
-    ('y ~ x', [Categorical('y', list('ab'))], getfamily('Normal'), []),
-    ('y ~ x', [Integral('y', min=0, max=1)], getfamily('Normal'), []),
-    ('y ~ x', [], apply(getfamily('Binomial'), num_trials=1), []),
-    ('y ~ x', [Integral('y', min=-1, max=1)], apply(getfamily('Binomial'), num_trials=1), []),
+    ('y ~ x', [], Bernoulli, []),
+    ('y ~ x', [Integral('y', min=0, max=2)], Bernoulli, []),
+    ('y ~ x', [Categorical('y', list('abc'))], Bernoulli, []),
+    ('y ~ x', [Categorical('y', list('ab'))], Normal, []),
+    ('y ~ x', [Integral('y', min=0, max=1)], Normal, []),
+    ('y ~ x', [], Binomial(num_trials=1), []),
+    ('y ~ x', [Integral('y', min=-1, max=1)], Binomial(num_trials=1), []),
     ('y ~ x',
      [Integral('y', min=0, max=3)],
-     apply(getfamily('Binomial'), num_trials=2),
+     Binomial(num_trials=2),
      []),
-    ('y ~ x', [Categorical('y', list('abc'))], apply(getfamily('Binomial'), num_trials=1), []),
+    ('y ~ x', [Categorical('y', list('abc'))], Binomial(num_trials=1), []),
 ])
 def test_family_and_response_type_checks(formula_str, non_real_cols, family, prior_edits):
     formula = parse(formula_str)
@@ -431,27 +431,27 @@ def test_family_and_response_type_checks(formula_str, non_real_cols, family, pri
 @pytest.mark.parametrize('formula_str, non_real_cols, family, prior_edits, expected_error', [
     ('y ~ x',
      [],
-     getfamily('Normal'),
-     [PriorEdit(('resp', 'sigma'), prior('Normal', [0., 1.]))],
+     Normal,
+     [PriorEdit(('resp', 'sigma'), Normal(0., 1.))],
      r'(?i)invalid prior'),
     ('y ~ x1 | x2',
      [Categorical('x2', list('ab'))],
-     getfamily('Normal'),
-     [PriorEdit(('sd', 'x2'), prior('Normal', [0., 1.]))],
+     Normal,
+     [PriorEdit(('sd', 'x2'), Normal(0., 1.))],
      r'(?i)invalid prior'),
     ('y ~ 1 + x1 | x2',
      [Categorical('x2', list('ab'))],
-     getfamily('Normal'),
-     [PriorEdit(('cor', 'x2'), prior('Normal', [0., 1.]))],
+     Normal,
+     [PriorEdit(('cor', 'x2'), Normal(0., 1.))],
      r'(?i)invalid prior'),
     ('y ~ x',
      [],
-     getfamily('Normal'),
-     [PriorEdit(('b',), prior('Bernoulli', [.5]))],
+     Normal,
+     [PriorEdit(('b',), Bernoulli(.5))],
      r'(?i)invalid prior'),
     ('y ~ x',
      [Integral('y', 0, 1)],
-     getfamily('Binomial'),
+     Binomial,
      [],
      r'(?i)prior missing'),
 ])

@@ -5,7 +5,7 @@ import numpy as np
 from jax import random
 from numpyro.handlers import seed
 
-from .family import Family, LinkFn, getfamily, args, free_param_names
+from .family import Family, Normal, LinkFn, args, free_param_names
 from .model import ModelDesc, Group
 from .backend import Model
 
@@ -150,7 +150,7 @@ def gengroup(i, group):
     # be to pass `torch.mm(torch.diag(sd_{}), L_{})` as the
     # `scale_tril` argument of a `MultivariateNormal`. Is there any
     # significant different between these two approaches?
-    code.append(sample('z_{}'.format(i), gendist(getfamily('Normal'), [0., 1.], [M_i, N_i])))
+    code.append(sample('z_{}'.format(i), gendist(Normal, [0., 1.], [M_i, N_i])))
     code.append('assert z_{}.shape == (M_{}, N_{}) # {} x {}'.format(i, i, i, M_i, N_i))
 
     if group.corr_prior:

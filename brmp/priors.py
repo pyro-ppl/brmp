@@ -6,7 +6,7 @@ import pandas as pd
 from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula
 from pyro.contrib.brm.design import DesignMeta, PopulationMeta, GroupMeta
-from pyro.contrib.brm.family import getfamily, Family, nonlocparams, Type, apply, apply1, fully_applied
+from pyro.contrib.brm.family import Cauchy, HalfCauchy, LKJ, Family, nonlocparams, Type, fully_applied
 
 # `is_param` indicates whether a node corresponds to a parameter in
 # the model. (Nodes without this flag set exist only to add structure
@@ -17,24 +17,9 @@ Node = namedtuple('Node', 'name prior_edit is_param checks children')
 def leaf(name, prior_edit=None, checks=[]):
     return Node(name, prior_edit, True, checks, [])
 
-# e.g. Prior('Normal', [0., 1.])
-
-# TODO: This is no longer prior specific. e.g. It could be used when
-# specifying a response family. This suggests moving this to family.py
-# and renaming. Though eventually I think a function of this sort
-# won't be necessary since we ought to be able to write e.g.
-# `Binomial(num_trials=n)`.
-def prior(family_name, values):
-    family = getfamily(family_name)
-    names = [p.name for p in family.params]
-    for (name, val) in zip(names, values):
-        family = apply1(family, name, val)
-    return family
-
-
 RESPONSE_PRIORS = {
     'Normal': {
-        'sigma': prior('HalfCauchy', [3.])
+        'sigma': HalfCauchy(3.)
     },
 }
 
@@ -128,10 +113,10 @@ def default_prior(formula, design_metadata, family):
     resp_children = [leaf(p.name, mk_resp_prior_edit(p.name, family.name), [chk_support(p.type)])
                      for p in nonlocparams(family)]
     return Node('root', None, False, [], [
-        Node('b',    PriorEdit(('b',),   prior('Cauchy', [0., 1.])), False, [chk_support(Type['Real']())],    b_children),
-        Node('sd',   PriorEdit(('sd',),  prior('HalfCauchy', [3.])), False, [chk_support(Type['PosReal']())], sd_children),
-        Node('cor',  PriorEdit(('cor',), prior('LKJ', [1.])),        False, [chk_lkj],                        cor_children),
-        Node('resp', None,                                           False, [],                               resp_children)])
+        Node('b',    PriorEdit(('b',),   Cauchy(0., 1.)), False, [chk_support(Type['Real']())],    b_children),
+        Node('sd',   PriorEdit(('sd',),  HalfCauchy(3.)), False, [chk_support(Type['PosReal']())], sd_children),
+        Node('cor',  PriorEdit(('cor',), LKJ(1.)),        False, [chk_lkj],                        cor_children),
+        Node('resp', None,                                False, [],                               resp_children)])
 
 def cols2str(cols):
     return ':'.join(cols)

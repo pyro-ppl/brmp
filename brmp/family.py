@@ -8,6 +8,8 @@ from functools import partial
 
 # TODO: Ensure that families always have a support specified.
 Family = namedtuple('Family', 'name params support link')
+Family.__call__ = lambda self, *args, **kwargs: apply(self, *args, **kwargs)
+Family.__repr__ = lambda self: family_repr(self)
 
 # TODO: Check that `value` is in `type` (or None).
 Param = namedtuple('Param', 'name type value')
@@ -55,34 +57,32 @@ def const(x):
         return x
     return f
 
-FAMILIES = [
-    Family('Normal',
-           [param('mu', Type['Real']()), param('sigma', Type['PosReal']())],
-           const(Type['Real']()),
-           Link('mu', LinkFn.identity)),
-    Family('Bernoulli',
-           [param('probs', Type['UnitInterval']())],
-           const(Type['Boolean']()),
-           Link('probs', LinkFn.logit)),
-    Family('Cauchy',
-           [param('loc', Type['Real']()), param('scale', Type['PosReal']())],
-           const(Type['Real']()), None),
-    Family('HalfCauchy',
-           [param('scale', Type['PosReal']())],
-           const(Type['PosReal']()), None),
-    Family('LKJ',
-           [param('eta', Type['PosReal']())],
-           const(Type['CorrCholesky']()), None),
-    Family('Binomial',
-           [param('num_trials', Type['IntegerRange'](0, None)),
-            param('probs', Type['UnitInterval']())],
-           lambda num_trials: Type['IntegerRange'](0, num_trials),
-           Link('probs', LinkFn.logit)),
-    Family('HalfNormal',
-           [param('sigma', Type['PosReal']())],
-           const(Type['PosReal']()),
-           None),
-]
+Normal     = Family('Normal',
+                    [param('mu', Type['Real']()), param('sigma', Type['PosReal']())],
+                    const(Type['Real']()),
+                    Link('mu', LinkFn.identity))
+Bernoulli  = Family('Bernoulli',
+                    [param('probs', Type['UnitInterval']())],
+                    const(Type['Boolean']()),
+                    Link('probs', LinkFn.logit))
+Cauchy     = Family('Cauchy',
+                    [param('loc', Type['Real']()), param('scale', Type['PosReal']())],
+                    const(Type['Real']()), None)
+HalfCauchy = Family('HalfCauchy',
+                    [param('scale', Type['PosReal']())],
+                    const(Type['PosReal']()), None)
+LKJ        = Family('LKJ',
+                    [param('eta', Type['PosReal']())],
+                    const(Type['CorrCholesky']()), None)
+Binomial   = Family('Binomial',
+                    [param('num_trials', Type['IntegerRange'](0, None)),
+                     param('probs', Type['UnitInterval']())],
+                    lambda num_trials: Type['IntegerRange'](0, num_trials),
+                    Link('probs', LinkFn.logit))
+HalfNormal = Family('HalfNormal',
+                    [param('sigma', Type['PosReal']())],
+                    const(Type['PosReal']()),
+                    None)
 
 def apply1(family, name, value):
     if name not in [p.name for p in family.params]:
@@ -98,7 +98,12 @@ def apply1(family, name, value):
     return Family(family.name, params, support, family.link)
 
 # This could be __call__ on a Family class.
-def apply(family, **kwargs):
+def apply(family, *args, **kwargs):
+    free_param_names = [param.name
+                        for param in family.params
+                        if param.value is None]
+    for name, value in zip(free_param_names, args):
+        family = apply1(family, name, value)
     for name, value in kwargs.items():
         family = apply1(family, name, value)
     return family
@@ -117,15 +122,6 @@ def family_repr(family):
                        for param in family.params
                        if not param.value is None)
     return '{}({})'.format(family.name, params)
-
-def lookup(items, name):
-    for item in items:
-        if item.name == name:
-            return item
-    raise Exception('Family "{}" not found.'.format(name))
-
-def getfamily(name):
-    return lookup(FAMILIES, name)
 
 def nonlocparams(family):
     assert type(family) == Family
