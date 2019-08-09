@@ -337,6 +337,7 @@ def test_expected_response_codegen(response_meta, family, args, expected, backen
 @pytest.mark.parametrize('fitargs', [
     dict(backend=pyro_backend, iter=1, warmup=0),
     dict(backend=pyro_backend, algo='svi', iter=1, num_samples=1),
+    dict(backend=pyro_backend, algo='svi', iter=1, num_samples=1, subsample_size=1),
     # Set environment variable `RUN_SLOW=1` to run against the NumPyro
     # back end.
     pytest.param(

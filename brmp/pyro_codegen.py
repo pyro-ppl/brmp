@@ -108,8 +108,9 @@ def gengroup(i, group):
     assert type(i) == int # A unique int assigned to each group.
     assert type(group) == Group
 
-    code = ['']
-    code.append(comment('Group {}: factor={}'.format(i, ':'.join(group.factor_names))))
+    cmt = comment('Group {}: factor={}'.format(i, ':'.join(group.factor_names)))
+    code = ['', cmt]
+    mu_code = [cmt]
 
     # The number of coefficients per level.
     M_i = len(group.coefs)
@@ -180,13 +181,13 @@ def gengroup(i, group):
     # guess einsum doesn't help because we'd have nested indices?)
 
     for j in range(M_i):
-        code.append('r_{}_{} = r_{}[:, {}]'.format(i, j+1, i, j))
+        mu_code.append('r_{}_{} = r_{}[:, {}]'.format(i, j+1, i, j))
     for j in range(M_i):
-        code.append('Z_{}_{} = Z_{}[:, {}]'.format(i, j+1, i, j))
+        mu_code.append('Z_{}_{} = Z_{}[:, {}]'.format(i, j+1, i, j))
     for j in range(M_i):
-        code.append('mu = mu + r_{}_{}[J_{}] * Z_{}_{}'.format(i, j+1, i, i, j+1))
+        mu_code.append('mu = mu + r_{}_{}[J_{}] * Z_{}_{}'.format(i, j+1, i, i, j+1))
 
-    return code
+    return code, mu_code
 
 def geninvlinkbody(linkfn, code):
     if linkfn == LinkFn.identity:
@@ -247,14 +248,23 @@ def genmodel(model):
 
     body = []
 
+    body.append('assert mode == "full" or mode == "prior_and_mu" or mode == "prior_only"')
+    body.append('assert (subsample is None) == (dfN is None)') # Expect both or neither.
+
     body.append('assert type(X) == torch.Tensor')
     body.append('N = X.shape[0]')
+
+    body.append('if dfN is None:')
+    body.append(indent('dfN = N'))
+    body.append('else:')
+    body.append(indent('assert len(subsample) == N'))
 
     # The number of columns in the design matrix.
     M = len(model.population.coefs)
 
     body.append('M = {}'.format(M))
     body.append('assert X.shape == (N, M)')
+    body.append('')
 
     # Population level
     # --------------------------------------------------
@@ -263,13 +273,22 @@ def genmodel(model):
     body.extend(genprior('b', contig(model.population.priors)))
     body.append('assert b.shape == (M,)')
 
-    # Compute mu.
-    body.append('mu = torch.mv(X, b)')
-
     # Group level
     # --------------------------------------------------
+    mu_code = []
     for i, group in enumerate(model.groups):
-        body.extend(gengroup(i, group))
+        grp_code, grp_mu_code = gengroup(i, group)
+        body.extend(grp_code)
+        mu_code.extend(grp_mu_code)
+
+    # Compute mu.
+    body.append('')
+    body.append('if mode == "prior_only":')
+    body.append(indent('mu = None'))
+    body.append('else:')
+    body.append(indent('mu = torch.mv(X, b)'))
+    body.extend(indent(line) for line in mu_code)
+    body.append('')
 
     # Response
     # --------------------------------------------------
@@ -279,8 +298,9 @@ def genmodel(model):
     for param, param_prior in zip(model.response.nonlocparams, model.response.priors):
         body.append(sample(param.name, gendist(param_prior, args(param_prior), [1], False)))
 
-    body.append('with pyro.plate("obs", N):')
-    body.append(indent(sample('y', gen_response_dist(model), 'y_obs')))
+    body.append('if mode == "full":')
+    body.append(indent('with pyro.plate("obs", dfN, subsample=subsample):'))
+    body.append(indent(indent(sample('y', gen_response_dist(model), 'y_obs'))))
 
     # Values of interest that are not generated directly by sample
     # statements (such as the `b` vector) are returned from the model
@@ -289,12 +309,13 @@ def genmodel(model):
                        ['sd_{}'.format(i) for i in range(num_groups)] +
                        ['r_{}'.format(i) for i in range(num_groups)])
     retval =  '{{{}}}'.format(', '.join('\'{}\': {}'.format(p, p) for p in returned_params))
+    body.append('')
     body.append('return {}'.format(retval))
 
     params = (['X'] +
               ['Z_{}'.format(i) for i in range(num_groups)] +
               ['J_{}'.format(i) for i in range(num_groups)] +
-              ['y_obs=None'])
+              ['y_obs=None', 'dfN=None', 'subsample=None', 'mode="full"'])
     return '\n'.join(method('model', params, body))
 
 def eval_method(code):

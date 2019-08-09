@@ -39,39 +39,11 @@ def get_param(samples, name):
 
 def location(modelfn, samples, data):
 
-    # In general, we need to re-run the model, taking values from the
-    # given samples at `sample` sites, and using the given data.
+    # Re-run the model, taking values from the given samples at
+    # `sample` sites, and using the given data to compute `mu`.
 
-    # The current strategy is to patch up the trace so that we can
-    # re-run the model as is. One appealing aspect of this is that it
-    # might be easy to adapt to this also sample new values for y.
-    # (Rather than having to add something analogous to
-    # `expected_response_fn` to code gen.) OTOH, it seems like
-    # `expected_response_fn` will stick around, since computing the
-    # expectation as part of the model seems wasteful during
-    # inference, and perhaps it's easy to adapt this to do sampling
-    # with out really adding any new code gen.
-
-    # One alternative would be to add a flag to the model that allows
-    # the plate & response distribution to be skipped. (Or
-    # alternatively generate two versions of the model if avoiding
-    # checking the flag during inference is desirable.)
-
-    # Another option, of course, is to codegen an extra function that
-    # directly implements the requuired functionality. This function
-    # could be vectorized (i.e. operate on multiple samples in
-    # parallel) which is nice.
-
-    def f(sample):
-        trace = sample.copy()
-        trace.remove_node('y')
-        # The length of the vector of indices stored at the plate
-        # will likely not match the number of data points in the
-        # data. (When applying `location` to "new data".) We could
-        # explicitly patch up `trace.node['obs']['value']` but
-        # simply removing the node seems to work just as well.
-        trace.remove_node('obs')
-        return poutine.replay(modelfn, trace)(**data)['mu']
+    def f(trace):
+        return poutine.replay(modelfn, trace)(mode='prior_and_mu', **data)['mu']
 
     return torch.stack([f(s).detach() for s in samples])
 
@@ -160,13 +132,40 @@ def nuts(data, model, iter=None, warmup=None):
 
     return Posterior(all_samples, lambda name: all_samples[name], loc)
 
-def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None):
+# Ideally we'd simply use `arr[subsample]` to select out a mini batch,
+# but doing so is problematic when the design matrix is empty. (More
+# detail below.) This function exists to work around the problem.
+#
+# Even though the following works:
+#
+# torch.mv(torch.empty(5, 0), torch.empty(0))
+# => torch.tensor([0., 0., 0., 0., 0.])
+#
+# Attempting to index into the (degenerate) matrix breaks things:
+#
+# torch.mv(torch.empty(5,0)[[0,1]], torch.empty(0))
+# => RuntimeError: invalid argument 6
+#
+def get_mini_batch(arr, subsample):
+    dim = arr.dim()
+    assert dim == 1 or dim == 2
+    if dim == 2 and arr.shape[1] == 0:
+        return torch.empty(len(subsample), 0)
+    else:
+        return arr[subsample]
+
+def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None, subsample_size=None):
     assert type(data) == dict
     assert type(model) == Model
 
     assert iter is None or type(iter) == int
     assert num_samples is None or type(num_samples) == int
     assert autoguide is None or callable(autoguide)
+
+    N = next(data.values().__iter__()).shape[0]
+    assert all(arr.shape[0] == N for arr in  data.values())
+    assert (subsample_size is None or
+            type(subsample_size) == int and 0 < subsample_size < N)
 
     # TODO: Fix that this interface doesn't work for
     # `AutoLaplaceApproximation`, which requires different functions
@@ -181,8 +180,17 @@ def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None):
     t0 = time.time()
     max_iter_str_width = len(str(iter))
     max_out_len = 0
+
     for i in range(iter):
-        loss = svi.step(**data)
+        if subsample_size is None:
+            dfN = None
+            subsample = None
+            data_for_step = data
+        else:
+            dfN = N
+            subsample = torch.randint(0, N, (subsample_size,)).long()
+            data_for_step = {k: get_mini_batch(arr, subsample) for k, arr in data.items()}
+        loss = svi.step(dfN=dfN, subsample=subsample, **data_for_step)
         t1 = time.time()
         if t1 - t0 > 0.5 or (i+1) == iter:
             iter_str = str(i+1).rjust(max_iter_str_width)
@@ -197,10 +205,10 @@ def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None):
 
     # We run the guide to generate traces from the (approx.)
     # posterior. We also run the model against those traces in order
-    # to compute transformed parameters, such as `b`, `mu`, etc.
+    # to compute transformed parameters, such as `b`, etc.
     def get_model_trace():
         guide_tr = poutine.trace(guide).get_trace()
-        model_tr = poutine.trace(poutine.replay(model.fn, trace=guide_tr)).get_trace(**data)
+        model_tr = poutine.trace(poutine.replay(model.fn, trace=guide_tr)).get_trace(mode='prior_only', **data)
         return model_tr
 
     # Represent the posterior as a bunch of samples, ignoring the
@@ -208,14 +216,13 @@ def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None):
     # posterior maginals from the variational parameters.
     samples = [get_model_trace() for _ in range(num_samples)]
 
+    # Unlike the NUTS case, we don't eagerly compute `mu` (for the
+    # data set used for inference) when building `Posterior#samples`.
+    # (This is because it's possible that N is very large since we
+    # support subsampling.) Therefore `loc` always computes `mu` from
+    # the data and the samples here.
     def loc(d):
-        # Optimization: For the data used for inference, values for
-        # `mu` are already computed and available from the
-        # traces/samples.
-        if d == data:
-            return get_node_or_return_value(samples, 'mu')
-        else:
-            return location(model.fn, samples, d)
+        return location(model.fn, samples, d)
 
     return Posterior(samples, partial(get_param, samples), loc)
 
