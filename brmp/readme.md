@@ -53,8 +53,9 @@ example, users can specify:
 * etc.
 
 Users can give multiple such specifications and they combine in a
-sensible way. See [`ex1.py`](./ex1.py#L141) for a simple example of
-this.
+sensible way.
+
+See the "Priors" notebook for examples.
 
 #### Response Families
 
