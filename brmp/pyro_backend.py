@@ -11,7 +11,7 @@ from pyro.infer.mcmc.api import MCMC
 import pyro
 import pyro.poutine as poutine
 from pyro.infer import SVI, Trace_ELBO
-from pyro.contrib.autoguide import AutoDiagonalNormal
+from pyro.contrib.autoguide import AutoMultivariateNormal
 from pyro.optim import Adam
 
 from pyro.contrib.brm.backend import Backend, Model, apply_default_hmc_args
@@ -154,12 +154,12 @@ def get_mini_batch(arr, subsample):
     else:
         return arr[subsample]
 
-def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None, subsample_size=None):
+def svi(data, model, iter=10, num_samples=10, autoguide=None, optim=None, subsample_size=None):
     assert type(data) == dict
     assert type(model) == Model
 
-    assert iter is None or type(iter) == int
-    assert num_samples is None or type(num_samples) == int
+    assert type(iter) == int
+    assert type(num_samples) == int
     assert autoguide is None or callable(autoguide)
 
     N = next(data.values().__iter__()).shape[0]
@@ -170,7 +170,7 @@ def svi(data, model, iter=None, num_samples=None, autoguide=None, optim=None, su
     # TODO: Fix that this interface doesn't work for
     # `AutoLaplaceApproximation`, which requires different functions
     # to be used for optimisation / collecting samples.
-    autoguide = AutoDiagonalNormal if autoguide is None else autoguide
+    autoguide = AutoMultivariateNormal if autoguide is None else autoguide
     optim = Adam({'lr': 1e-3}) if optim is None else optim
 
     guide = autoguide(model.fn)
