@@ -28,12 +28,11 @@ def get_response_prior(family, parameter):
         return RESPONSE_PRIORS[family][parameter]
 
 # This is similar to brms `set_prior`. (e.g. `set_prior('<prior>',
-# coef='x1')` is similar to `PriorEdit(['x1'], '<prior>)`.) By
-# specifying paths (rather than class/group/coef) we're diverging from
-# brms, but the hope is that a brms-like interface can be put in front
-# of this.
+# coef='x1')` is similar to `Prior(['x1'], '<prior>)`.) By specifying
+# paths (rather than class/group/coef) we're diverging from brms, but
+# the hope is that a brms-like interface can be put in front of this.
 
-PriorEdit = namedtuple('PriorEdit', 'path prior')
+Prior = namedtuple('Prior', 'path prior')
 
 def walk(node, path):
     assert type(node) == Node
@@ -108,27 +107,27 @@ def default_prior(formula, design_metadata, family):
     def mk_resp_prior_edit(param_name, family_name):
         prior = get_response_prior(family_name, param_name)
         if prior is not None:
-            return PriorEdit(('resp', param_name), prior)
+            return Prior(('resp', param_name), prior)
 
     resp_children = [leaf(p.name, mk_resp_prior_edit(p.name, family.name), [chk_support(p.type)])
                      for p in nonlocparams(family)]
     return Node('root', None, False, [], [
-        Node('b',    PriorEdit(('b',),   Cauchy(0., 1.)), False, [chk_support(Type['Real']())],    b_children),
-        Node('sd',   PriorEdit(('sd',),  HalfCauchy(3.)), False, [chk_support(Type['PosReal']())], sd_children),
-        Node('cor',  PriorEdit(('cor',), LKJ(1.)),        False, [chk_lkj],                        cor_children),
-        Node('resp', None,                                False, [],                               resp_children)])
+        Node('b',    Prior(('b',),   Cauchy(0., 1.)), False, [chk_support(Type['Real']())],    b_children),
+        Node('sd',   Prior(('sd',),  HalfCauchy(3.)), False, [chk_support(Type['PosReal']())], sd_children),
+        Node('cor',  Prior(('cor',), LKJ(1.)),        False, [chk_lkj],                        cor_children),
+        Node('resp', None,                            False, [],                               resp_children)])
 
 def cols2str(cols):
     return ':'.join(cols)
 
 
-def customize_prior(tree, prior_edits):
+def customize_prior(tree, priors):
     assert type(tree) == Node
-    assert type(prior_edits) == list
-    assert all(type(p) == PriorEdit for p in prior_edits)
-    for prior_edit in prior_edits:
+    assert type(priors) == list
+    assert all(type(p) == Prior for p in priors)
+    for prior_edit in priors:
         # TODO: It probably makes sense to move this to the
-        # constructor of PriorEdit, once such a thing exists.
+        # constructor of Prior, once such a thing exists.
         if not fully_applied(prior_edit.prior):
             raise Exception('Distribution arguments missing from prior "{}"'.format(prior_edit.prior.name))
         tree = edit(tree, prior_edit.path,
@@ -138,8 +137,8 @@ def customize_prior(tree, prior_edits):
 # It's important that trees maintain the order of their children, so
 # that coefficients in the prior tree continue to line up with columns
 # in the design matrix.
-def build_prior_tree(formula, design_metadata, family, prior_edits, chk=True):
-    tree = fill(customize_prior(default_prior(formula, design_metadata, family), prior_edits))
+def build_prior_tree(formula, design_metadata, family, priors, chk=True):
+    tree = fill(customize_prior(default_prior(formula, design_metadata, family), priors))
     if chk:
         # TODO: I might consider delaying this check (that all
         # parameters have priors) until just before code generation

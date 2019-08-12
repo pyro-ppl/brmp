@@ -12,26 +12,26 @@ from pyro.contrib.brm.backend import data_from_numpy
 
 _default_backend = pyro_backend
 
-def makecode(formula, df, family, prior_edits, backend=pyro_backend):
-    desc = makedesc(formula, metadata_from_df(df), family, prior_edits)
+def makecode(formula, df, family, priors, backend=pyro_backend):
+    desc = makedesc(formula, metadata_from_df(df), family, priors)
     return backend.gen(desc).code
 
-def makedesc(formula, metadata, family, prior_edits):
+def makedesc(formula, metadata, family, priors):
     assert type(formula) == Formula
     assert type(metadata) == Metadata
     assert type(family) == Family
-    assert type(prior_edits) == list
+    assert type(priors) == list
     design_metadata = designmatrices_metadata(formula, metadata)
-    prior_tree = build_prior_tree(formula, design_metadata, family, prior_edits)
+    prior_tree = build_prior_tree(formula, design_metadata, family, priors)
     return build_model(formula, prior_tree, family, metadata)
 
-def defm(formula_str, df, family=None, prior_edits=None):
+def defm(formula_str, df, family=None, priors=None):
     assert type(formula_str) == str
     assert type(df) == pd.DataFrame
     assert family is None or type(family) == Family
-    assert prior_edits is None or type(prior_edits) == list
+    assert priors is None or type(priors) == list
     family = family or Normal
-    prior_edits = prior_edits or []
+    priors = priors or []
     formula = parse(formula_str)
     # TODO: Both `makedata` and `designmatrices_metadata` call
     # `coding` (from design.py) internally. Instead we ought to call
@@ -42,7 +42,7 @@ def defm(formula_str, df, family=None, prior_edits=None):
     #
     # Related: Perhaps design matrices ought to always have metadata
     # (i.e. column names) associated with them, as in Patsy. (This
-    desc = makedesc(formula, metadata_from_df(df), family, prior_edits)
+    desc = makedesc(formula, metadata_from_df(df), family, priors)
     data = makedata(formula, df)
     return DefmResult(formula, desc, data)
 
@@ -102,5 +102,5 @@ class GenerateResult():
         return self._run_algo('svi', *args, **kwargs)
 
 
-def brm(formula_str, df, family=None, prior_edits=None, **kwargs):
-    return defm(formula_str, df, family, prior_edits).fit(_default_backend, **kwargs)
+def brm(formula_str, df, family=None, priors=None, **kwargs):
+    return defm(formula_str, df, family, priors).fit(_default_backend, **kwargs)

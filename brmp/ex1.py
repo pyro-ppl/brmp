@@ -4,7 +4,7 @@ import pandas as pd
 from pyro.contrib.brm import makecode
 from pyro.contrib.brm.formula import parse
 from pyro.contrib.brm.design import makedata
-from pyro.contrib.brm.priors import PriorEdit
+from pyro.contrib.brm.priors import Prior
 from pyro.contrib.brm.family import Normal, Cauchy
 
 # --------------------------------------------------
@@ -154,10 +154,10 @@ df1a = pd.DataFrame(dict(y=[0., 1., 2.],
 priors3 = [
     # All population-level coefficients should use a `Normal(0, 10)`
     # prior.
-    PriorEdit(('b',), Normal(0., 10.)),
+    Prior(('b',), Normal(0., 10.)),
     # The intercept coefficient should use a `Cauchy(0, 100)` prior.
     # This takes precedence over the less specific request above.
-    PriorEdit(('b', 'intercept'), Cauchy(0., 100.)),
+    Prior(('b', 'intercept'), Cauchy(0., 100.)),
 ]
 
 # Here's the code this generates:
