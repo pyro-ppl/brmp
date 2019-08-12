@@ -1,5 +1,7 @@
 from functools import partial
 
+import numpy as np
+
 from jax import random, vmap
 from jax.config import config; config.update("jax_platform_name", "cpu")
 
@@ -40,12 +42,15 @@ def from_numpy(data):
 def run_model_on_samples_and_data(modelfn, samples, data):
     return vmap(lambda sample: substitute(modelfn, sample)(**data))(samples)
 
-def nuts(data, model, seed=0, iter=None, warmup=None):
+def nuts(data, model, seed=None, iter=None, warmup=None):
     assert type(data) == dict
     assert type(model) == Model
+    assert seed is None or type(seed) == int
 
     iter, warmup = apply_default_hmc_args(iter, warmup)
 
+    if seed is None:
+        seed = np.random.randint(0, 2**32, dtype=np.uint32).astype(np.int32)
     rng = random.PRNGKey(seed)
     init_params, potential_fn, constrain_fn = initialize_model(rng, model.fn, **data)
     samples = mcmc(warmup, iter, init_params,
