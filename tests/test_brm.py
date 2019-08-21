@@ -13,7 +13,7 @@ import numpyro.handlers as numpyro
 
 from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata, designmatrix_metadata, designmatrices_metadata, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_cols, make_column_lookup
+from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata, designmatrix_metadata, designmatrices_metadata, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_df, metadata_from_cols, make_column_lookup
 from pyro.contrib.brm.priors import Prior, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ
 from pyro.contrib.brm.model import build_model, parameters, scalar_parameter_map
@@ -669,7 +669,8 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
 
 ])
 def test_designmatrix(formula_str, df, expected):
-    data = makedata(parse(formula_str), df)
+    metadata = metadata_from_df(df)
+    data = makedata(parse(formula_str), df, metadata)
     assert set(data.keys()) == set(expected.keys())
     for k in expected.keys():
         assert data[k].dtype == expected[k].dtype

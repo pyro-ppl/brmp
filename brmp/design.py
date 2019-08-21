@@ -375,9 +375,8 @@ def partition_terms(terms, metadata):
 # of floats, ints, or level values?) and the existing dataframe
 # metadata structure to describe the types of the columns, etc.
 
-def designmatrix(terms, df):
+def designmatrix(terms, df, metadata):
     assert type(terms) == OrderedSet
-    metadata = metadata_from_df(df)
     coded_interactions = code_terms(terms, metadata)
     product_cols = join(coded_interaction_to_product_cols(code, metadata)
                         for code in coded_interactions)
@@ -474,7 +473,6 @@ def execute_product_col(product_col, df):
         dfcol = df[col.factor]
         if type(col) == IndicatorCol:
             assert is_categorical_dtype(dfcol)
-            assert col.level in dfcol.cat.categories
             return (dfcol == col.level).to_numpy()
         elif type(col) == NumericCol:
             assert is_float_dtype(dfcol) or is_integer_dtype(dfcol)
@@ -549,11 +547,10 @@ def designmatrices_metadata(formula, metadata):
 
 # --------------------------------------------------
 
-def lookupvector(columns, df):
+def lookupvector(columns, df, metadata):
     assert type(columns) == list
     assert all(type(col) == str for col in columns)
     assert type(df) == pd.DataFrame
-    metadata = metadata_from_df(df)
     # TODO: Perhaps better to use a dictionary in case the number of
     # combinations present in the data becomes large.
     table = metadata.levels(columns)
@@ -563,7 +560,7 @@ def lookupvector(columns, df):
     indices = [table.index(tuple(row)) for _,row in df[columns].iterrows()]
     return np.array(indices, dtype=np.int64)
 
-def responsevector(column, df):
+def responsevector(column, df, metadata):
     assert type(column) == str
     assert type(df) == pd.DataFrame
     assert column in df
@@ -577,21 +574,20 @@ def responsevector(column, df):
         code = CategoricalCoding(column, True)
     else:
         raise Exception('Don\'t know how to code a response of this type.')
-    metadata = metadata_from_df(df)
     pcols = coded_interaction_to_product_cols([code], metadata)
     assert len(pcols) == 1
     return execute_product_col(pcols[0], df)
 
-def predictors(formula, df):
+def predictors(formula, df, metadata):
     assert type(formula) == Formula
     assert type(df) == pd.DataFrame
     data = {}
-    data['X'] = designmatrix(formula.terms, df)
+    data['X'] = designmatrix(formula.terms, df, metadata)
     for i, group in enumerate(formula.groups):
-        data['Z_{}'.format(i)] = designmatrix(group.terms, df)
-        data['J_{}'.format(i)] = lookupvector(group.columns, df)
+        data['Z_{}'.format(i)] = designmatrix(group.terms, df, metadata)
+        data['J_{}'.format(i)] = lookupvector(group.columns, df, metadata)
     return data
 
-def makedata(formula, df):
-    return dict(predictors(formula, df),
-                y_obs=responsevector(formula.response, df))
+def makedata(formula, df, metadata):
+    return dict(predictors(formula, df, metadata),
+                y_obs=responsevector(formula.response, df, metadata))

@@ -42,8 +42,9 @@ def defm(formula_str, df, family=None, priors=None):
     #
     # Related: Perhaps design matrices ought to always have metadata
     # (i.e. column names) associated with them, as in Patsy. (This
-    desc = makedesc(formula, metadata_from_df(df), family, priors)
-    data = makedata(formula, df)
+    metadata = metadata_from_df(df)
+    desc = makedesc(formula, metadata, family, priors)
+    data = makedata(formula, df, metadata)
     return DefmResult(formula, desc, data)
 
 # A wrapper around a pair of model and data. Has a friendly `repr` and

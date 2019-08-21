@@ -5,7 +5,7 @@ import pandas as pd
 
 from pyro.contrib.brm.model import model_repr, parameter_names, scalar_parameter_map, scalar_parameter_names
 from pyro.contrib.brm.family import free_param_names
-from pyro.contrib.brm.design import predictors
+from pyro.contrib.brm.design import predictors, metadata_from_df
 from pyro.contrib.brm.backend import data_from_numpy
 
 Fit = namedtuple('Fit', 'formula data model_desc model posterior backend')
@@ -102,8 +102,11 @@ def fitted(fit, what='expectation', data=None):
     sample_response   = fit.model.sample_response_fn
     inv_link          = fit.model.inv_link_fn
 
+    # TODO: I suspect this ought to use the metadata from the original
+    # data, to ensure consistent coding of categorical
+    # columns/groupings.
     mu = location(fit.data if data is None
-                  else data_from_numpy(fit.backend, predictors(fit.formula, data)))
+                  else data_from_numpy(fit.backend, predictors(fit.formula, data, metadata_from_df(data))))
 
     if what == 'sample' or what == 'expectation':
         args = [mu if name == 'mu' else get_param(name)
