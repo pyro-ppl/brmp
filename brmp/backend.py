@@ -40,7 +40,7 @@ from collections import namedtuple
 # as though the only use is for debugging?
 
 # For now, assume that each back end provides a single inference algorithm.
-Backend = namedtuple('Backend', 'name gen nuts svi from_numpy to_numpy')
+Backend = namedtuple('Backend', 'name gen prior nuts svi from_numpy to_numpy')
 
 # Map `from_numpy` over a dict of numpy arrays, (As produced by e.g.
 # `makedata`.)

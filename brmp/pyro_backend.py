@@ -226,4 +226,16 @@ def svi(data, model, iter=10, num_samples=10, autoguide=None, optim=None, subsam
 
     return Posterior(samples, partial(get_param, samples), loc)
 
-backend = Backend('Pyro', gen, nuts, svi, from_numpy, to_numpy)
+def prior(data, model, num_samples):
+
+    def get_model_trace():
+        return poutine.trace(model.fn).get_trace(mode='prior_only', **data)
+
+    samples = [get_model_trace() for _ in range(num_samples)]
+
+    def loc(d):
+        return location(model.fn, samples, d)
+
+    return Posterior(samples, partial(get_param, samples), loc)
+
+backend = Backend('Pyro', gen, prior, nuts, svi, from_numpy, to_numpy)

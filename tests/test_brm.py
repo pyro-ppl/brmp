@@ -791,11 +791,15 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
 @pytest.mark.parametrize('fitargs', [
     lambda S: dict(backend=pyro_backend, iter=S, warmup=0),
     lambda S: dict(backend=pyro_backend, algo='svi', iter=1, num_samples=S),
+    lambda S: dict(backend=pyro_backend, algo='prior', num_samples=S),
     # Set environment variable `RUN_SLOW=1` to run against the NumPyro
     # back end.
     pytest.param(
         lambda S: dict(backend=numpyro_backend, iter=S, warmup=0),
-        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow'))
+        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow')),
+    pytest.param(
+        lambda S: dict(backend=numpyro_backend, algo='prior', num_samples=S),
+        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow')),
 ])
 def test_marginals_fitted_smoke(fitargs):
     N = 10

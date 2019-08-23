@@ -57,7 +57,7 @@ class DefmResult:
 
     def fit(self, backend=_default_backend, algo='nuts', **kwargs):
         assert type(backend) == Backend
-        assert algo in ['nuts', 'svi']
+        assert algo in ['prior', 'nuts', 'svi']
         return getattr(self.generate(backend), algo)(**kwargs)
 
     # Generate model code and data from this description, using the
@@ -95,6 +95,9 @@ class GenerateResult():
     def _run_algo(self, algo, *args, **kwargs):
         posterior = getattr(self.backend, algo)(self.data, self.model, *args, **kwargs)
         return Fit(self.defm_result.formula, self.data, self.defm_result.desc, self.model, posterior, self.backend)
+
+    def prior(self, *args, **kwargs):
+        return self._run_algo('prior', *args, **kwargs)
 
     def nuts(self, *args, **kwargs):
         return self._run_algo('nuts', *args, **kwargs)

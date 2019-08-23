@@ -79,6 +79,33 @@ def nuts(data, model, seed=None, iter=None, warmup=None):
 def svi(*args, **kwargs):
     raise NotImplementedError
 
+def prior(data, model, num_samples, seed=None):
+    assert type(data) == dict
+    assert type(model) == Model
+    assert type(num_samples) == int and num_samples > 0
+    assert seed is None or type(seed) == int
+
+    if seed is None:
+        seed = np.random.randint(0, 2**32, dtype=np.uint32).astype(np.int32)
+    rngs = random.split(random.PRNGKey(seed), num_samples)
+
+    def get_model_trace(rng):
+        fn = handler.seed(model.fn, rng)
+        model_tr = handler.trace(fn).get_trace(mode="prior_only", **data)
+        # Unpack the bits of the trace we're interested in into a dict
+        # in order to support vectorization. (dicts support
+        # vectorization, OrderedDicts, as used by the trace, don't.)
+        return {k: node['value'] for k,node in model_tr.items()}
+
+    samples = vmap(get_model_trace)(rngs)
+    transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
+    all_samples = dict(samples, **transformed_samples)
+
+    loc = partial(location, data, samples, transformed_samples, model.fn)
+
+    return Posterior(all_samples, partial(get_param, all_samples), loc)
+
+
 # TODO: Make it possible to run inference on a gpu.
 
-backend = Backend('NumPyro', gen, nuts, svi, from_numpy, to_numpy)
+backend = Backend('NumPyro', gen, prior, nuts, svi, from_numpy, to_numpy)
