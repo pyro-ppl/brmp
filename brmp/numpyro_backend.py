@@ -40,7 +40,7 @@ def from_numpy(data):
 
 # TODO: Better name.
 def run_model_on_samples_and_data(modelfn, samples, data):
-    return vmap(lambda sample: substitute(modelfn, sample)(**data))(samples)
+    return vmap(lambda sample: substitute(modelfn, sample)(**data, mode='prior_and_mu'))(samples)
 
 def nuts(data, model, seed=None, iter=None, warmup=None):
     assert type(data) == dict

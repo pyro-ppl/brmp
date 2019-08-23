@@ -123,8 +123,9 @@ def gengroup(i, group):
     assert type(i) == int # A unique int assigned to each group.
     assert type(group) == Group
 
-    code = ['']
-    code.append(comment('Group {}: factor={}'.format(i, ':'.join(group.factor_names))))
+    cmt = comment('Group {}: factor={}'.format(i, ':'.join(group.factor_names)))
+    code = ['', cmt]
+    mu_code = [cmt]
 
     # The number of coefficients per level.
     M_i = len(group.coefs)
@@ -195,13 +196,13 @@ def gengroup(i, group):
     # guess einsum doesn't help because we'd have nested indices?)
 
     for j in range(M_i):
-        code.append('r_{}_{} = r_{}[:, {}]'.format(i, j+1, i, j))
+        mu_code.append('r_{}_{} = r_{}[:, {}]'.format(i, j+1, i, j))
     for j in range(M_i):
-        code.append('Z_{}_{} = Z_{}[:, {}]'.format(i, j+1, i, j))
+        mu_code.append('Z_{}_{} = Z_{}[:, {}]'.format(i, j+1, i, j))
     for j in range(M_i):
-        code.append('mu = mu + r_{}_{}[J_{}] * Z_{}_{}'.format(i, j+1, i, i, j+1))
+        mu_code.append('mu = mu + r_{}_{}[J_{}] * Z_{}_{}'.format(i, j+1, i, i, j+1))
 
-    return code
+    return code, mu_code
 
 def geninvlinkbody(linkfn, code):
     if linkfn == LinkFn.identity:
@@ -262,6 +263,8 @@ def genmodel(model):
 
     body = []
 
+    body.append('assert mode == "full" or mode == "prior_and_mu" or mode == "prior_only"')
+
     body.append('assert type(X) == onp.ndarray')
     body.append('N = X.shape[0]')
 
@@ -278,13 +281,22 @@ def genmodel(model):
     body.extend(genprior('b', contig(model.population.priors)))
     body.append('assert b.shape == (M,)')
 
-    # Compute mu.
-    body.append('mu = np.matmul(X, b)')
-
     # Group level
     # --------------------------------------------------
+    mu_code = []
     for i, group in enumerate(model.groups):
-        body.extend(gengroup(i, group))
+        grp_code, grp_mu_code = gengroup(i, group)
+        body.extend(grp_code)
+        mu_code.extend(grp_mu_code)
+
+    # Compute mu.
+    body.append('')
+    body.append('if mode == "prior_only":')
+    body.append(indent('mu = None'))
+    body.append('else:')
+    body.append(indent('mu = np.matmul(X, b)'))
+    body.extend(indent(line) for line in mu_code)
+    body.append('')
 
     # Response
     # --------------------------------------------------
@@ -301,7 +313,7 @@ def genmodel(model):
     # interface) without having to worry about threading a RNG. I'd
     # rather not make this unnecessary check during inference and
     # might therefore revisit this approach.
-    body.append('if y_obs is not None:')
+    body.append('if mode == "full":')
     body.append(indent(sample('y', gen_response_dist(model), 'y_obs')))
 
     # Values of interest that are not generated directly by sample
@@ -316,7 +328,7 @@ def genmodel(model):
     params = (['X'] +
               ['Z_{}'.format(i) for i in range(num_groups)] +
               ['J_{}'.format(i) for i in range(num_groups)] +
-              ['y_obs=None'])
+              ['y_obs=None', 'mode="full"'])
     return '\n'.join(method('model', params, body))
 
 def eval_method(code):
