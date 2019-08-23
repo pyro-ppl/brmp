@@ -5,7 +5,7 @@ import numpy as np
 from jax import random, vmap
 from jax.config import config; config.update("jax_platform_name", "cpu")
 
-from numpyro.handlers import substitute
+import numpyro.handlers as handler
 from numpyro.hmc_util import initialize_model
 from numpyro.mcmc import mcmc
 
@@ -40,7 +40,7 @@ def from_numpy(data):
 
 # TODO: Better name.
 def run_model_on_samples_and_data(modelfn, samples, data):
-    return vmap(lambda sample: substitute(modelfn, sample)(**data, mode='prior_and_mu'))(samples)
+    return vmap(lambda sample: handler.substitute(modelfn, sample)(**data, mode='prior_and_mu'))(samples)
 
 def location(original_data, samples, transformed_samples, model_fn, new_data):
     # Optimization: For the data used for inference, values for `mu`
