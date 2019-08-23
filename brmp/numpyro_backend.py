@@ -42,6 +42,14 @@ def from_numpy(data):
 def run_model_on_samples_and_data(modelfn, samples, data):
     return vmap(lambda sample: substitute(modelfn, sample)(**data, mode='prior_and_mu'))(samples)
 
+def location(original_data, samples, transformed_samples, model_fn, new_data):
+    # Optimization: For the data used for inference, values for `mu`
+    # are already computed and available from `transformed_samples`.
+    if new_data == original_data:
+        return transformed_samples['mu']
+    else:
+        return run_model_on_samples_and_data(model_fn, samples, new_data)['mu']
+
 def nuts(data, model, seed=None, iter=None, warmup=None):
     assert type(data) == dict
     assert type(model) == Model
@@ -64,14 +72,7 @@ def nuts(data, model, seed=None, iter=None, warmup=None):
     transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
     all_samples = dict(samples, **transformed_samples)
 
-    def loc(d):
-        # Optimization: For the data used for inference, values for
-        # `mu` are already computed and available from
-        # `transformed_samples`.
-        if d == data:
-            return transformed_samples['mu']
-        else:
-            return run_model_on_samples_and_data(model.fn, samples, d)['mu']
+    loc = partial(location, data, samples, transformed_samples, model.fn)
 
     return Posterior(all_samples, partial(get_param, all_samples), loc)
 
