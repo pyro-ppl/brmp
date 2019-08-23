@@ -384,7 +384,7 @@ def designmatrix(terms, df, metadata):
     arrs = [execute_product_col(pcol, df) for pcol in product_cols]
     X = np.stack(arrs, axis=1) if arrs else np.empty((N, 0))
     assert X.shape[0] == N
-    if X.shape[1] > 0 and np.linalg.matrix_rank(X) != X.shape[1]:
+    if X.shape[0] > 0 and X.shape[1] > 0 and np.linalg.matrix_rank(X) != X.shape[1]:
         print('WARNING: Design matrix may not be full rank.')
     return X
 
