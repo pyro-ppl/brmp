@@ -10,7 +10,7 @@ from numpyro.hmc_util import initialize_model
 from numpyro.mcmc import mcmc
 
 from pyro.contrib.brm.backend import Backend, Model, apply_default_hmc_args
-from pyro.contrib.brm.fit import Posterior
+from pyro.contrib.brm.fit import Samples
 from pyro.contrib.brm.numpyro_codegen import gen
 
 # The types described in the comments in pyro_backend.py as follows
@@ -74,7 +74,7 @@ def nuts(data, model, seed=None, iter=None, warmup=None):
 
     loc = partial(location, data, samples, transformed_samples, model.fn)
 
-    return Posterior(all_samples, partial(get_param, all_samples), loc)
+    return Samples(all_samples, partial(get_param, all_samples), loc)
 
 def svi(*args, **kwargs):
     raise NotImplementedError
@@ -103,7 +103,7 @@ def prior(data, model, num_samples, seed=None):
 
     loc = partial(location, data, samples, transformed_samples, model.fn)
 
-    return Posterior(all_samples, partial(get_param, all_samples), loc)
+    return Samples(all_samples, partial(get_param, all_samples), loc)
 
 
 # TODO: Make it possible to run inference on a gpu.

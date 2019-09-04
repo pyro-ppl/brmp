@@ -93,8 +93,8 @@ class GenerateResult():
         self.data = data
 
     def _run_algo(self, algo, *args, **kwargs):
-        posterior = getattr(self.backend, algo)(self.data, self.model, *args, **kwargs)
-        return Fit(self.defm_result.formula, self.data, self.defm_result.desc, self.model, posterior, self.backend)
+        samples = getattr(self.backend, algo)(self.data, self.model, *args, **kwargs)
+        return Fit(self.defm_result.formula, self.data, self.defm_result.desc, self.model, samples, self.backend)
 
     def prior(self, *args, **kwargs):
         return self._run_algo('prior', *args, **kwargs)

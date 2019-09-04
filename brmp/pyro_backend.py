@@ -15,7 +15,7 @@ from pyro.contrib.autoguide import AutoMultivariateNormal
 from pyro.optim import Adam
 
 from pyro.contrib.brm.backend import Backend, Model, apply_default_hmc_args
-from pyro.contrib.brm.fit import Posterior
+from pyro.contrib.brm.fit import Samples
 from pyro.contrib.brm.pyro_codegen import gen
 
 def get_node_or_return_value(samples, name):
@@ -130,7 +130,7 @@ def nuts(data, model, iter=None, warmup=None):
 
     all_samples = dict(samples, **transformed_samples)
 
-    return Posterior(all_samples, lambda name: all_samples[name], loc)
+    return Samples(all_samples, lambda name: all_samples[name], loc)
 
 # Ideally we'd simply use `arr[subsample]` to select out a mini batch,
 # but doing so is problematic when the design matrix is empty. (More
@@ -217,14 +217,14 @@ def svi(data, model, iter=10, num_samples=10, autoguide=None, optim=None, subsam
     samples = [get_model_trace() for _ in range(num_samples)]
 
     # Unlike the NUTS case, we don't eagerly compute `mu` (for the
-    # data set used for inference) when building `Posterior#samples`.
+    # data set used for inference) when building `Samples#raw_samples`.
     # (This is because it's possible that N is very large since we
     # support subsampling.) Therefore `loc` always computes `mu` from
     # the data and the samples here.
     def loc(d):
         return location(model.fn, samples, d)
 
-    return Posterior(samples, partial(get_param, samples), loc)
+    return Samples(samples, partial(get_param, samples), loc)
 
 def prior(data, model, num_samples):
 
@@ -236,6 +236,6 @@ def prior(data, model, num_samples):
     def loc(d):
         return location(model.fn, samples, d)
 
-    return Posterior(samples, partial(get_param, samples), loc)
+    return Samples(samples, partial(get_param, samples), loc)
 
 backend = Backend('Pyro', gen, prior, nuts, svi, from_numpy, to_numpy)

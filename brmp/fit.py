@@ -8,13 +8,13 @@ from pyro.contrib.brm.family import free_param_names
 from pyro.contrib.brm.design import predictors, metadata_from_df
 from pyro.contrib.brm.backend import data_from_numpy
 
-Fit = namedtuple('Fit', 'formula data model_desc model posterior backend')
-Posterior = namedtuple('Posterior', ['samples', 'get_param', 'location'])
+Fit = namedtuple('Fit', 'formula data model_desc model samples backend')
+Samples = namedtuple('Samples', ['raw_samples', 'get_param', 'location'])
 
 def param_marginal(fit, parameter_name):
     assert type(fit) == Fit
-    posterior = fit.posterior
-    return fit.backend.to_numpy(posterior.get_param(parameter_name))
+    samples = fit.samples
+    return fit.backend.to_numpy(samples.get_param(parameter_name))
 
 default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
 
@@ -95,8 +95,8 @@ def fitted(fit, what='expectation', data=None):
     assert what in ['sample', 'expectation', 'linear', 'response']
     assert data is None or type(data) is pd.DataFrame
 
-    get_param         = fit.posterior.get_param
-    location          = fit.posterior.location
+    get_param         = fit.samples.get_param
+    location          = fit.samples.location
     to_numpy          = fit.backend.to_numpy
     expected_response = fit.model.expected_response_fn
     sample_response   = fit.model.sample_response_fn
@@ -155,9 +155,9 @@ def print_model(fit):
 
 # TODO: This should eventually be presented in a similar way to
 # `get_param` to avoid confusion. e.g. They might both me methods in
-# `fit.posterior`. If parameter and scalar parameter names never
+# `fit.samples`. If parameter and scalar parameter names never
 # clash, perhaps having a single lookup method would be convenient.
-# Perhaps this could be wired up to `fit.posterior[...]`?
+# Perhaps this could be wired up to `fit.samples[...]`?
 def get_scalar_param(fit, name):
     assert type(fit) == Fit
     m = scalar_parameter_map(fit.model_desc)
@@ -168,4 +168,4 @@ def get_scalar_param(fit, name):
     param_name, index = res[0]
     # Construct a slice to pick out the given index at all rows.
     slc = (slice(None, None, None),) + index
-    return fit.backend.to_numpy(fit.posterior.get_param(param_name))[slc]
+    return fit.backend.to_numpy(fit.samples.get_param(param_name))[slc]
