@@ -101,7 +101,7 @@ def default_prior(formula, model_desc_pre, family):
                for (mgroup, fgroup)
                in zip(model_desc_pre.groups, formula.groups))
     b_children = [leaf(name) for name in model_desc_pre.population.coefs]
-    cor_children = [leaf(cols2str(group.columns)) for group in formula.groups if group.corr and len(group.terms) > 1]
+    cor_children = [leaf(cols2str(group.columns)) for group in model_desc_pre.groups if group.corr]
     sd_children = [Node(cols2str(gm.columns), None, False, [], [leaf(name) for name in gm.coefs]) for gm in model_desc_pre.groups]
 
     def mk_resp_prior_edit(param_name, family_name):
