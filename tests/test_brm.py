@@ -431,7 +431,7 @@ def test_family_and_response_type_checks(formula_str, non_real_cols, family, pri
     cols = expand_columns(formula, non_real_cols)
     metadata = metadata_from_cols(cols)
     design_metadata = build_model_pre(formula, metadata)
-    prior_tree = build_prior_tree(formula, design_metadata, family, priors)
+    prior_tree = build_prior_tree(design_metadata, family, priors)
     with pytest.raises(Exception, match='not compatible'):
         model = build_model(formula, prior_tree, family, metadata)
 
@@ -469,7 +469,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     metadata = metadata_from_cols(cols)
     design_metadata = build_model_pre(formula, metadata)
     with pytest.raises(Exception, match=expected_error):
-        build_prior_tree(formula, design_metadata, family, priors)
+        build_prior_tree(design_metadata, family, priors)
 
 @pytest.mark.parametrize('formula_str, df, expected', [
     # (Formula('y', [], []),

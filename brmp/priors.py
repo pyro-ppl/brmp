@@ -84,22 +84,13 @@ def edit(node, path, f):
 # thing is to make an separate pass over the entire default tree once
 # built, and assert its consistency.
 
-def default_prior(formula, model_desc_pre, family):
-    assert type(formula) == Formula
+def default_prior(model_desc_pre, family):
     assert type(model_desc_pre) == ModelDescPre
     assert type(family) == Family
     assert family.link is not None
     assert type(model_desc_pre.population) == PopulationPre
     assert type(model_desc_pre.groups) == list
     assert all(type(gm) == GroupPre for gm in model_desc_pre.groups)
-    # It's assumed that `formula` and `model_desc_pre` are
-    # consistent. Something like, there exists dataframe metadata
-    # `metadata` s.t.:
-    # `model_desc_pre = build_model_pre(formula, metadata)`
-    # This sanity checks the these two agree about which groups are present.
-    assert all(mgroup.columns == fgroup.columns
-               for (mgroup, fgroup)
-               in zip(model_desc_pre.groups, formula.groups))
     b_children = [leaf(name) for name in model_desc_pre.population.coefs]
     cor_children = [leaf(cols2str(group.columns)) for group in model_desc_pre.groups if group.corr]
     sd_children = [Node(cols2str(gm.columns), None, False, [], [leaf(name) for name in gm.coefs]) for gm in model_desc_pre.groups]
@@ -137,8 +128,8 @@ def customize_prior(tree, priors):
 # It's important that trees maintain the order of their children, so
 # that coefficients in the prior tree continue to line up with columns
 # in the design matrix.
-def build_prior_tree(formula, model_desc_pre, family, priors, chk=True):
-    tree = fill(customize_prior(default_prior(formula, model_desc_pre, family), priors))
+def build_prior_tree(model_desc_pre, family, priors, chk=True):
+    tree = fill(customize_prior(default_prior(model_desc_pre, family), priors))
     if chk:
         # TODO: I might consider delaying this check (that all
         # parameters have priors) until just before code generation

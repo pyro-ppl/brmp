@@ -508,15 +508,12 @@ def execute_product_col(product_col, df):
 # originally imagined this would be used in e.g. `marginals` but
 # `ModelDesc` plays that role.)
 
-# It might be possible to extend this structure to simplify some key
-# functions. For example, `default_prior` currently takes formula,
-# design matrix meta data and family argument, but if this pre/proto
-# model were fleshed out with a little more information, it alone
-# might be sufficient to build the default prior. Similarly,
-# `build_model` requires a bunch or arguments, but one might expect
-# that that just a pre/proto model and the prior tree would be
-# sufficient to build a `ModelDesc`. (This function would then clearly
-# be taking one model description to a second, richer, description.)
+# TODO: It might be possible to extend this structure to simplify some
+# key functions. For example, `build_model` requires a bunch or
+# arguments, but one might expect that just a pre/proto model and the
+# prior tree would be sufficient to build a `ModelDesc`. (This
+# function would then clearly be taking one model description to a
+# second, richer, description.)
 
 def coef_names(terms, metadata):
     assert type(terms) == OrderedSet
