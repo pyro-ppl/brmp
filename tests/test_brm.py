@@ -13,7 +13,7 @@ import numpyro.handlers as numpyro
 
 from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata, designmatrix_metadata, designmatrices_metadata, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_df, metadata_from_cols, make_column_lookup
+from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata, coef_names, build_model_pre, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_df, metadata_from_cols, make_column_lookup
 from pyro.contrib.brm.priors import Prior, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ
 from pyro.contrib.brm.model import build_model, parameters, scalar_parameter_map
@@ -422,7 +422,7 @@ def test_family_and_response_type_checks(formula_str, non_real_cols, family, pri
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
     metadata = metadata_from_cols(cols)
-    design_metadata = designmatrices_metadata(formula, metadata)
+    design_metadata = build_model_pre(formula, metadata)
     prior_tree = build_prior_tree(formula, design_metadata, family, priors)
     with pytest.raises(Exception, match='not compatible'):
         model = build_model(formula, prior_tree, family, metadata)
@@ -459,7 +459,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
     metadata = metadata_from_cols(cols)
-    design_metadata = designmatrices_metadata(formula, metadata)
+    design_metadata = build_model_pre(formula, metadata)
     with pytest.raises(Exception, match=expected_error):
         build_prior_tree(formula, design_metadata, family, priors)
 
@@ -783,7 +783,7 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
     metadata = metadata_from_cols(cols)
-    assert designmatrix_metadata(formula.terms, metadata) == expected_names
+    assert coef_names(formula.terms, metadata) == expected_names
 
 
 # I expect these to also pass with PYRO_TENSOR_TYPE='torch.FloatTensor'.

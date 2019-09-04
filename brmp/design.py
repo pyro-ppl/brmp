@@ -496,16 +496,11 @@ def execute_product_col(product_col, df):
 
 # --------------------------------------------------
 
-# TODO: Rename the "design matrix metadata" bits.
-
-# It's a misnomer to call this design matrix metadata, a name I've
-# long found confusing. I think a better name would pre/proto model
-# (desc) or similar. That's because this an intermediate step towards
-# a full `ModelDesc`. (`DesignMeta` is pretty much just a stripped
-# down `ModelDesc`.) We start with a formula and some (meta)data, and
-# from that we build one of these (pre/proto models). At this stage we
-# know how the data will be coded, and therefore know what coefs
-# appear in the model, but we don't yet have priors specified.
+# `ModelDescPre` is an intermediate step towards a full `ModelDesc`.
+# We start with a formula and some (meta)data, and from that we build
+# one of these pre/proto models. At this stage we know how the data
+# will be coded, and therefore know what coefs appear in the model,
+# but we don't yet have priors specified.
 
 # Serving as the basis for prior specification is the only purpose of
 # this structure -- once priors are specifed, the formula, prior tree
@@ -523,7 +518,7 @@ def execute_product_col(product_col, df):
 # sufficient to build a `ModelDesc`. (This function would then clearly
 # be taking one model description to a second, richer, description.)
 
-def designmatrix_metadata(terms, metadata):
+def coef_names(terms, metadata):
     assert type(terms) == OrderedSet
     assert type(metadata) == Metadata
     coded_interactions = code_terms(terms, metadata)
@@ -531,19 +526,18 @@ def designmatrix_metadata(terms, metadata):
                         for code in coded_interactions)
     return [product_col_to_coef_name(pcol) for pcol in product_cols]
 
+ModelDescPre = namedtuple('DesignMeta', 'population groups')
+PopulationPre = namedtuple('PopulationMeta', 'coefs')
+GroupPre = namedtuple('GroupMeta', 'columns coefs')
 
-DesignMeta = namedtuple('DesignMeta', 'population groups')
-PopulationMeta = namedtuple('PopulationMeta', 'coefs')
-GroupMeta = namedtuple('GroupMeta', 'columns coefs')
-
-def designmatrices_metadata(formula, metadata):
+def build_model_pre(formula, metadata):
     assert type(formula) == Formula
     assert type(metadata) == Metadata
     assert set(allfactors(formula)).issubset(set(col.name for col in metadata.columns))
-    p = PopulationMeta(designmatrix_metadata(formula.terms, metadata))
-    gs = [GroupMeta(group.columns, designmatrix_metadata(group.terms, metadata))
+    p = PopulationPre(coef_names(formula.terms, metadata))
+    gs = [GroupPre(group.columns, coef_names(group.terms, metadata))
           for group in formula.groups]
-    return DesignMeta(p, gs)
+    return ModelDescPre(p, gs)
 
 # --------------------------------------------------
 

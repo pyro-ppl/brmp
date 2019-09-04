@@ -1,7 +1,7 @@
 import pandas as pd
 
 from pyro.contrib.brm.formula import parse, Formula
-from pyro.contrib.brm.design import makedata, Metadata, metadata_from_df, designmatrices_metadata
+from pyro.contrib.brm.design import makedata, Metadata, metadata_from_df, build_model_pre
 from pyro.contrib.brm.fit import Fit
 from pyro.contrib.brm.backend import Backend
 from pyro.contrib.brm.family import Family, Normal
@@ -21,8 +21,8 @@ def makedesc(formula, metadata, family, priors):
     assert type(metadata) == Metadata
     assert type(family) == Family
     assert type(priors) == list
-    design_metadata = designmatrices_metadata(formula, metadata)
-    prior_tree = build_prior_tree(formula, design_metadata, family, priors)
+    model_desc_pre = build_model_pre(formula, metadata)
+    prior_tree = build_prior_tree(formula, model_desc_pre, family, priors)
     return build_model(formula, prior_tree, family, metadata)
 
 def defm(formula_str, df, family=None, priors=None):
