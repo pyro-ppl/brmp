@@ -535,8 +535,9 @@ def build_model_pre(formula, metadata):
     assert type(metadata) == Metadata
     assert set(allfactors(formula)).issubset(set(col.name for col in metadata.columns))
     p = PopulationPre(coef_names(formula.terms, metadata))
-    gs = [GroupPre(group.columns, coef_names(group.terms, metadata), group.corr and len(group.terms) > 1)
-          for group in formula.groups]
+    gs = [GroupPre(group.columns, coefs, group.corr and len(coefs) > 1)
+          for group, coefs in ((group, coef_names(group.terms, metadata))
+                               for group in formula.groups)]
     return ModelDescPre(p, gs)
 
 # --------------------------------------------------

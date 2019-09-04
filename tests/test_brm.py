@@ -79,6 +79,14 @@ codegen_cases = [
       ('z_0', 'Normal', {}),
       ('sd_0_0', 'HalfCauchy', {})]),
 
+    ('y ~ x | z',
+     [Categorical('x', list('ab')), Categorical('z', list('ab'))],
+     Normal, [],
+     [('sigma', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('sd_0_0', 'HalfCauchy', {}),
+      ('L_0', 'LKJ', {})]),
+
     ('y ~ 1 + x1 + x2 + (1 + x3 | z)', [Categorical('z', list('ab'))], Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {}),
