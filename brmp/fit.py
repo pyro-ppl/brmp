@@ -153,11 +153,15 @@ def marginals(fit, qs=default_quantiles):
 def print_model(fit):
     print(model_repr(fit.model_desc))
 
-# TODO: This should eventually be presented in a similar way to
-# `get_param` to avoid confusion. e.g. They might both me methods in
-# `fit.samples`. If parameter and scalar parameter names never
-# clash, perhaps having a single lookup method would be convenient.
-# Perhaps this could be wired up to `fit.samples[...]`?
+# A back end agnostic wrapper around back end specific implementations
+# of `fit.samples.get_param`.
+def get_param(fit, name):
+    assert type(fit) == Fit
+    return fit.backend.to_numpy(fit.samples.get_param(name))
+
+# TODO: If parameter and scalar parameter names never clash, perhaps
+# having a single lookup method would be convenient. Perhaps this
+# could be wired up to `fit.samples[...]`?
 def get_scalar_param(fit, name):
     assert type(fit) == Fit
     m = scalar_parameter_map(fit.model_desc)
@@ -168,4 +172,4 @@ def get_scalar_param(fit, name):
     param_name, index = res[0]
     # Construct a slice to pick out the given index at all rows.
     slc = (slice(None, None, None),) + index
-    return fit.backend.to_numpy(fit.samples.get_param(param_name))[slc]
+    return get_param(fit, param_name)[slc]
