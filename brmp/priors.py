@@ -6,7 +6,7 @@ import pandas as pd
 from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula
 from pyro.contrib.brm.model_pre import ModelDescPre, PopulationPre, GroupPre
-from pyro.contrib.brm.family import Cauchy, HalfCauchy, LKJ, Family, nonlocparams, Type, fully_applied
+from pyro.contrib.brm.family import Cauchy, HalfCauchy, LKJ, Family, Type, fully_applied
 
 # `is_param` indicates whether a node corresponds to a parameter in
 # the model. (Nodes without this flag set exist only to add structure
@@ -96,7 +96,7 @@ def default_prior(model_desc_pre):
             return Prior(('resp', param_name), prior)
 
     resp_children = [leaf(p.name, mk_resp_prior_edit(p.name), [chk_support(p.type)])
-                     for p in nonlocparams(family)]
+                     for p in model_desc_pre.response.nonlocparams]
     return Node('root', None, False, [], [
         Node('b',    Prior(('b',),   Cauchy(0., 1.)), False, [chk_support(Type['Real']())],    b_children),
         Node('sd',   Prior(('sd',),  HalfCauchy(3.)), False, [chk_support(Type['PosReal']())], sd_children),
