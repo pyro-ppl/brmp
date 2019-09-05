@@ -90,12 +90,12 @@ def default_prior(model_desc_pre):
     cor_children = [leaf(cols2str(group.columns)) for group in model_desc_pre.groups if group.corr]
     sd_children = [Node(cols2str(gm.columns), None, False, [], [leaf(name) for name in gm.coefs]) for gm in model_desc_pre.groups]
 
-    def mk_resp_prior_edit(param_name, family_name):
-        prior = get_response_prior(family_name, param_name)
+    def mk_resp_prior_edit(param_name):
+        prior = get_response_prior(family.name, param_name)
         if prior is not None:
             return Prior(('resp', param_name), prior)
 
-    resp_children = [leaf(p.name, mk_resp_prior_edit(p.name, family.name), [chk_support(p.type)])
+    resp_children = [leaf(p.name, mk_resp_prior_edit(p.name), [chk_support(p.type)])
                      for p in nonlocparams(family)]
     return Node('root', None, False, [], [
         Node('b',    Prior(('b',),   Cauchy(0., 1.)), False, [chk_support(Type['Real']())],    b_children),
