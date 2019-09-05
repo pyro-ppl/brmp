@@ -78,8 +78,9 @@ def edit(node, path, f):
 # thing is to make an separate pass over the entire default tree once
 # built, and assert its consistency.
 
-def default_prior(model_desc_pre, family):
+def default_prior(model_desc_pre):
     assert type(model_desc_pre) == ModelDescPre
+    family = model_desc_pre.response.family
     assert type(family) == Family
     assert family.link is not None
     assert type(model_desc_pre.population) == PopulationPre
@@ -122,8 +123,8 @@ def customize_prior(tree, priors):
 # It's important that trees maintain the order of their children, so
 # that coefficients in the prior tree continue to line up with columns
 # in the design matrix.
-def build_prior_tree(model_desc_pre, family, priors, chk=True):
-    tree = fill(customize_prior(default_prior(model_desc_pre, family), priors))
+def build_prior_tree(model_desc_pre, priors, chk=True):
+    tree = fill(customize_prior(default_prior(model_desc_pre), priors))
     if chk:
         # TODO: I might consider delaying this check (that all
         # parameters have priors) until just before code generation

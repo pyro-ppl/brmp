@@ -481,7 +481,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     metadata = metadata_from_cols(cols)
     design_metadata = build_model_pre(formula, metadata, family)
     with pytest.raises(Exception, match=expected_error):
-        build_prior_tree(design_metadata, family, priors)
+        build_prior_tree(design_metadata, priors)
 
 @pytest.mark.parametrize('formula_str, df, expected', [
     # (Formula('y', [], []),

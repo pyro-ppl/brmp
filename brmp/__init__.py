@@ -23,7 +23,7 @@ def makedesc(formula, metadata, family, priors):
     assert type(family) == Family
     assert type(priors) == list
     model_desc_pre = build_model_pre(formula, metadata, family)
-    prior_tree = build_prior_tree(model_desc_pre, family, priors)
+    prior_tree = build_prior_tree(model_desc_pre, priors)
     return build_model(model_desc_pre, prior_tree)
 
 def defm(formula_str, df, family=None, priors=None):
