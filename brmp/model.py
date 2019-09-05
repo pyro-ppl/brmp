@@ -2,48 +2,10 @@ from collections import namedtuple
 
 from pyro.contrib.brm.utils import unzip
 from .formula import Formula
-from .design import Metadata, RealValued, Categorical, Integral
-from .family import Family, Type, nonlocparams, support_depends_on_args, args, family_repr
+from .design import Metadata
+from .family import Family, nonlocparams, args
 from .priors import select, tryselect, Node
 from pyro.contrib.brm.model_pre import ModelDescPre
-
-def family_matches_response(formula, metadata, family):
-    assert type(formula) == Formula
-    assert type(metadata) == Metadata
-    assert type(family) == Family
-    # I don't think there is any way for this not to hold with the
-    # present system. However, it /could/ arise if it were possible to
-    # put a prior over e.g. the `num_trials` parameter of Binomial,
-    # for example. Because this holds we know we can safely
-    # call`family.support` with zero args below.
-    assert not support_depends_on_args(family)
-    factor = metadata.column(formula.response)
-    if type(family.support()) == Type['Real']:
-        return type(factor) == RealValued
-    elif type(family.support()) == Type['Boolean']:
-        if type(factor) == Categorical:
-            return len(factor.levels) == 2
-        elif type(factor) == Integral:
-            return factor.min == 0 and factor.max == 1
-        else:
-            return False
-    elif (type(family.support()) == Type['IntegerRange']):
-        factor = metadata.column(formula.response)
-        return (type(factor) == Integral and
-                (family.support().lb is None or factor.min >= family.support().lb) and
-                (family.support().ub is None or factor.max <= family.support().ub))
-    else:
-        return False
-
-def check_family_matches_response(formula, metadata, family):
-    assert type(metadata) == Metadata
-    if not family_matches_response(formula, metadata, family):
-        # TODO: This could be more informative. e.g. If choosing
-        # Bernoulli fails, is the problem that the response is
-        # numeric, or that it has more than two levels?
-        error = 'The response distribution "{}" is not compatible with the type of the response column "{}".'
-        raise Exception(error.format(family_repr(family), formula.response))
-
 
 # Abstract model description.
 ModelDesc = namedtuple('ModelDesc', 'population groups response')
@@ -55,11 +17,6 @@ Response = namedtuple('Response', 'family nonlocparams priors')
 def build_model(model_desc_pre, prior_tree):
     assert type(model_desc_pre) == ModelDescPre
     assert type(prior_tree) == Node
-
-    # TODO: Do this earlier, e.g. in `build_model_pre`. (Was in
-    # original `build_model`.)
-
-    #check_family_matches_response(formula, metadata, family)
 
     node = select(prior_tree, ('b',))
     b_coefs, b_priors = unzip([(n.name, n.prior_edit.prior) for n in node.children])
