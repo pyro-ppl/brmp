@@ -11,6 +11,7 @@ from pandas.api.types import is_categorical_dtype, is_integer_dtype, is_float_dt
 
 from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula, OrderedSet, Term, allfactors
+from pyro.contrib.brm.family import nonlocparams
 
 
 # TODO: Levels of pandas categorical columns can be any hashable type
@@ -508,13 +509,6 @@ def execute_product_col(product_col, df):
 # originally imagined this would be used in e.g. `marginals` but
 # `ModelDesc` plays that role.)
 
-# TODO: It might be possible to extend this structure to simplify some
-# key functions. For example, `build_model` requires a bunch or
-# arguments, but one might expect that just a pre/proto model and the
-# prior tree would be sufficient to build a `ModelDesc`. (This
-# function would then clearly be taking one model description to a
-# second, richer, description.)
-
 def coef_names(terms, metadata):
     assert type(terms) == OrderedSet
     assert type(metadata) == Metadata
@@ -523,19 +517,21 @@ def coef_names(terms, metadata):
                         for code in coded_interactions)
     return [product_col_to_coef_name(pcol) for pcol in product_cols]
 
-ModelDescPre = namedtuple('ModelDescPre', 'population groups')
+ModelDescPre = namedtuple('ModelDescPre', 'population groups response')
 PopulationPre = namedtuple('PopulationPre', 'coefs')
-GroupPre = namedtuple('GroupPre', 'columns coefs corr')
+GroupPre = namedtuple('GroupPre', 'columns levels coefs corr')
+ResponsePre = namedtuple('ResponsePre', 'family nonlocparams')
 
-def build_model_pre(formula, metadata):
+def build_model_pre(formula, metadata, family):
     assert type(formula) == Formula
     assert type(metadata) == Metadata
     assert set(allfactors(formula)).issubset(set(col.name for col in metadata.columns))
     p = PopulationPre(coef_names(formula.terms, metadata))
-    gs = [GroupPre(group.columns, coefs, group.corr and len(coefs) > 1)
+    gs = [GroupPre(group.columns, metadata.levels(group.columns), coefs, group.corr and len(coefs) > 1)
           for group, coefs in ((group, coef_names(group.terms, metadata))
                                for group in formula.groups)]
-    return ModelDescPre(p, gs)
+    response = ResponsePre(family, nonlocparams(family))
+    return ModelDescPre(p, gs, response)
 
 # --------------------------------------------------
 

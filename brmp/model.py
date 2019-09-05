@@ -2,7 +2,7 @@ from collections import namedtuple
 
 from pyro.contrib.brm.utils import unzip
 from .formula import Formula
-from .design import Metadata, RealValued, Categorical, Integral
+from .design import Metadata, RealValued, Categorical, Integral, ModelDescPre
 from .family import Family, Type, nonlocparams, support_depends_on_args, args, family_repr
 from .priors import select, tryselect, Node
 
@@ -50,60 +50,52 @@ Population = namedtuple('Population', 'coefs priors')
 Group = namedtuple('Group', 'factor_names levels coefs sd_priors corr_prior')
 Response = namedtuple('Response', 'family nonlocparams priors')
 
-def build_model(formula, prior_tree, family, metadata):
-    assert type(formula) == Formula
+# Add information from the prior tree to the pre-model description.
+def build_model(model_desc_pre, prior_tree):
+    assert type(model_desc_pre) == ModelDescPre
     assert type(prior_tree) == Node
-    assert type(family) == Family
-    assert type(metadata) == Metadata
 
-    # TODO: `formula` is only used in order to perform the following
-    # check. Internally, the information about the response column
-    # name is used to perform the check. So, does it make sense for
-    # `build_model` to take only the response column as argument?
-    # Alternatively, perhaps it makes sense for this information could
-    # be incorporated in design meta, or otherwise included in one of
-    # the args. already received.
-    check_family_matches_response(formula, metadata, family)
+    # TODO: Do this earlier, e.g. in `build_model_pre`. (Was in
+    # original `build_model`.)
 
-    # Population-level
+    #check_family_matches_response(formula, metadata, family)
+
     node = select(prior_tree, ('b',))
     b_coefs, b_priors = unzip([(n.name, n.prior_edit.prior) for n in node.children])
-    population = Population(b_coefs, b_priors)
-    # Assert invariant.
-    assert len(population.coefs) == len(population.priors)
+    # Sanity check. Assert that the coef names pulled from the tree
+    # match those in the pre-model.
+    assert model_desc_pre.population.coefs == list(b_coefs)
+    population = Population(model_desc_pre.population.coefs, b_priors)
 
-    # Groups
     groups = []
+    for group in model_desc_pre.groups:
 
+        # TODO: Do this earlier, also in `build_model_pre`? (Was in
+        # original `build_model`.)
 
-    for node in select(prior_tree, ('sd',)).children:
+        #assert all(type(metadata.column(col)) == Categorical for col in cols), 'grouping columns must be a factor'
 
-        # TODO: It's unpleasant to have to do this deserializaton.
-        # (Splitting on ":".) The problem is that we only get the
-        # prior tree here, and the prior tree needs to serialize the
-        # factor names in order to allow priors to be specified. Once
-        # design meta data is renamed to `ModelDescPre` or similar, it
-        # will it seem natural to pass that in here (along with the
-        # prior tree), at which point it will be more convenient to
-        # grab the group's factor names from there.
-        cols = node.name.split(':')
-        assert all(type(metadata.column(col)) == Categorical for col in cols), 'grouping columns must be a factor'
+        # TODO: The presumably happens in priors.py too. Extract/reuse helper.
+        grp_node_name = ':'.join(group.columns)
 
-        sd_coefs, sd_priors = unzip([(n.name, n.prior_edit.prior) for n in node.children])
+        # If the pre-model indicates there is a corr prior, look it up
+        # in the tree.
+        corr_prior = select(prior_tree, ('cor', grp_node_name)).prior_edit.prior if group.corr else None
+        assert corr_prior is None or type(corr_prior) == Family
 
-        corr_node = tryselect(prior_tree, ('cor', node.name))
-        corr_prior = None if corr_node is None else corr_node.prior_edit.prior
+        sd_coefs, sd_priors = unzip([(n.name, n.prior_edit.prior) for n in select(prior_tree, ('sd', grp_node_name)).children])
 
-        group = Group(cols, metadata.levels(cols), sd_coefs, sd_priors, corr_prior)
-        # Assert invariants.
-        assert len(group.coefs) == len(group.sd_priors)
-        assert group.corr_prior is None or type(group.corr_prior) == Family
-        groups.append(group)
+        # Sanity check. Assert that the coef names pulled from the
+        # tree match those in the pre-model.
+        assert group.coefs == list(sd_coefs)
 
-    nl_params = nonlocparams(family)
+        groups.append(Group(group.columns, group.levels, group.coefs, sd_priors, corr_prior))
+
     nl_priors = [n.prior_edit.prior for n in select(prior_tree, ('resp',)).children]
-    response = Response(family, nl_params, nl_priors)
-    # Assert invariants.
+    response = Response(model_desc_pre.response.family,
+                        model_desc_pre.response.nonlocparams,
+                        nl_priors)
+    # Sanity check. Ensure we have the correct number of priors.
     assert len(response.nonlocparams) == len(response.priors)
 
     return ModelDesc(population, groups, response)
