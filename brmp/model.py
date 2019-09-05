@@ -8,7 +8,7 @@ from pyro.contrib.brm.model_pre import ModelDescPre
 # Abstract model description.
 ModelDesc = namedtuple('ModelDesc', 'population groups response')
 Population = namedtuple('Population', 'coefs priors')
-Group = namedtuple('Group', 'factor_names levels coefs sd_priors corr_prior')
+Group = namedtuple('Group', 'columns levels coefs sd_priors corr_prior')
 Response = namedtuple('Response', 'family nonlocparams priors')
 
 # Add information from the prior tree to the pre-model description.
@@ -66,7 +66,7 @@ def model_repr(model):
         write('=' * 40)
         write('Group {}'.format(i))
         write('-' * 40)
-        write('Factors: {}\nNum Levels: {}'.format(', '.join(group.factor_names), len(group.levels)))
+        write('Factors: {}\nNum Levels: {}'.format(', '.join(group.columns), len(group.levels)))
         write('Corr. Prior: {}'.format(None if group.corr_prior is None else family_repr(group.corr_prior)))
         write('S.D. Priors:')
         for (coef, sd_prior) in zip(group.coefs, group.sd_priors):
@@ -116,9 +116,9 @@ def scalar_parameter_map(model):
     out = [('b_{}'.format(coef), ('b', (i,)))
            for i, coef in enumerate(model.population.coefs)]
     for ix, group in enumerate(model.groups):
-        out.extend([('sd_{}__{}'.format(cols2str(group.factor_names), coef), ('sd_{}'.format(ix), (i,)))
+        out.extend([('sd_{}__{}'.format(cols2str(group.columns), coef), ('sd_{}'.format(ix), (i,)))
                     for i, coef in enumerate(group.coefs)])
-        out.extend([('r_{}[{},{}]'.format(cols2str(group.factor_names), '_'.join(level), coef), ('r_{}'.format(ix), (i, j)))
+        out.extend([('r_{}[{},{}]'.format(cols2str(group.columns), '_'.join(level), coef), ('r_{}'.format(ix), (i, j)))
                     for j, coef in enumerate(group.coefs)
                     for i, level in enumerate(group.levels)])
     for param in model.response.nonlocparams:

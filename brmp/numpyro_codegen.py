@@ -123,7 +123,7 @@ def gengroup(i, group):
     assert type(i) == int # A unique int assigned to each group.
     assert type(group) == Group
 
-    cmt = comment('Group {}: factor={}'.format(i, ':'.join(group.factor_names)))
+    cmt = comment('Group {}: factor={}'.format(i, ':'.join(group.columns)))
     code = ['', cmt]
     mu_code = [cmt]
 
