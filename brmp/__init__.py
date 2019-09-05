@@ -1,11 +1,12 @@
 import pandas as pd
 
 from pyro.contrib.brm.formula import parse, Formula
-from pyro.contrib.brm.design import makedata, Metadata, metadata_from_df, build_model_pre
+from pyro.contrib.brm.design import makedata, Metadata, metadata_from_df
 from pyro.contrib.brm.fit import Fit
 from pyro.contrib.brm.backend import Backend
 from pyro.contrib.brm.family import Family, Normal
 from pyro.contrib.brm.priors import build_prior_tree
+from pyro.contrib.brm.model_pre import build_model_pre
 from pyro.contrib.brm.model import build_model, model_repr
 from pyro.contrib.brm.pyro_backend import backend as pyro_backend
 from pyro.contrib.brm.backend import data_from_numpy

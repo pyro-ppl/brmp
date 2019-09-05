@@ -13,9 +13,10 @@ import numpyro.handlers as numpyro
 
 from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata, coef_names, build_model_pre, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_df, metadata_from_cols, make_column_lookup
+from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata, coef_names, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_df, metadata_from_cols, make_column_lookup
 from pyro.contrib.brm.priors import Prior, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ
+from pyro.contrib.brm.model_pre import build_model_pre
 from pyro.contrib.brm.model import build_model, parameters, scalar_parameter_map
 from pyro.contrib.brm.fit import marginals, fitted, param_marginal
 from pyro.contrib.brm.pyro_backend import backend as pyro_backend

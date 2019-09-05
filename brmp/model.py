@@ -2,9 +2,10 @@ from collections import namedtuple
 
 from pyro.contrib.brm.utils import unzip
 from .formula import Formula
-from .design import Metadata, RealValued, Categorical, Integral, ModelDescPre
+from .design import Metadata, RealValued, Categorical, Integral
 from .family import Family, Type, nonlocparams, support_depends_on_args, args, family_repr
 from .priors import select, tryselect, Node
+from pyro.contrib.brm.model_pre import ModelDescPre
 
 def family_matches_response(formula, metadata, family):
     assert type(formula) == Formula
