@@ -49,12 +49,6 @@ def walk(node, path):
 def select(node, path):
     return walk(node, path)[-1]
 
-def tryselect(node, path, default=None):
-    try:
-        return select(node, path)
-    except ValueError:
-        return default
-
 def edit(node, path, f):
     assert type(node) == Node
     assert type(path) == tuple
