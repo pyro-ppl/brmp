@@ -34,15 +34,8 @@ def defm(formula_str, df, family=None, priors=None):
     family = family or Normal
     priors = priors or []
     formula = parse(formula_str)
-    # TODO: Both `makedata` and `designmatrices_metadata` call
-    # `coding` (from design.py) internally. Instead we ought to call
-    # this once and share the result. (Perhaps by having the process
-    # of generating design matrices always return the metadata, while
-    # retaining the ability to generate the metadata without a
-    # concrete dataset.)
-    #
-    # Related: Perhaps design matrices ought to always have metadata
-    # (i.e. column names) associated with them, as in Patsy. (This
+    # Perhaps design matrices ought to always have metadata (i.e.
+    # column names) associated with them, as in Patsy.
     metadata = metadata_from_df(df)
     desc = makedesc(formula, metadata, family, priors)
     data = makedata(formula, df, metadata)
