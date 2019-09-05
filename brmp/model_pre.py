@@ -61,6 +61,7 @@ ResponsePre = namedtuple('ResponsePre', 'family nonlocparams')
 def build_model_pre(formula, metadata, family):
     assert type(formula) == Formula
     assert type(metadata) == Metadata
+    assert type(family) == Family
     assert set(allfactors(formula)).issubset(set(col.name for col in metadata.columns))
 
     check_family_matches_response(formula, metadata, family)
