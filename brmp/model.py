@@ -2,7 +2,7 @@ from collections import namedtuple
 
 from pyro.contrib.brm.utils import unzip
 from .family import Family
-from .priors import select, Node
+from .priors import select, Node, cols2str
 from pyro.contrib.brm.model_pre import ModelDescPre
 
 # Abstract model description.
@@ -26,8 +26,7 @@ def build_model(model_desc_pre, prior_tree):
     groups = []
     for group in model_desc_pre.groups:
 
-        # TODO: The presumably happens in priors.py too. Extract/reuse helper.
-        grp_node_name = ':'.join(group.columns)
+        grp_node_name = cols2str(group.columns)
 
         # If the pre-model indicates there is a corr prior, look it up
         # in the tree.
@@ -117,9 +116,9 @@ def scalar_parameter_map(model):
     out = [('b_{}'.format(coef), ('b', (i,)))
            for i, coef in enumerate(model.population.coefs)]
     for ix, group in enumerate(model.groups):
-        out.extend([('sd_{}__{}'.format(':'.join(group.factor_names), coef), ('sd_{}'.format(ix), (i,)))
+        out.extend([('sd_{}__{}'.format(cols2str(group.factor_names), coef), ('sd_{}'.format(ix), (i,)))
                     for i, coef in enumerate(group.coefs)])
-        out.extend([('r_{}[{},{}]'.format(':'.join(group.factor_names), '_'.join(level), coef), ('r_{}'.format(ix), (i, j)))
+        out.extend([('r_{}[{},{}]'.format(cols2str(group.factor_names), '_'.join(level), coef), ('r_{}'.format(ix), (i, j)))
                     for j, coef in enumerate(group.coefs)
                     for i, level in enumerate(group.levels)])
     for param in model.response.nonlocparams:
