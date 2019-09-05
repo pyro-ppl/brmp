@@ -66,8 +66,13 @@ def build_model_pre(formula, metadata, family):
     check_family_matches_response(formula, metadata, family)
 
     p = PopulationPre(coef_names(formula.terms, metadata))
-    gs = [GroupPre(group.columns, metadata.levels(group.columns), coefs, group.corr and len(coefs) > 1)
-          for group, coefs in ((group, coef_names(group.terms, metadata))
-                               for group in formula.groups)]
+
+    gs = []
+    for group in formula.groups:
+        assert all(type(metadata.column(col)) == Categorical for col in group.columns), 'grouping columns must be a factor'
+        coefs = coef_names(group.terms, metadata)
+        g = GroupPre(group.columns, metadata.levels(group.columns), coefs, group.corr and len(coefs) > 1)
+        gs.append(g)
+
     response = ResponsePre(family, nonlocparams(family))
     return ModelDescPre(p, gs, response)

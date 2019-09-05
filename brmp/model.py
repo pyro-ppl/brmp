@@ -26,11 +26,6 @@ def build_model(model_desc_pre, prior_tree):
     groups = []
     for group in model_desc_pre.groups:
 
-        # TODO: Do this earlier, also in `build_model_pre`? (Was in
-        # original `build_model`.)
-
-        #assert all(type(metadata.column(col)) == Categorical for col in cols), 'grouping columns must be a factor'
-
         # TODO: The presumably happens in priors.py too. Extract/reuse helper.
         grp_node_name = ':'.join(group.columns)
 
