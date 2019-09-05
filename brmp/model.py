@@ -1,7 +1,7 @@
 from collections import namedtuple
 
 from pyro.contrib.brm.utils import unzip
-from .family import Family
+from .family import Family, family_repr
 from .priors import select, Node, cols2str
 from pyro.contrib.brm.model_pre import ModelDescPre
 
