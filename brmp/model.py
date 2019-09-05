@@ -1,10 +1,8 @@
 from collections import namedtuple
 
 from pyro.contrib.brm.utils import unzip
-from .formula import Formula
-from .design import Metadata
-from .family import Family, nonlocparams, args
-from .priors import select, tryselect, Node
+from .family import Family
+from .priors import select, Node
 from pyro.contrib.brm.model_pre import ModelDescPre
 
 # Abstract model description.
