@@ -42,16 +42,13 @@ def check_family_matches_response(formula, metadata, family):
         raise Exception(error.format(family_repr(family), formula.response))
 
 # `ModelDescPre` is an intermediate step towards a full `ModelDesc`.
-# We start with a formula and some (meta)data, and from that we build
-# one of these pre/proto models. At this stage we know how the data
-# will be coded, and therefore know what coefs appear in the model,
-# but we don't yet have priors specified.
+# At this stage we know how the data will be coded, and therefore know
+# what coefs appear in the model, but we don't yet have priors
+# specified.
 
-# Serving as the basis for prior specification is the only purpose of
-# this structure -- once priors are specifed, the formula, prior tree
-# and (meta)data carry enough information to build the `ModelDesc`. (I
-# originally imagined this would be used in e.g. `marginals` but
-# `ModelDesc` plays that role.)
+# This structure serves as the basis for prior specification. Once the
+# prior tree is built, it is combined with this `ModelDescPre` to
+# produce the final `ModelDesc`.
 
 ModelDescPre = namedtuple('ModelDescPre', 'population groups response')
 PopulationPre = namedtuple('PopulationPre', 'coefs')
