@@ -523,9 +523,9 @@ def coef_names(terms, metadata):
                         for code in coded_interactions)
     return [product_col_to_coef_name(pcol) for pcol in product_cols]
 
-ModelDescPre = namedtuple('DesignMeta', 'population groups')
-PopulationPre = namedtuple('PopulationMeta', 'coefs')
-GroupPre = namedtuple('GroupMeta', 'columns coefs corr')
+ModelDescPre = namedtuple('ModelDescPre', 'population groups')
+PopulationPre = namedtuple('PopulationPre', 'coefs')
+GroupPre = namedtuple('GroupPre', 'columns coefs corr')
 
 def build_model_pre(formula, metadata):
     assert type(formula) == Formula
