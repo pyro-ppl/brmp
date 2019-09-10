@@ -18,7 +18,7 @@ from pyro.contrib.brm.priors import Prior, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ
 from pyro.contrib.brm.model_pre import build_model_pre
 from pyro.contrib.brm.model import build_model, parameters, scalar_parameter_map
-from pyro.contrib.brm.fit import marginals, fitted, param_marginal
+from pyro.contrib.brm.fit import Samples, marginals, fitted, param_marginal
 from pyro.contrib.brm.pyro_backend import backend as pyro_backend
 from pyro.contrib.brm.numpyro_backend import backend as numpyro_backend
 from pyro.contrib.brm.backend import data_from_numpy
@@ -319,6 +319,20 @@ def test_numpyro_codegen(N, formula_str, non_real_cols, family, priors, expected
                 name = 'concentration'
             val = fn.__getattribute__(name)
             assert_equal(val._value, np.broadcast_to(expected_val, val.shape))
+
+@pytest.mark.parametrize('N', [5])
+@pytest.mark.parametrize('backend', [pyro_backend])
+@pytest.mark.parametrize('formula_str, non_real_cols, family, priors, expected', codegen_cases)
+def test_sampling_from_prior_smoke(N, backend, formula_str, non_real_cols, family, priors, expected):
+    formula = parse(formula_str)
+    cols = expand_columns(formula, non_real_cols)
+    metadata = metadata_from_cols(cols) # Use full metadata for same reason given in comment in codegen test.
+    desc = makedesc(formula, metadata, family, priors)
+    model = backend.gen(desc)
+    df = dummy_df(cols, N)
+    data = data_from_numpy(backend, makedata(formula, df, metadata))
+    samples = backend.prior(data, model, num_samples=10)
+    assert type(samples) == Samples
 
 # Sanity checks to ensure that the generated `expected_response`
 # function does something sensible for some common families.
