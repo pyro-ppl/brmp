@@ -57,14 +57,20 @@ def from_numpy(arr):
     default_dtype = torch.get_default_dtype()
     if arr.size == 0:
         # Attempting to convert an empty array using
-        # `torch.from_numpy()` throws an error, so make a new
-        # empty array instead. I think this can only happen when
-        # `arr` holds floats, which at present will always be 64
-        # bit. (See `col2numpy` in design.py.)
-        assert arr.dtype == np.float64
-        out = torch.empty(arr.shape)
-        assert out.dtype == default_dtype
-        return out
+        # `torch.from_numpy()` throws an error, so make a new empty
+        # array instead.
+        if arr.dtype == np.float64:
+            # I expect that when `arr` holds floats they will always
+            # be 64 bit. (See `col2numpy` in design.py.)
+            out = torch.empty(arr.shape)
+            assert out.dtype == default_dtype
+            return out
+        elif arr.dtype == np.int64:
+            out = torch.empty(arr.shape).long()
+            assert out.dtype == torch.int64
+            return out
+        else:
+            raise Exception('unsupported array type')
     else:
         out = torch.from_numpy(arr)
         if torch.is_floating_point(out) and not out.dtype == default_dtype:

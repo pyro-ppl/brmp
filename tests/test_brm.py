@@ -320,7 +320,7 @@ def test_numpyro_codegen(N, formula_str, non_real_cols, family, priors, expected
             val = fn.__getattribute__(name)
             assert_equal(val._value, np.broadcast_to(expected_val, val.shape))
 
-@pytest.mark.parametrize('N', [5])
+@pytest.mark.parametrize('N', [0, 5])
 @pytest.mark.parametrize('backend', [pyro_backend])
 @pytest.mark.parametrize('formula_str, non_real_cols, family, priors, expected', codegen_cases)
 def test_sampling_from_prior_smoke(N, backend, formula_str, non_real_cols, family, priors, expected):
