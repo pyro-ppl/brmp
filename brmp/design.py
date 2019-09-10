@@ -521,10 +521,10 @@ def responsevector(column, df, metadata):
     assert type(column) == str
     assert type(df) == pd.DataFrame
     assert column in df
-    dfcol = df[column]
-    if is_float_dtype(dfcol) or is_integer_dtype(dfcol):
+    col = metadata.column(column)
+    if type(col) == RealValued or type(col) == Integral:
         code = NumericCoding(column)
-    elif is_categorical_dtype(dfcol) and len(dfcol.cat.categories) == 2:
+    elif type(col) == Categorical and len(col.levels) == 2:
         # TODO: How does a user know how this was coded? For design
         # matrices this is revealed by the column names in the design
         # metadata, but we don't have the here.

@@ -249,10 +249,10 @@ codegen_cases = [
 ]
 
 # TODO: Extend this. Could check that the response is observed?
+@pytest.mark.parametrize('N', [1, 5])
 @pytest.mark.parametrize('formula_str, non_real_cols, family, priors, expected', codegen_cases)
-def test_pyro_codegen(formula_str, non_real_cols, family, priors, expected):
+def test_pyro_codegen(N, formula_str, non_real_cols, family, priors, expected):
     # Make dummy data.
-    N = 5
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
     # Generate the model from the column information rather than from
@@ -287,10 +287,10 @@ def test_pyro_codegen(formula_str, non_real_cols, family, priors, expected):
 def unwrapfn(fn):
     return unwrapfn(fn.base_dist) if type(fn) == Independent else fn
 
+@pytest.mark.parametrize('N', [1, 5])
 @pytest.mark.parametrize('formula_str, non_real_cols, family, priors, expected', codegen_cases)
-def test_numpyro_codegen(formula_str, non_real_cols, family, priors, expected):
+def test_numpyro_codegen(N, formula_str, non_real_cols, family, priors, expected):
     # Make dummy data.
-    N = 5
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
     metadata = metadata_from_cols(cols)
