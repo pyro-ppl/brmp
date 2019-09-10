@@ -30,9 +30,6 @@ Here are some example formulae that the system can handle:
 | `y ~ 1 + x0 + (x1 \| z0) + (1 + x2 \|\| z1)` | Combinations of the above |
 
 
-The file [`ex1.py`](./ex1.py) shows the model code and data generated
-for a number of similar formulae.
-
 #### Priors
 
 Custom priors can be specified at various levels of granularity. For
