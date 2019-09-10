@@ -255,14 +255,21 @@ def test_pyro_codegen(formula_str, non_real_cols, family, priors, expected):
     N = 5
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
-    df = dummy_df(cols, N)
-
-    # Define model.
-    model = defm(formula_str, df, family, priors)
+    # Generate the model from the column information rather than from
+    # the metadata extracted from `df`. Since N is small, the metadata
+    # extracted from `df` might loose information compared to the full
+    # metadata derived from `cols` (e.g. levels of a categorical
+    # column) leading to unexpected results. e.g. Missing levels might
+    # cause correlations not to be modelled, even thought they ought
+    # to be given the full metadata.
+    metadata = metadata_from_cols(cols)
+    desc = makedesc(formula, metadata, family, priors)
 
     # Generate model function and data.
-    modelfn = pyro_backend.gen(model.desc).fn
-    data = data_from_numpy(pyro_backend, model.data)
+    modelfn = pyro_backend.gen(desc).fn
+
+    df = dummy_df(cols, N)
+    data = data_from_numpy(pyro_backend, makedata(formula, df, metadata))
 
     # Check sample sites.
     trace = poutine.trace(modelfn).get_trace(**data)
@@ -286,14 +293,14 @@ def test_numpyro_codegen(formula_str, non_real_cols, family, priors, expected):
     N = 5
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
-    df = dummy_df(cols, N)
-
-    # Define model.
-    model = defm(formula_str, df, family, priors)
+    metadata = metadata_from_cols(cols)
+    desc = makedesc(formula, metadata, family, priors)
 
     # Generate model function and data.
-    modelfn = numpyro_backend.gen(model.desc).fn
-    data = data_from_numpy(numpyro_backend, model.data)
+    modelfn = numpyro_backend.gen(desc).fn
+
+    df = dummy_df(cols, N)
+    data = data_from_numpy(numpyro_backend, makedata(formula, df, metadata))
 
     # Check sample sites.
     rng = random.PRNGKey(0)
