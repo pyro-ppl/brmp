@@ -339,7 +339,7 @@ def eval_method(code):
     from jax.scipy.special import expit as sigmoid
     import numpy as onp
     import numpyro.distributions as dist
-    from numpyro.handlers import sample
+    from numpyro import sample
     def chk_shape(arr, expected_shape):
         assert arr.shape == expected_shape
         return arr

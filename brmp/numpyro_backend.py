@@ -6,8 +6,7 @@ from jax import random, vmap
 from jax.config import config; config.update("jax_platform_name", "cpu")
 
 import numpyro.handlers as handler
-from numpyro.hmc_util import initialize_model
-from numpyro.mcmc import mcmc
+from numpyro.mcmc import MCMC, NUTS
 
 from pyro.contrib.brm.backend import Backend, Model, apply_default_hmc_args
 from pyro.contrib.brm.fit import Samples
@@ -60,11 +59,11 @@ def nuts(data, model, seed=None, iter=None, warmup=None):
     if seed is None:
         seed = np.random.randint(0, 2**32, dtype=np.uint32).astype(np.int32)
     rng = random.PRNGKey(seed)
-    init_params, potential_fn, constrain_fn = initialize_model(rng, model.fn, **data)
-    samples = mcmc(warmup, iter, init_params,
-                   potential_fn=potential_fn,
-                   constrain_fn=constrain_fn,
-                   print_summary=False)
+
+    kernel = NUTS(model.fn)
+    mcmc = MCMC(kernel, warmup, iter)
+    mcmc.run(rng, **data)
+    samples = mcmc.get_samples()
 
     # Here we re-run the model on the samples in order to collect
     # transformed parameters. (e.g. `b`, `mu`, etc.) Theses are made
