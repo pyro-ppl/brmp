@@ -55,7 +55,7 @@ PopulationPre = namedtuple('PopulationPre', 'coefs')
 GroupPre = namedtuple('GroupPre', 'columns levels coefs corr')
 ResponsePre = namedtuple('ResponsePre', 'family nonlocparams')
 
-def build_model_pre(formula, metadata, family):
+def build_model_pre(formula, metadata, family, custom_code_lengths):
     assert type(formula) == Formula
     assert type(metadata) == Metadata
     assert type(family) == Family
@@ -63,12 +63,12 @@ def build_model_pre(formula, metadata, family):
 
     check_family_matches_response(formula, metadata, family)
 
-    p = PopulationPre(coef_names(formula.terms, metadata))
+    p = PopulationPre(coef_names(formula.terms, metadata, custom_code_lengths))
 
     gs = []
     for group in formula.groups:
         assert all(type(metadata.column(col)) == Categorical for col in group.columns), 'grouping columns must be a factor'
-        coefs = coef_names(group.terms, metadata)
+        coefs = coef_names(group.terms, metadata, custom_code_lengths)
         g = GroupPre(group.columns, metadata.levels(group.columns), coefs, group.corr and len(coefs) > 1)
         gs.append(g)
 

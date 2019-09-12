@@ -105,8 +105,12 @@ def fitted(fit, what='expectation', data=None):
     # TODO: I suspect this ought to use the metadata from the original
     # data, to ensure consistent coding of categorical
     # columns/groupings.
+
+    # TODO: This ought to re-use any contrasts used to code the
+    # original data?
+
     mu = location(fit.data if data is None
-                  else data_from_numpy(fit.backend, predictors(fit.formula, data, metadata_from_df(data))))
+                  else data_from_numpy(fit.backend, predictors(fit.formula, data, metadata_from_df(data), {})))
 
     if what == 'sample' or what == 'expectation':
         args = [mu if name == 'mu' else get_param(name)

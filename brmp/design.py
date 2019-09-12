@@ -366,6 +366,11 @@ def partition_terms(terms, metadata):
     return first + rest
 
 
+
+def code_lengths(contrasts):
+    assert type(contrasts) == dict
+    return {k:mat.shape[1] for k,mat in contrasts.items()}
+
 # Build a simple design matrix (as a torch tensor) from columns of a
 # pandas data frame.
 
@@ -375,13 +380,13 @@ def partition_terms(terms, metadata):
 # of floats, ints, or level values?) and the existing dataframe
 # metadata structure to describe the types of the columns, etc.
 
-def designmatrix(terms, df, metadata):
+def designmatrix(terms, df, metadata, contrasts):
     assert type(terms) == OrderedSet
     coded_interactions = code_terms(terms, metadata)
-    product_cols = join(coded_interaction_to_product_cols(code, metadata)
+    product_cols = join(coded_interaction_to_product_cols(code, metadata, code_lengths(contrasts))
                         for code in coded_interactions)
     N = len(df)
-    arrs = [execute_product_col(pcol, df) for pcol in product_cols]
+    arrs = [execute_product_col(pcol, df, contrasts) for pcol in product_cols]
     X = np.stack(arrs, axis=1) if arrs else np.empty((N, 0))
     assert X.shape[0] == N
     if X.shape[0] > 0 and X.shape[1] > 0 and np.linalg.matrix_rank(X) != X.shape[1]:
@@ -410,6 +415,9 @@ def code_terms(terms, metadata):
 IndicatorCol = namedtuple('IndicatorCol', ['factor', 'level'])
 IndicatorCol.__repr__ = lambda self: 'I[{}={}]'.format(self.factor, self.level)
 
+CustomCol = namedtuple('CustomCol', ['factor', 'index'])
+CustomCol.__repr__ = lambda self: 'Custom({})[{}]'.format(self.factor, self.index)
+
 NumericCol = namedtuple('NumericCol', ['factor'])
 NumericCol.__repr__ = lambda self: 'Num({})'.format(self.factor)
 
@@ -417,18 +425,30 @@ NumericCol.__repr__ = lambda self: 'Num({})'.format(self.factor)
 ProductCol = namedtuple('ProductCol', ['cols']) # `cols` is expected to be a list
 
 
-def coded_interaction_to_product_cols(coded_interaction, metadata):
+def coded_interaction_to_product_cols(coded_interaction, metadata, code_lengths):
     assert type(coded_interaction) == list
     assert type(metadata) == Metadata
+    assert type(code_lengths) == dict
     assert all(type(c) in [CategoricalCoding, NumericCoding] for c in coded_interaction)
 
     cs, ns = partition(lambda cf: type(cf) == NumericCoding, coded_interaction)
 
-    def levels(c):
-        all_levels = metadata.column(c.factor).levels
-        return all_levels[1:] if c.reduced else all_levels
+    def go(c):
+        # Patsy and R seem to differ in what they do here. This
+        # implementation is similar to Patsy. In contrast, in R the
+        # custom coding is only used when `c.reduced == True`.
+        if c.factor in code_lengths:
+            # Custom coding.
+            code_length = code_lengths[c.factor]
+            assert type(code_length) == int
+            return [CustomCol(c.factor, i) for i in range(code_length)]
+        else:
+            # Default coding.
+            all_levels = metadata.column(c.factor).levels
+            levels = all_levels[1:] if c.reduced else all_levels
+            return [IndicatorCol(c.factor, level) for level in levels]
 
-    interactions = product([[IndicatorCol(c.factor, level) for level in levels(c)] for c in cs])
+    interactions = product([go(c) for c in cs])
 
     ncols_dict = {n.factor: NumericCol(n.factor) for n in ns}
     def extend_with_numeric_cols(ccols):
@@ -456,6 +476,8 @@ def product_col_to_coef_name(product_col):
             return '{}[{}]'.format(col.factor, col.level)
         elif type(col) == NumericCol:
             return col.factor
+        elif type(col) == CustomCol:
+            return '{}[custom.{}]'.format(col.factor, col.index)
         else:
             raise Exception('unknown column type')
 
@@ -465,7 +487,7 @@ def product_col_to_coef_name(product_col):
         return ':'.join(dispatch(col) for col in product_col.cols)
 
 
-def execute_product_col(product_col, df):
+def execute_product_col(product_col, df, contrasts):
     assert type(product_col) == ProductCol
     assert type(df) == pd.DataFrame
 
@@ -477,6 +499,16 @@ def execute_product_col(product_col, df):
         elif type(col) == NumericCol:
             assert is_float_dtype(dfcol) or is_integer_dtype(dfcol)
             return dfcol.to_numpy()
+        elif type(col) == CustomCol:
+            assert col.factor in contrasts
+            mat = contrasts[col.factor]
+            levels = dfcol.cat.categories.to_list()
+            assert len(levels) == mat.shape[0]
+            assert col.index < mat.shape[1]
+            # TODO: Better asymptotics then using `.index()`
+            out = mat[[levels.index(val) for val in dfcol], col.index]
+            print(out)
+            return out
         else:
             raise Exception('unknown column type')
 
@@ -494,11 +526,11 @@ def execute_product_col(product_col, df):
     assert arr.shape[0] == N
     return arr
 
-def coef_names(terms, metadata):
+def coef_names(terms, metadata, code_lengths):
     assert type(terms) == OrderedSet
     assert type(metadata) == Metadata
     coded_interactions = code_terms(terms, metadata)
-    product_cols = join(coded_interaction_to_product_cols(code, metadata)
+    product_cols = join(coded_interaction_to_product_cols(code, metadata, code_lengths)
                         for code in coded_interactions)
     return [product_col_to_coef_name(pcol) for pcol in product_cols]
 
@@ -531,20 +563,20 @@ def responsevector(column, df, metadata):
         code = CategoricalCoding(column, True)
     else:
         raise Exception('Don\'t know how to code a response of this type.')
-    pcols = coded_interaction_to_product_cols([code], metadata)
+    pcols = coded_interaction_to_product_cols([code], metadata, {})
     assert len(pcols) == 1
-    return execute_product_col(pcols[0], df)
+    return execute_product_col(pcols[0], df, {})
 
-def predictors(formula, df, metadata):
+def predictors(formula, df, metadata, contrasts):
     assert type(formula) == Formula
     assert type(df) == pd.DataFrame
     data = {}
-    data['X'] = designmatrix(formula.terms, df, metadata)
+    data['X'] = designmatrix(formula.terms, df, metadata, contrasts)
     for i, group in enumerate(formula.groups):
-        data['Z_{}'.format(i)] = designmatrix(group.terms, df, metadata)
+        data['Z_{}'.format(i)] = designmatrix(group.terms, df, metadata, contrasts)
         data['J_{}'.format(i)] = lookupvector(group.columns, df, metadata)
     return data
 
-def makedata(formula, df, metadata):
-    return dict(predictors(formula, df, metadata),
+def makedata(formula, df, metadata, contrasts):
+    return dict(predictors(formula, df, metadata, contrasts),
                 y_obs=responsevector(formula.response, df, metadata))

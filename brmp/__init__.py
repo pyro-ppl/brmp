@@ -1,7 +1,8 @@
+import numpy as np
 import pandas as pd
 
 from pyro.contrib.brm.formula import parse, Formula
-from pyro.contrib.brm.design import makedata, Metadata, metadata_from_df
+from pyro.contrib.brm.design import makedata, Metadata, metadata_from_df, code_lengths
 from pyro.contrib.brm.fit import Fit
 from pyro.contrib.brm.backend import Backend
 from pyro.contrib.brm.family import Family, Normal
@@ -17,28 +18,36 @@ def makecode(formula, df, family, priors, backend=pyro_backend):
     desc = makedesc(formula, metadata_from_df(df), family, priors)
     return backend.gen(desc).code
 
-def makedesc(formula, metadata, family, priors):
+def makedesc(formula, metadata, family, priors, code_lengths):
     assert type(formula) == Formula
     assert type(metadata) == Metadata
     assert type(family) == Family
     assert type(priors) == list
-    model_desc_pre = build_model_pre(formula, metadata, family)
+    model_desc_pre = build_model_pre(formula, metadata, family, code_lengths)
     prior_tree = build_prior_tree(model_desc_pre, priors)
     return build_model(model_desc_pre, prior_tree)
 
-def defm(formula_str, df, family=None, priors=None):
+def defm(formula_str, df, family=None, priors=None, contrasts=None):
     assert type(formula_str) == str
     assert type(df) == pd.DataFrame
     assert family is None or type(family) == Family
     assert priors is None or type(priors) == list
+    assert contrasts is None or type(contrasts) == dict
+
     family = family or Normal
     priors = priors or []
+    contrasts = contrasts or {}
+
+    # TODO: Consider accepting nested arrays as well as numpy arrays.
+    # (If we do, convert to numpy arrays here in `defm`?)
+    assert all(type(val) == np.ndarray and len(val.shape) == 2 for val in contrasts.values())
+
     formula = parse(formula_str)
     # Perhaps design matrices ought to always have metadata (i.e.
     # column names) associated with them, as in Patsy.
     metadata = metadata_from_df(df)
-    desc = makedesc(formula, metadata, family, priors)
-    data = makedata(formula, df, metadata)
+    desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
+    data = makedata(formula, df, metadata, contrasts)
     return DefmResult(formula, desc, data)
 
 # A wrapper around a pair of model and data. Has a friendly `repr` and
