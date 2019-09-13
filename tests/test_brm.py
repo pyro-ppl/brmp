@@ -264,10 +264,28 @@ codegen_cases = [
     # Contrasts
     ('y ~ a',
      [Categorical('a', ['a1', 'a2'])],
-     {'a': np.array([[-1, 0], [1, 0]])},
+     {'a': np.array([[-1, -1, -1], [1, 1, 1]])},
      Normal,
-     [],
+     [Prior(('b', 'a[custom.1]'), Normal(0., 1.))],
      [('b_0', 'Cauchy', {}),
+      ('b_1', 'Normal', {}),
+      ('b_2', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {})]),
+
+    ('y ~ a + (a | b)',
+     [Categorical('a', ['a1', 'a2']), Categorical('b', ['b1', 'b2'])],
+     {'a': np.array([[-1, -1, -1], [1, 1, 1]])},
+     Normal, [
+         Prior(('b', 'a[custom.1]'), Normal(0., 1.)),
+         Prior(('sd', 'b', 'a[custom.0]'), HalfCauchy(4.))
+     ],
+     [('b_0', 'Cauchy', {}),
+      ('b_1', 'Normal', {}),
+      ('b_2', 'Cauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('sd_0_0', 'HalfCauchy', {'scale': 4.}),
+      ('sd_0_1', 'HalfCauchy', {}),
+      ('L_0', 'LKJ', {}),
       ('sigma', 'HalfCauchy', {})]),
 
 ]
