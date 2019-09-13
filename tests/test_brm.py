@@ -951,6 +951,13 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
     ('y ~ 1 + x + (1 | a)',
      [Categorical('a', list('ab'))],
      {}),
+    # Using this contrast means `a` is coded as two columns rather
+    # than (the default) one. Because of this, it's crucial that
+    # `fitted` uses the contrast when coding *new data*. This test
+    # would fail if that didn't happen.
+    ('y ~ 1 + a',
+     [Categorical('a', list('ab'))],
+     {'a': np.array([[-1, -1], [1, 1]])}),
 ])
 def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, contrasts):
     N = 10
