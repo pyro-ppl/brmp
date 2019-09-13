@@ -260,6 +260,16 @@ codegen_cases = [
      Binomial(num_trials=10),
      [],
      [('b_0', 'Cauchy', {})]),
+
+    # Contrasts
+    ('y ~ a',
+     [Categorical('a', ['a1', 'a2'])],
+     {'a': np.array([[-1, 0], [1, 0]])},
+     Normal,
+     [],
+     [('b_0', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {})]),
+
 ]
 
 # TODO: Extend this. Could check that the response is observed?

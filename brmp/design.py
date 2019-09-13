@@ -503,7 +503,7 @@ def execute_product_col(product_col, df, contrasts):
             assert col.factor in contrasts
             mat = contrasts[col.factor]
             levels = dfcol.cat.categories.to_list()
-            assert len(levels) == mat.shape[0]
+            assert len(levels) <= mat.shape[0]
             assert col.index < mat.shape[1]
             # TODO: Better asymptotics then using `.index()`
             out = mat[[levels.index(val) for val in dfcol], col.index]
