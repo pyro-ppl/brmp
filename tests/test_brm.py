@@ -13,7 +13,7 @@ import numpyro.handlers as numpyro
 
 from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata, coef_names, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_df, metadata_from_cols, make_column_lookup
+from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata, coef_names, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_df, metadata_from_cols, make_column_lookup, code_lengths
 from pyro.contrib.brm.priors import Prior, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ
 from pyro.contrib.brm.model_pre import build_model_pre
@@ -47,22 +47,22 @@ codegen_cases = [
     # these be dropped?
     #(Formula('y', [], []), [], [], ['sigma']),
 
-    ('y ~ 1 + x', [], Normal, [],
+    ('y ~ 1 + x', [], {}, Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {})]),
 
     # Integer valued predictor.
-    ('y ~ 1 + x', [Integral('x', min=0, max=10)], Normal, [],
+    ('y ~ 1 + x', [Integral('x', min=0, max=10)], {}, Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {})]),
 
-    ('y ~ 1 + x1 + x2', [], Normal, [],
+    ('y ~ 1 + x1 + x2', [], {}, Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {})]),
 
     ('y ~ x1:x2',
      [Categorical('x1', list('ab')), Categorical('x2', list('cd'))],
-     Normal, [],
+     {}, Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {})]),
 
@@ -70,32 +70,32 @@ codegen_cases = [
     # Groups with fewer than two terms don't sample the (Cholesky
     # decomp. of the) correlation matrix.
     #(Formula('y', [], [Group([], 'z', True)]), [Categorical('z', list('ab'))], [], ['sigma', 'z_1']),
-    ('y ~ 1 | z', [Categorical('z', list('ab'))], Normal, [],
+    ('y ~ 1 | z', [Categorical('z', list('ab'))], {}, Normal, [],
      [('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
       ('sd_0_0', 'HalfCauchy', {})]),
 
-    ('y ~ x | z', [Categorical('z', list('ab'))], Normal, [],
+    ('y ~ x | z', [Categorical('z', list('ab'))], {}, Normal, [],
      [('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
       ('sd_0_0', 'HalfCauchy', {})]),
 
     ('y ~ x | z',
      [Categorical('x', list('ab')), Categorical('z', list('ab'))],
-     Normal, [],
+     {}, Normal, [],
      [('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
       ('sd_0_0', 'HalfCauchy', {}),
       ('L_0', 'LKJ', {})]),
 
-    ('y ~ 1 + x1 + x2 + (1 + x3 | z)', [Categorical('z', list('ab'))], Normal, [],
+    ('y ~ 1 + x1 + x2 + (1 + x3 | z)', [Categorical('z', list('ab'))], {}, Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
       ('sd_0_0', 'HalfCauchy', {}),
       ('L_0', 'LKJ', {})]),
 
-    ('y ~ 1 + x1 + x2 + (1 + x3 || z)', [Categorical('z', list('ab'))], Normal, [],
+    ('y ~ 1 + x1 + x2 + (1 + x3 || z)', [Categorical('z', list('ab'))], {}, Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
@@ -103,6 +103,7 @@ codegen_cases = [
 
     ('y ~ 1 + x1 + x2 + (1 + x3 + x4 | z1) + (1 + x5 | z2)',
      [Categorical('z1', list('ab')), Categorical('z2', list('ab'))],
+     {},
      Normal,
      [],
      [('b_0', 'Cauchy', {}),
@@ -116,6 +117,7 @@ codegen_cases = [
 
     ('y ~ 1 | a:b',
      [Categorical('a', ['a1', 'a2']), Categorical('b', ['b1', 'b2'])],
+     {},
      Normal,
      [],
      [('sigma', 'HalfCauchy', {}),
@@ -124,14 +126,14 @@ codegen_cases = [
 
     # Custom priors.
     ('y ~ 1 + x1 + x2',
-     [],
+     [], {},
      Normal,
      [Prior(('b',), Normal(0., 100.))],
      [('b_0', 'Normal', {'loc': 0., 'scale': 100.}),
       ('sigma', 'HalfCauchy', {})]),
 
     ('y ~ 1 + x1 + x2',
-     [],
+     [], {},
      Normal,
      [Prior(('b', 'intercept'), Normal(0., 100.))],
      [('b_0', 'Normal', {'loc': 0., 'scale': 100.}),
@@ -139,7 +141,7 @@ codegen_cases = [
       ('sigma', 'HalfCauchy', {})]),
 
     ('y ~ 1 + x1 + x2',
-     [],
+     [], {},
      Normal,
      [Prior(('b', 'x1'), Normal(0., 100.))],
      [('b_0', 'Cauchy', {}),
@@ -150,6 +152,7 @@ codegen_cases = [
     # Prior on coef of a factor.
     ('y ~ 1 + x',
      [Categorical('x', list('ab'))],
+     {},
      Normal,
      [Prior(('b', 'x[b]'), Normal(0., 100.))],
      [('b_0', 'Cauchy', {}),
@@ -159,6 +162,7 @@ codegen_cases = [
     # Prior on coef of an interaction.
     ('y ~ x1:x2',
      [Categorical('x1', list('ab')), Categorical('x2', list('cd'))],
+     {},
      Normal,
      [Prior(('b', 'x1[b]:x2[c]'), Normal(0., 100.))],
      [('b_0', 'Cauchy', {}),
@@ -169,6 +173,7 @@ codegen_cases = [
     # Prior on group level `sd` choice.
     ('y ~ 1 + x2 + x3 | x1',
      [Categorical('x1', list('ab'))],
+     {},
      Normal,
      [Prior(('sd', 'x1', 'intercept'), HalfCauchy(4.))],
      [('sigma', 'HalfCauchy', {}),
@@ -179,6 +184,7 @@ codegen_cases = [
 
     ('y ~ 1 + x2 + x3 || x1',
      [Categorical('x1', list('ab'))],
+     {},
      Normal,
      [Prior(('sd', 'x1', 'intercept'), HalfNormal(4.))],
      [('sigma', 'HalfCauchy', {}),
@@ -188,6 +194,7 @@ codegen_cases = [
 
     ('y ~ 1 + x || a:b',
      [Categorical('a', ['a1', 'a2']), Categorical('b', ['b1', 'b2'])],
+     {},
      Normal,
      [Prior(('sd', 'a:b', 'intercept'), HalfNormal(4.))],
      [('sigma', 'HalfCauchy', {}),
@@ -198,6 +205,7 @@ codegen_cases = [
     # Prior on L.
     ('y ~ 1 + x2 | x1',
      [Categorical('x1', list('ab'))],
+     {},
      Normal,
      [Prior(('cor',), LKJ(2.))],
      [('sigma', 'HalfCauchy', {}),
@@ -207,6 +215,7 @@ codegen_cases = [
 
     ('y ~ 1 + x | a:b',
      [Categorical('a', ['a1', 'a2']), Categorical('b', ['b1', 'b2'])],
+     {},
      Normal,
      [Prior(('cor', 'a:b'), LKJ(2.))],
      [('sigma', 'HalfCauchy', {}),
@@ -217,6 +226,7 @@ codegen_cases = [
     # Prior on parameter of response distribution.
     ('y ~ x',
      [],
+     {},
      Normal,
      [Prior(('resp', 'sigma'), HalfCauchy(4.))],
      [('b_0', 'Cauchy', {}),
@@ -225,24 +235,28 @@ codegen_cases = [
     # Custom response family.
     ('y ~ x',
      [],
+     {},
      Normal(sigma=0.5),
      [],
      [('b_0', 'Cauchy', {})]),
 
     ('y ~ x',
      [Categorical('y', list('AB'))],
+     {},
      Bernoulli,
      [],
      [('b_0', 'Cauchy', {})]),
 
     ('y ~ x',
      [Integral('y', min=0, max=1)],
+     {},
      Bernoulli,
      [],
      [('b_0', 'Cauchy', {})]),
 
     ('y ~ x',
      [Integral('y', min=0, max=10)],
+     {},
      Binomial(num_trials=10),
      [],
      [('b_0', 'Cauchy', {})]),
@@ -250,8 +264,8 @@ codegen_cases = [
 
 # TODO: Extend this. Could check that the response is observed?
 @pytest.mark.parametrize('N', [1, 5])
-@pytest.mark.parametrize('formula_str, non_real_cols, family, priors, expected', codegen_cases)
-def test_pyro_codegen(N, formula_str, non_real_cols, family, priors, expected):
+@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
+def test_pyro_codegen(N, formula_str, non_real_cols, contrasts, family, priors, expected):
     # Make dummy data.
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
@@ -263,13 +277,13 @@ def test_pyro_codegen(N, formula_str, non_real_cols, family, priors, expected):
     # cause correlations not to be modelled, even thought they ought
     # to be given the full metadata.
     metadata = metadata_from_cols(cols)
-    desc = makedesc(formula, metadata, family, priors, {})
+    desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
 
     # Generate model function and data.
     modelfn = pyro_backend.gen(desc).fn
 
     df = dummy_df(cols, N)
-    data = data_from_numpy(pyro_backend, makedata(formula, df, metadata, {}))
+    data = data_from_numpy(pyro_backend, makedata(formula, df, metadata, contrasts))
 
     # Check sample sites.
     trace = poutine.trace(modelfn).get_trace(**data)
@@ -288,19 +302,19 @@ def unwrapfn(fn):
     return unwrapfn(fn.base_dist) if type(fn) == Independent else fn
 
 @pytest.mark.parametrize('N', [1, 5])
-@pytest.mark.parametrize('formula_str, non_real_cols, family, priors, expected', codegen_cases)
-def test_numpyro_codegen(N, formula_str, non_real_cols, family, priors, expected):
+@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
+def test_numpyro_codegen(N, formula_str, non_real_cols, contrasts, family, priors, expected):
     # Make dummy data.
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
     metadata = metadata_from_cols(cols)
-    desc = makedesc(formula, metadata, family, priors, {})
+    desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
 
     # Generate model function and data.
     modelfn = numpyro_backend.gen(desc).fn
 
     df = dummy_df(cols, N)
-    data = data_from_numpy(numpyro_backend, makedata(formula, df, metadata, {}))
+    data = data_from_numpy(numpyro_backend, makedata(formula, df, metadata, contrasts))
 
     # Check sample sites.
     rng = random.PRNGKey(0)
@@ -322,15 +336,15 @@ def test_numpyro_codegen(N, formula_str, non_real_cols, family, priors, expected
 
 @pytest.mark.parametrize('N', [0, 5])
 @pytest.mark.parametrize('backend', [pyro_backend, numpyro_backend])
-@pytest.mark.parametrize('formula_str, non_real_cols, family, priors, expected', codegen_cases)
-def test_sampling_from_prior_smoke(N, backend, formula_str, non_real_cols, family, priors, expected):
+@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
+def test_sampling_from_prior_smoke(N, backend, formula_str, non_real_cols, contrasts, family, priors, expected):
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
     metadata = metadata_from_cols(cols) # Use full metadata for same reason given in comment in codegen test.
-    desc = makedesc(formula, metadata, family, priors, {})
+    desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
     model = backend.gen(desc)
     df = dummy_df(cols, N)
-    data = data_from_numpy(backend, makedata(formula, df, metadata, {}))
+    data = data_from_numpy(backend, makedata(formula, df, metadata, contrasts))
     samples = backend.prior(data, model, num_samples=10)
     assert type(samples) == Samples
 
@@ -363,7 +377,7 @@ def test_expected_response_codegen(response_meta, family, args, expected, backen
         return backend.to_numpy(fn(*backend_args))
     assert_equal(expected_response(*args), expected)
 
-@pytest.mark.parametrize('formula_str, non_real_cols, family, priors, expected', codegen_cases)
+@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
 @pytest.mark.parametrize('fitargs', [
     dict(backend=pyro_backend, iter=1, warmup=0),
     dict(backend=pyro_backend, algo='svi', iter=1, num_samples=1),
@@ -374,7 +388,7 @@ def test_expected_response_codegen(response_meta, family, args, expected, backen
         dict(backend=numpyro_backend, iter=1, warmup=0),
         marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow'))
 ])
-def test_parameter_shapes(formula_str, non_real_cols, family, priors, expected, fitargs):
+def test_parameter_shapes(formula_str, non_real_cols, contrasts, family, priors, expected, fitargs):
     # Make dummy data.
     N = 5
     formula = parse(formula_str)
@@ -382,7 +396,7 @@ def test_parameter_shapes(formula_str, non_real_cols, family, priors, expected, 
     df = dummy_df(cols, N)
 
     # Define model, and generate a single posterior sample.
-    model = defm(formula_str, df, family, priors)
+    model = defm(formula_str, df, family, priors, contrasts)
     fit = model.fit(**fitargs)
 
     # Check parameter sizes.
