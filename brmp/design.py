@@ -507,7 +507,6 @@ def execute_product_col(product_col, df, contrasts):
             assert col.index < mat.shape[1]
             # TODO: Better asymptotics then using `.index()`
             out = mat[[levels.index(val) for val in dfcol], col.index]
-            print(out)
             return out
         else:
             raise Exception('unknown column type')
