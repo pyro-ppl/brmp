@@ -17,7 +17,7 @@ from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata,
 from pyro.contrib.brm.priors import Prior, get_response_prior, build_prior_tree
 from pyro.contrib.brm.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ
 from pyro.contrib.brm.model_pre import build_model_pre
-from pyro.contrib.brm.model import build_model, parameters, scalar_parameter_map
+from pyro.contrib.brm.model import build_model, parameters, scalar_parameter_map, scalar_parameter_names
 from pyro.contrib.brm.fit import Samples, marginals, fitted, param_marginal
 from pyro.contrib.brm.pyro_backend import backend as pyro_backend
 from pyro.contrib.brm.numpyro_backend import backend as numpyro_backend
@@ -947,18 +947,22 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
         lambda S: dict(backend=numpyro_backend, algo='prior', num_samples=S),
         marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow')),
 ])
-def test_marginals_fitted_smoke(fitargs):
+@pytest.mark.parametrize('formula_str, non_real_cols, contrasts', [
+    ('y ~ 1 + x + (1 | a)',
+     [Categorical('a', list('ab'))],
+     {}),
+])
+def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, contrasts):
     N = 10
     S = 4
-    cols = [RealValued('y'),
-            RealValued('x'),
-            Categorical('a', list('ab'))]
+    cols = expand_columns(parse(formula_str), non_real_cols)
     df = dummy_df(cols, N)
-    fit = defm('y ~ 1 + x + (1 | a)', df).fit(**fitargs(S))
+    fit = defm(formula_str, df, contrasts=contrasts).fit(**fitargs(S))
     def chk(arr, expected_shape):
         assert np.all(np.isfinite(arr))
         assert arr.shape == expected_shape
-    chk(marginals(fit).array, (6, 7)) # num coefs x num stats
+    num_coefs = len(scalar_parameter_names(fit.model_desc))
+    chk(marginals(fit).array, (num_coefs, 7)) # num coefs x num stats
     chk(fitted(fit), (S, N))
     chk(fitted(fit, 'linear'), (S, N))
     chk(fitted(fit, 'response'), (S, N))
