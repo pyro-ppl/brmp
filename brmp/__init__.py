@@ -48,13 +48,14 @@ def defm(formula_str, df, family=None, priors=None, contrasts=None):
     metadata = metadata_from_df(df)
     desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
     data = makedata(formula, df, metadata, contrasts)
-    return DefmResult(formula, contrasts, desc, data)
+    return DefmResult(formula, metadata, contrasts, desc, data)
 
 # A wrapper around a pair of model and data. Has a friendly `repr` and
 # makes it easy to fit the model.
 class DefmResult:
-    def __init__(self, formula, contrasts, desc, data):
+    def __init__(self, formula, metadata, contrasts, desc, data):
         self.formula = formula
+        self.metadata = metadata
         self.contrasts = contrasts
         self.desc = desc
         self.data = data
@@ -98,7 +99,7 @@ class GenerateResult():
 
     def _run_algo(self, algo, *args, **kwargs):
         samples = getattr(self.backend, algo)(self.data, self.model, *args, **kwargs)
-        return Fit(self.defm_result.formula, self.defm_result.contrasts, self.data, self.defm_result.desc, self.model, samples, self.backend)
+        return Fit(self.defm_result.formula, self.defm_result.metadata, self.defm_result.contrasts, self.data, self.defm_result.desc, self.model, samples, self.backend)
 
     def prior(self, *args, **kwargs):
         return self._run_algo('prior', *args, **kwargs)

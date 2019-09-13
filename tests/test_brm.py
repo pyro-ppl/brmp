@@ -951,6 +951,9 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
     ('y ~ 1 + x + (1 | a)',
      [Categorical('a', list('ab'))],
      {}),
+    ('y ~ 1 + a',
+     [Categorical('a', list('ab'))],
+     {}),
     # Using this contrast means `a` is coded as two columns rather
     # than (the default) one. Because of this, it's crucial that
     # `fitted` uses the contrast when coding *new data*. This test
@@ -959,11 +962,18 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
      [Categorical('a', list('ab'))],
      {'a': np.array([[-1, -1], [1, 1]])}),
 ])
-def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, contrasts):
+# Testing with N2=1 ensure that for model with categorical
+# factors/columns, "new data" can only include a proper subset of the
+# available levels. Such data must be coded using the original
+# metadata in order ensure to be compatible with the model, and this
+# test exercises that.
+@pytest.mark.parametrize('N2', [1, 8])
+def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, contrasts, N2):
     N = 10
     S = 4
     cols = expand_columns(parse(formula_str), non_real_cols)
     df = dummy_df(cols, N)
+    print(df)
     fit = defm(formula_str, df, contrasts=contrasts).fit(**fitargs(S))
     def chk(arr, expected_shape):
         assert np.all(np.isfinite(arr))
@@ -975,6 +985,6 @@ def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, contrasts):
     chk(fitted(fit, 'response'), (S, N))
     chk(fitted(fit, 'sample'), (S, N))
     # Applying `fitted` to new data.
-    N2 = 8
     df2 = dummy_df(cols, N2)
+    print(df2)
     chk(fitted(fit, data=df2), (S, N2))
