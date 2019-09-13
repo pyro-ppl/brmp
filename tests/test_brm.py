@@ -757,6 +757,20 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
                       [1.,  1., 3.,  3.]]),
           y_obs=np.array([1., 2., 3.]))),
 
+    ('y ~ 1 + (a | b)',
+     pd.DataFrame(dict(y=[1., 2., 3.],
+                       a=pd.Categorical(['a1', 'a1', 'a2']),
+                       b=pd.Categorical(['b1', 'b2', 'b2']))),
+     {'a': np.array([[-1], [1]])},
+     dict(X=np.array([[1.],
+                      [1.],
+                      [1.]]),
+          Z_0=np.array([[-1.],
+                        [-1.],
+                        [ 1.]]),
+          J_0=np.array([0, 1, 1]),
+          y_obs=np.array([1., 2., 3.]))),
+
 ])
 def test_designmatrix(formula_str, df, contrasts, expected):
     metadata = metadata_from_df(df)
