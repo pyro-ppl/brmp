@@ -83,6 +83,21 @@ HalfNormal = Family('HalfNormal',
                     [param('sigma', Type['PosReal']())],
                     const(Type['PosReal']()),
                     None)
+# TODO: Add tests for these families.
+# TODO: Add default priors of parameters of ZOIB.
+ZeroOneInflatedBeta = Family('ZeroOneInflatedBeta',
+                             [param('loc', Type['UnitInterval']()),
+                              param('prec', Type['PosReal']()),
+                              param('alpha', Type['UnitInterval']()),
+                              param('gamma', Type['UnitInterval']())],
+                             const(Type['UnitInterval']()),
+                             Link('loc', LinkFn.logit))
+Beta = Family('Beta',
+              [param('alpha', Type['PosReal']()),
+               param('beta', Type['PosReal']())],
+              const(Type['UnitInterval']()),
+              None)
+
 
 def apply1(family, name, value):
     if name not in [p.name for p in family.params]:

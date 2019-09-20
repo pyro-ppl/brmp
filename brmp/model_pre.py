@@ -29,6 +29,9 @@ def family_matches_response(formula, metadata, family):
         return (type(factor) == Integral and
                 (family.support().lb is None or factor.min >= family.support().lb) and
                 (family.support().ub is None or factor.max <= family.support().ub))
+    elif type(family.support()) == Type['UnitInterval']:
+        # TODO: Check data are in range.
+        return type(factor) == RealValued
     else:
         return False
 
