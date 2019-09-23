@@ -32,7 +32,13 @@ Integral = namedtuple('Integral',
                        'min',
                        'max'])
 
-RealValued = namedtuple('RealValued', ['name'])
+class RealValued(namedtuple('RealValued', ['name', 'min', 'max'])):
+    def __new__(cls, name, min=None, max=None): # None stands for -/+ infinity.
+        assert min is None or type(min) == float
+        assert max is None or type(max) == float
+        if min is not None and max is not None:
+            assert max >= min
+        return super(RealValued, cls).__new__(cls, name, min, max)
 
 def is_numeric_col(col):
     assert type(col) in [Categorical, Integral, RealValued]
@@ -84,7 +90,7 @@ def dfcols(df):
         elif is_integer_dtype(dfcol):
             return Integral(dfcol.name, min(dfcol), max(dfcol))
         elif is_float_dtype(dfcol):
-            return RealValued(dfcol.name)
+            return RealValued(dfcol.name, min(dfcol), max(dfcol))
         else:
             raise Exception('unhandled column type encountered for column "{}"'.format(dfcol.name))
     return [dispatch(df[c]) for c in df]
@@ -119,15 +125,22 @@ def metadata_from_cols(cols):
 def dummy_df(cols, N):
     assert type(cols) == list
     assert all(type(col) in [RealValued, Categorical, Integral] for col in cols)
-    def gen_numeric_col():
-        return np.random.rand(N)
+    def gen_numeric_col(factor):
+        if factor.min is not None and factor.max is not None:
+            return np.random.uniform(factor.min, factor.max, N)
+        elif factor.min is not None:
+            return factor.min + np.abs(np.random.randn(N))
+        elif factor.max is not None:
+            return factor.max - np.abs(np.random.randn(N))
+        else:
+            return np.random.randn(N)
     def gen_categorical_col(levels):
         return pd.Categorical(random.choices(levels, k=N))
     def gen_integral_col(factor):
         return np.random.randint(factor.min, factor.max + 1, N)
     def dispatch(col):
         if type(col) == RealValued:
-            return gen_numeric_col()
+            return gen_numeric_col(col)
         elif type(col) == Categorical:
             return gen_categorical_col(col.levels)
         elif type(col) == Integral:

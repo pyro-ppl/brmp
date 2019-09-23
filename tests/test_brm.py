@@ -294,7 +294,7 @@ codegen_cases = [
 # TODO: Add ZOIB to numpyro.
 extra_codegen_cases = [
     ('y ~ x',
-     [],
+     [RealValued('y', min=0., max=1.)],
      {},
      ZeroOneInflatedBeta,
      [],
@@ -503,6 +503,7 @@ def test_scalar_param_map_consistency():
      Binomial(num_trials=2),
      []),
     ('y ~ x', [Categorical('y', list('abc'))], Binomial(num_trials=1), []),
+    ('y ~ x', [RealValued('y', min=0.1, max=1.05)], ZeroOneInflatedBeta, []),
 ])
 def test_family_and_response_type_checks(formula_str, non_real_cols, family, priors):
     formula = parse(formula_str)
@@ -552,17 +553,17 @@ def test_family_and_response_type_checks(formula_str, non_real_cols, family, pri
         [],
         r'(?i)prior missing', marks=pytest.mark.xfail),
     ('y ~ x',
-     [],
+     [RealValued('y', min=0., max=1.)],
      ZeroOneInflatedBeta,
      [Prior(('resp', 'prec'), Normal(0., 1.))],
      r'(?i)invalid prior'),
     ('y ~ x',
-     [],
+     [RealValued('y', min=0., max=1.)],
      ZeroOneInflatedBeta,
      [Prior(('resp', 'alpha'), Normal(0., 1.))],
      r'(?i)invalid prior'),
     ('y ~ x',
-     [],
+     [RealValued('y', min=0., max=1.)],
      ZeroOneInflatedBeta,
      [Prior(('resp', 'gamma'), Normal(0., 1.))],
      r'(?i)invalid prior'),
@@ -986,7 +987,7 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
      Normal,
      {}),
     ('y ~ 1',
-     [],
+     [RealValued('y', min=0., max=1.)],
      ZeroOneInflatedBeta,
      {}),
     # Using this contrast means `a` is coded as two columns rather

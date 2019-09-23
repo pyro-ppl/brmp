@@ -30,8 +30,11 @@ def family_matches_response(formula, metadata, family):
                 (family.support().lb is None or factor.min >= family.support().lb) and
                 (family.support().ub is None or factor.max <= family.support().ub))
     elif type(family.support()) == Type['UnitInterval']:
-        # TODO: Check data are in range.
-        return type(factor) == RealValued
+        return (type(factor) == RealValued and
+                factor.min is not None and
+                factor.max is not None and
+                factor.min >= 0. and
+                factor.max <= 1.)
     else:
         return False
 
