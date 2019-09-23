@@ -15,7 +15,7 @@ from pyro.contrib.brm import brm, defm, makedesc
 from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
 from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata, coef_names, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_df, metadata_from_cols, make_column_lookup, code_lengths
 from pyro.contrib.brm.priors import Prior, get_response_prior, build_prior_tree
-from pyro.contrib.brm.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ
+from pyro.contrib.brm.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ, ZeroOneInflatedBeta, Beta
 from pyro.contrib.brm.model_pre import build_model_pre
 from pyro.contrib.brm.model import build_model, parameters, scalar_parameter_map, scalar_parameter_names
 from pyro.contrib.brm.fit import Samples, marginals, fitted, param_marginal
@@ -31,6 +31,7 @@ default_params = dict(
     HalfCauchy = dict(scale=3.),
     HalfNormal = dict(scale=1.),
     LKJ        = dict(eta=1.),
+    Beta       = dict(concentration1=1., concentration0=1.),
 )
 
 # Makes list of columns metadata that includes an entry for every
@@ -290,9 +291,22 @@ codegen_cases = [
 
 ]
 
+# TODO: Add ZOIB to numpyro.
+extra_codegen_cases = [
+    ('y ~ x',
+     [],
+     {},
+     ZeroOneInflatedBeta,
+     [],
+     [('b_0', 'Cauchy', {}),
+      ('prec', 'HalfCauchy', {}),
+      ('alpha', 'Beta', {}),
+      ('gamma', 'Beta', {})]),
+]
+
 # TODO: Extend this. Could check that the response is observed?
 @pytest.mark.parametrize('N', [1, 5])
-@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
+@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases + extra_codegen_cases)
 def test_pyro_codegen(N, formula_str, non_real_cols, contrasts, family, priors, expected):
     # Make dummy data.
     formula = parse(formula_str)
@@ -364,7 +378,7 @@ def test_numpyro_codegen(N, formula_str, non_real_cols, contrasts, family, prior
 
 @pytest.mark.parametrize('N', [0, 5])
 @pytest.mark.parametrize('backend', [pyro_backend, numpyro_backend])
-@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
+@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases + extra_codegen_cases)
 def test_sampling_from_prior_smoke(N, backend, formula_str, non_real_cols, contrasts, family, priors, expected):
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
@@ -537,6 +551,21 @@ def test_family_and_response_type_checks(formula_str, non_real_cols, family, pri
         Binomial,
         [],
         r'(?i)prior missing', marks=pytest.mark.xfail),
+    ('y ~ x',
+     [],
+     ZeroOneInflatedBeta,
+     [Prior(('resp', 'prec'), Normal(0., 1.))],
+     r'(?i)invalid prior'),
+    ('y ~ x',
+     [],
+     ZeroOneInflatedBeta,
+     [Prior(('resp', 'alpha'), Normal(0., 1.))],
+     r'(?i)invalid prior'),
+    ('y ~ x',
+     [],
+     ZeroOneInflatedBeta,
+     [Prior(('resp', 'gamma'), Normal(0., 1.))],
+     r'(?i)invalid prior'),
 ])
 def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error):
     formula = parse(formula_str)

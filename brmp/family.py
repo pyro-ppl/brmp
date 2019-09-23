@@ -93,8 +93,8 @@ ZeroOneInflatedBeta = Family('ZeroOneInflatedBeta',
                              const(Type['UnitInterval']()),
                              Link('loc', LinkFn.logit))
 Beta = Family('Beta',
-              [param('alpha', Type['PosReal']()),
-               param('beta', Type['PosReal']())],
+              [param('concentration1', Type['PosReal']()),
+               param('concentration0', Type['PosReal']())],
               const(Type['UnitInterval']()),
               None)
 

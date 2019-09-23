@@ -6,7 +6,7 @@ import pandas as pd
 from pyro.contrib.brm.utils import join
 from pyro.contrib.brm.formula import Formula
 from pyro.contrib.brm.model_pre import ModelDescPre, PopulationPre, GroupPre
-from pyro.contrib.brm.family import Cauchy, HalfCauchy, LKJ, Family, Type, fully_applied
+from pyro.contrib.brm.family import Cauchy, HalfCauchy, LKJ, Beta, Family, Type, fully_applied
 
 # `is_param` indicates whether a node corresponds to a parameter in
 # the model. (Nodes without this flag set exist only to add structure
@@ -20,6 +20,11 @@ def leaf(name, prior_edit=None, checks=[]):
 RESPONSE_PRIORS = {
     'Normal': {
         'sigma': HalfCauchy(3.)
+    },
+    'ZeroOneInflatedBeta': {
+        'prec': HalfCauchy(3.),
+        'alpha': Beta(1., 1.),
+        'gamma': Beta(1., 1.),
     },
 }
 
