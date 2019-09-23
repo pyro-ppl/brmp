@@ -976,12 +976,14 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
         lambda S: dict(backend=numpyro_backend, algo='prior', num_samples=S),
         marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow')),
 ])
-@pytest.mark.parametrize('formula_str, non_real_cols, contrasts', [
+@pytest.mark.parametrize('formula_str, non_real_cols, family, contrasts', [
     ('y ~ 1 + x + (1 | a)',
      [Categorical('a', list('ab'))],
+     Normal,
      {}),
     ('y ~ 1 + a',
      [Categorical('a', list('ab'))],
+     Normal,
      {}),
     # Using this contrast means `a` is coded as two columns rather
     # than (the default) one. Because of this, it's crucial that
@@ -989,6 +991,7 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
     # would fail if that didn't happen.
     ('y ~ 1 + a',
      [Categorical('a', list('ab'))],
+     Normal,
      {'a': np.array([[-1, -1], [1, 1]])}),
 ])
 # Testing with N2=1 ensure that for model with categorical
@@ -997,13 +1000,13 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
 # metadata in order ensure to be compatible with the model, and this
 # test exercises that.
 @pytest.mark.parametrize('N2', [1, 8])
-def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, contrasts, N2):
+def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, contrasts, N2):
     N = 10
     S = 4
     cols = expand_columns(parse(formula_str), non_real_cols)
     df = dummy_df(cols, N)
     print(df)
-    fit = defm(formula_str, df, contrasts=contrasts).fit(**fitargs(S))
+    fit = defm(formula_str, df, family, contrasts=contrasts).fit(**fitargs(S))
     def chk(arr, expected_shape):
         assert np.all(np.isfinite(arr))
         assert arr.shape == expected_shape
