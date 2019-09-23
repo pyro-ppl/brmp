@@ -985,6 +985,10 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
      [Categorical('a', list('ab'))],
      Normal,
      {}),
+    ('y ~ 1',
+     [],
+     ZeroOneInflatedBeta,
+     {}),
     # Using this contrast means `a` is coded as two columns rather
     # than (the default) one. Because of this, it's crucial that
     # `fitted` uses the contrast when coding *new data*. This test
@@ -1001,6 +1005,10 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
 # test exercises that.
 @pytest.mark.parametrize('N2', [1, 8])
 def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, contrasts, N2):
+    if (family == ZeroOneInflatedBeta and
+        fitargs(0)['backend'] == numpyro_backend):
+        pytest.xfail('numpyro does not yet support ZeroOneInflatedBeta')
+
     N = 10
     S = 4
     cols = expand_columns(parse(formula_str), non_real_cols)
