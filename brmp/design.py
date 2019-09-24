@@ -33,11 +33,10 @@ Integral = namedtuple('Integral',
                        'max'])
 
 class RealValued(namedtuple('RealValued', ['name', 'min', 'max'])):
-    def __new__(cls, name, min=None, max=None): # None stands for -/+ infinity.
-        assert min is None or type(min) == float
-        assert max is None or type(max) == float
-        if min is not None and max is not None:
-            assert max >= min
+    def __new__(cls, name, min=-np.inf, max=np.inf):
+        assert type(min) == float
+        assert type(max) == float
+        assert max >= min
         return super(RealValued, cls).__new__(cls, name, min, max)
 
 def is_numeric_col(col):
@@ -126,11 +125,11 @@ def dummy_df(cols, N):
     assert type(cols) == list
     assert all(type(col) in [RealValued, Categorical, Integral] for col in cols)
     def gen_numeric_col(factor):
-        if factor.min is not None and factor.max is not None:
+        if np.isfinite(factor.min) and np.isfinite(factor.max):
             return np.random.uniform(factor.min, factor.max, N)
-        elif factor.min is not None:
+        elif np.isfinite(factor.min):
             return factor.min + np.abs(np.random.randn(N))
-        elif factor.max is not None:
+        elif np.isfinite(factor.max):
             return factor.max - np.abs(np.random.randn(N))
         else:
             return np.random.randn(N)
