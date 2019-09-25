@@ -398,7 +398,7 @@ def designmatrix(terms, df, metadata, contrasts):
     product_cols = join(coded_interaction_to_product_cols(code, metadata, code_lengths(contrasts))
                         for code in coded_interactions)
     N = len(df)
-    arrs = [execute_product_col(pcol, df, contrasts) for pcol in product_cols]
+    arrs = [execute_product_col(pcol, df, metadata, contrasts) for pcol in product_cols]
     X = np.stack(arrs, axis=1) if arrs else np.empty((N, 0))
     assert X.shape[0] == N
     if X.shape[0] > 0 and X.shape[1] > 0 and np.linalg.matrix_rank(X) != X.shape[1]:
@@ -499,7 +499,7 @@ def product_col_to_coef_name(product_col):
         return ':'.join(dispatch(col) for col in product_col.cols)
 
 
-def execute_product_col(product_col, df, contrasts):
+def execute_product_col(product_col, df, metadata, contrasts):
     assert type(product_col) == ProductCol
     assert type(df) == pd.DataFrame
 
@@ -514,8 +514,14 @@ def execute_product_col(product_col, df, contrasts):
         elif type(col) == CustomCol:
             assert col.factor in contrasts
             mat = contrasts[col.factor]
-            levels = dfcol.cat.categories.to_list()
-            assert len(levels) <= mat.shape[0]
+            levels = metadata.column(col.factor).levels
+            # TODO: This can be triggered in normal use, so turn into
+            # friendly error. It probably makes sense to check for
+            # this earlier. This could possibly happen in `defm` after
+            # creating the metadata, though this would also require a
+            # separate check for SequentialOED. Is there anywhere
+            # sensible to put this that catches both?
+            assert len(levels) == mat.shape[0]
             assert col.index < mat.shape[1]
             # TODO: Better asymptotics then using `.index()`
             out = mat[[levels.index(val) for val in dfcol], col.index]
@@ -576,7 +582,7 @@ def responsevector(column, df, metadata):
         raise Exception('Don\'t know how to code a response of this type.')
     pcols = coded_interaction_to_product_cols([code], metadata, {})
     assert len(pcols) == 1
-    return execute_product_col(pcols[0], df, {})
+    return execute_product_col(pcols[0], df, metadata, {})
 
 def predictors(formula, df, metadata, contrasts):
     assert type(formula) == Formula
