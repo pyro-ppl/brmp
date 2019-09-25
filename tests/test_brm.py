@@ -576,7 +576,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     with pytest.raises(Exception, match=expected_error):
         build_prior_tree(design_metadata, priors)
 
-@pytest.mark.parametrize('formula_str, df, contrasts, expected', [
+@pytest.mark.parametrize('formula_str, df, metadata_cols, contrasts, expected', [
     # (Formula('y', [], []),
     #  pd.DataFrame(dict(y=[1, 2, 3])),
     #  dict(X=torch.tensor([[],
@@ -585,6 +585,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     #       y_obs=torch.tensor([1., 2., 3.]))),
     ('y ~ 1',
      pd.DataFrame(dict(y=[1., 2., 3.])),
+     None,
      {},
      dict(X=np.array([[1.],
                           [1.],
@@ -593,6 +594,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     ('y ~ x',
      pd.DataFrame(dict(y=[1., 2., 3.],
                        x=[4., 5., 6.])),
+     None,
      {},
      dict(X=np.array([[4.],
                           [5.],
@@ -601,6 +603,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     ('y ~ 1 + x',
      pd.DataFrame(dict(y=[1., 2., 3.],
                        x=[4., 5., 6.])),
+     None,
      {},
      dict(X=np.array([[1., 4.],
                           [1., 5.],
@@ -609,6 +612,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     ('y ~ x + 1',
      pd.DataFrame(dict(y=[1., 2., 3.],
                        x=[4., 5., 6.])),
+     None,
      {},
      dict(X=np.array([[1., 4.],
                           [1., 5.],
@@ -618,6 +622,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     ('y ~ x',
      pd.DataFrame(dict(y=[1., 2., 3.],
                        x=pd.Categorical(list('AAB')))),
+     None,
      {},
      dict(X=np.array([[1., 0.],
                           [1., 0.],
@@ -626,6 +631,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     ('y ~ 1 + x',
      pd.DataFrame(dict(y=[1., 2., 3.],
                        x=pd.Categorical(list('AAB')))),
+     None,
      {},
      dict(X=np.array([[1., 0.],
                           [1., 0.],
@@ -635,6 +641,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
      pd.DataFrame(dict(y=[1., 2., 3.],
                        x1=pd.Categorical(list('AAB')),
                        x2=pd.Categorical(list('ABC')))),
+     None,
      {},
      dict(X=np.array([[1., 0., 0., 0.],
                           [1., 0., 1., 0.],
@@ -644,6 +651,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     ('y ~ 1 + x',
      pd.DataFrame(dict(y=[1., 2., 3.],
                        x=pd.Categorical(list('ABC')))),
+     None,
      {},
      dict(X=np.array([[1., 0., 0.],
                           [1., 1., 0.],
@@ -665,6 +673,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
      pd.DataFrame(dict(y=[1., 2., 3.],
                        x1=pd.Categorical(list('AAB')),
                        x2=pd.Categorical(list('ABC')))),
+     None,
      {},
      dict(X=np.array([[1.],
                           [1.],
@@ -681,6 +690,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
                        a=pd.Categorical([0, 0, 1]),
                        b=pd.Categorical([2, 1, 0]),
                        c=pd.Categorical([0, 1, 2]))),
+     None,
      {},
      dict(X=np.array([[], [], []]),
           y_obs=np.array([1., 2., 3.]),
@@ -694,6 +704,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
      pd.DataFrame(dict(y=[1., 2., 3., 4.],
                        x1=pd.Categorical(list('ABAB')),
                        x2=pd.Categorical(list('CCDD')))),
+     None,
      {},
      #                     AC  BC  AD  BD
      dict(X=np.array([[1., 0., 0., 0.],
@@ -706,6 +717,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
      pd.DataFrame(dict(y=[1., 2., 3., 4.],
                        x1=pd.Categorical(list('ABAB')),
                        x2=pd.Categorical(list('CCDD')))),
+     None,
      {},
      #                     1   D   BC  BD
      dict(X=np.array([[1., 0., 0., 0.],
@@ -718,6 +730,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
      pd.DataFrame(dict(y=[1., 2., 3., 4.],
                        x1=pd.Categorical(list('ABAB')),
                        x2=pd.Categorical(list('CCDD')))),
+     None,
      {},
      #                     1   B   D   BD
      dict(X=np.array([[1., 0., 0., 0.],
@@ -731,6 +744,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
      pd.DataFrame(dict(y=[1., 2., 3., 4.],
                        x1=np.array([1., 2., 1., 2.]),
                        x2=np.array([-10., 0., 10., 20.]))),
+     None,
      {},
      dict(X=np.array([[-10.],
                       [  0.],
@@ -743,6 +757,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
      pd.DataFrame(dict(y=[1., 2., 3., 4.],
                        x1=np.array([1., 2., 1., 2.]),
                        x2=np.array([-10, 0, 10, 20]))),
+     None,
      {},
      dict(X=np.array([[-10.],
                       [  0.],
@@ -755,6 +770,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
      pd.DataFrame(dict(y=[1., 2., 3., 4.],
                        x1=np.array([1., 2., 3., 4.]),
                        x2=pd.Categorical(list('ABAB')))),
+     None,
      {},
      dict(X=np.array([[1., 0.],
                       [0., 2.],
@@ -769,6 +785,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
                        a=pd.Categorical(list('ABAB')),
                        b=pd.Categorical(list('CCDD')),
                        x=np.array([1., 2., 3., 4.]))),
+     None,
      {},
      dict(X=np.array([[1., 0., 0., 0., 1., 0.],
                       [0., 1., 0., 0., 0., 2.],
@@ -782,6 +799,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
      pd.DataFrame(dict(y=[1, 2, 3],
                        x1=[4, 5, 6],
                        x2=[7., 8., 9.])),
+     None,
      {},
      dict(X=np.array([[4., 7.],
                           [5., 8.],
@@ -793,6 +811,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     ('y ~ x',
      pd.DataFrame(dict(y=pd.Categorical(list('AAB')),
                        x=[1., 2., 3.])),
+     None,
      {},
      dict(X=np.array([[1.],
                           [2.],
@@ -804,6 +823,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     ('y ~ a',
      pd.DataFrame(dict(y=[1., 2., 3.],
                        a=pd.Categorical(['a1', 'a1', 'a2']))),
+     None,
      {'a': np.array([[-1], [1]])},
      dict(X=np.array([[-1.],
                       [-1.],
@@ -813,6 +833,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
     ('y ~ a',
      pd.DataFrame(dict(y=[1., 2., 3.],
                        a=pd.Categorical(['a1', 'a1', 'a2']))),
+     None,
      {'a': np.array([[-1, -2],[0, 1]])},
      dict(X=np.array([[-1., -2.],
                       [-1., -2.],
@@ -823,6 +844,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
      pd.DataFrame(dict(y=[1., 2., 3.],
                        a=pd.Categorical(['a1', 'a1', 'a2']),
                        b=pd.Categorical(['b1', 'b2', 'b2']))),
+     None,
      {'a': np.array([[-1], [1]]), 'b': np.array([[2], [3]])},
      dict(X=np.array([[1., -1., 2., -2.],
                       [1., -1., 3., -3.],
@@ -833,6 +855,7 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
      pd.DataFrame(dict(y=[1., 2., 3.],
                        a=pd.Categorical(['a1', 'a1', 'a2']),
                        b=pd.Categorical(['b1', 'b2', 'b2']))),
+     None,
      {'a': np.array([[-1], [1]])},
      dict(X=np.array([[1.],
                       [1.],
@@ -844,8 +867,8 @@ def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error
           y_obs=np.array([1., 2., 3.]))),
 
 ])
-def test_designmatrix(formula_str, df, contrasts, expected):
-    metadata = metadata_from_df(df)
+def test_designmatrix(formula_str, df, metadata_cols, contrasts, expected):
+    metadata = metadata_from_cols(metadata_cols) if metadata_cols is not None else metadata_from_df(df)
     data = makedata(parse(formula_str), df, metadata, contrasts)
     assert set(data.keys()) == set(expected.keys())
     for k in expected.keys():
