@@ -110,14 +110,14 @@ def run_model_on_samples_and_data(modelfn, samples, data):
     return {name: torch.stack([retval[name] for retval in return_values])
             for name in names}
 
-def nuts(data, model, iter=None, warmup=None):
+def nuts(data, model, iter=None, warmup=None, num_chains=None):
     assert type(data) == dict
     assert type(model) == Model
 
-    iter, warmup = apply_default_hmc_args(iter, warmup)
+    iter, warmup, num_chains = apply_default_hmc_args(iter, warmup, num_chains)
 
     nuts_kernel = NUTS(model.fn, jit_compile=False, adapt_step_size=True)
-    mcmc = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup)
+    mcmc = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup, num_chains=num_chains)
     mcmc.run(**data)
     samples = mcmc.get_samples()
     transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)

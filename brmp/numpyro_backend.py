@@ -49,19 +49,22 @@ def location(original_data, samples, transformed_samples, model_fn, new_data):
     else:
         return run_model_on_samples_and_data(model_fn, samples, new_data)['mu']
 
-def nuts(data, model, seed=None, iter=None, warmup=None):
+def nuts(data, model, seed=None, iter=None, warmup=None, num_chains=None):
     assert type(data) == dict
     assert type(model) == Model
     assert seed is None or type(seed) == int
 
-    iter, warmup = apply_default_hmc_args(iter, warmup)
+    iter, warmup, num_chains = apply_default_hmc_args(iter, warmup, num_chains)
 
     if seed is None:
         seed = np.random.randint(0, 2**32, dtype=np.uint32).astype(np.int32)
     rng = random.PRNGKey(seed)
 
     kernel = NUTS(model.fn)
-    mcmc = MCMC(kernel, warmup, iter)
+    # TODO: We could use a way of avoid requiring users to set
+    # `--xla_force_host_platform_device_count` manually when
+    # `num_chains` > 1 to achieve parallel chains.
+    mcmc = MCMC(kernel, warmup, iter, num_chains=num_chains)
     mcmc.run(rng, **data)
     samples = mcmc.get_samples()
 

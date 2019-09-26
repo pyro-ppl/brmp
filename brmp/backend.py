@@ -58,7 +58,8 @@ Model = namedtuple('Model', [
     'sample_response_fn', 'sample_response_code',
 ])
 
-def apply_default_hmc_args(iter, warmup):
+def apply_default_hmc_args(iter, warmup, num_chains):
     iter = 10 if iter is None else iter
     warmup = iter // 2 if warmup is None else warmup
-    return iter, warmup
+    num_chains = 1 if num_chains is None else num_chains
+    return iter, warmup, num_chains
