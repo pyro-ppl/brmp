@@ -3,10 +3,10 @@ from collections import namedtuple
 import numpy as np
 import pandas as pd
 
-from pyro.contrib.brm.model import model_repr, parameter_names, scalar_parameter_map, scalar_parameter_names
-from pyro.contrib.brm.family import free_param_names
-from pyro.contrib.brm.design import predictors, metadata_from_df
-from pyro.contrib.brm.backend import data_from_numpy
+from brmp.model import model_repr, parameter_names, scalar_parameter_map, scalar_parameter_names
+from brmp.family import free_param_names
+from brmp.design import predictors, metadata_from_df
+from brmp.backend import data_from_numpy
 
 # `Fit` carries around `formula`, `metadata` and `contrasts` for the
 # sole purpose of being able to encode any new data passed to

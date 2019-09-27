@@ -9,8 +9,8 @@ import pandas as pd
 # http://pandas.pydata.org/pandas-docs/stable/reference/general_utility_functions.html#dtype-introspection
 from pandas.api.types import is_categorical_dtype, is_integer_dtype, is_float_dtype
 
-from pyro.contrib.brm.utils import join
-from pyro.contrib.brm.formula import Formula, OrderedSet, Term, allfactors
+from brmp.utils import join
+from brmp.formula import Formula, OrderedSet, Term, allfactors
 
 
 # TODO: Levels of pandas categorical columns can be any hashable type

@@ -3,10 +3,10 @@ from pprint import pprint as pp
 
 import pandas as pd
 
-from pyro.contrib.brm.utils import join
-from pyro.contrib.brm.formula import Formula
-from pyro.contrib.brm.model_pre import ModelDescPre, PopulationPre, GroupPre
-from pyro.contrib.brm.family import Cauchy, HalfCauchy, LKJ, Beta, Family, Type, fully_applied
+from brmp.utils import join
+from brmp.formula import Formula
+from brmp.model_pre import ModelDescPre, PopulationPre, GroupPre
+from brmp.family import Cauchy, HalfCauchy, LKJ, Beta, Family, Type, fully_applied
 
 # `is_param` indicates whether a node corresponds to a parameter in
 # the model. (Nodes without this flag set exist only to add structure

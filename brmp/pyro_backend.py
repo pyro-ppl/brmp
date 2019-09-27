@@ -14,9 +14,9 @@ from pyro.infer import SVI, Trace_ELBO
 from pyro.contrib.autoguide import AutoMultivariateNormal
 from pyro.optim import Adam
 
-from pyro.contrib.brm.backend import Backend, Model, apply_default_hmc_args
-from pyro.contrib.brm.fit import Samples
-from pyro.contrib.brm.pyro_codegen import gen
+from brmp.backend import Backend, Model, apply_default_hmc_args
+from brmp.fit import Samples
+from brmp.pyro_codegen import gen
 
 def get_node_or_return_value(samples, name):
     def getp(sample):

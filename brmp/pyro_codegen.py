@@ -1,7 +1,7 @@
 import re
-from .family import Family, LinkFn, Normal, args, free_param_names
-from .model import ModelDesc, Group
-from .backend import Model
+from brmp.family import Family, LinkFn, Normal, args, free_param_names
+from brmp.model import ModelDesc, Group
+from brmp.backend import Model
 
 def gen_expanded_scalar(val, shape):
     assert type(val) in [float, int]

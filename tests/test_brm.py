@@ -11,17 +11,17 @@ from pyro.distributions import Independent
 from jax import random
 import numpyro.handlers as numpyro
 
-from pyro.contrib.brm import brm, defm, makedesc
-from pyro.contrib.brm.formula import parse, Formula, _1, Term, OrderedSet, allfactors
-from pyro.contrib.brm.design import Categorical, RealValued, Integral, makedata, coef_names, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_df, metadata_from_cols, make_column_lookup, code_lengths
-from pyro.contrib.brm.priors import Prior, get_response_prior, build_prior_tree
-from pyro.contrib.brm.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ, ZeroOneInflatedBeta, Beta
-from pyro.contrib.brm.model_pre import build_model_pre
-from pyro.contrib.brm.model import build_model, parameters, scalar_parameter_map, scalar_parameter_names
-from pyro.contrib.brm.fit import Samples, marginals, fitted, param_marginal
-from pyro.contrib.brm.pyro_backend import backend as pyro_backend
-from pyro.contrib.brm.numpyro_backend import backend as numpyro_backend
-from pyro.contrib.brm.backend import data_from_numpy
+from brmp import brm, defm, makedesc
+from brmp.formula import parse, Formula, _1, Term, OrderedSet, allfactors
+from brmp.design import Categorical, RealValued, Integral, makedata, coef_names, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_df, metadata_from_cols, make_column_lookup, code_lengths
+from brmp.priors import Prior, get_response_prior, build_prior_tree
+from brmp.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ, ZeroOneInflatedBeta, Beta
+from brmp.model_pre import build_model_pre
+from brmp.model import build_model, parameters, scalar_parameter_map, scalar_parameter_names
+from brmp.fit import Samples, marginals, fitted, param_marginal
+from brmp.pyro_backend import backend as pyro_backend
+from brmp.numpyro_backend import backend as numpyro_backend
+from brmp.backend import data_from_numpy
 
 from tests.common import assert_equal
 

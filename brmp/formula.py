@@ -3,7 +3,7 @@ from enum import Enum
 from collections import namedtuple
 import itertools
 
-from pyro.contrib.brm.utils import join
+from brmp.utils import join
 
 # Maintains order.
 def unique(xs):

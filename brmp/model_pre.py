@@ -1,8 +1,8 @@
 from collections import namedtuple
 
-from .formula import Formula, allfactors
-from .design import Metadata, coef_names, RealValued, Categorical, Integral
-from .family import Family, Type, nonlocparams, support_depends_on_args, family_repr
+from brmp.formula import Formula, allfactors
+from brmp.design import Metadata, coef_names, RealValued, Categorical, Integral
+from brmp.family import Family, Type, nonlocparams, support_depends_on_args, family_repr
 
 def family_matches_response(formula, metadata, family):
     assert type(formula) == Formula
