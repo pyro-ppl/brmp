@@ -15,7 +15,7 @@ from brmp import brm, defm, makedesc
 from brmp.formula import parse, Formula, _1, Term, OrderedSet, allfactors
 from brmp.design import Categorical, RealValued, Integral, makedata, coef_names, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_df, metadata_from_cols, make_column_lookup, code_lengths
 from brmp.priors import Prior, get_response_prior, build_prior_tree
-from brmp.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ, ZeroOneInflatedBeta, Beta
+from brmp.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ
 from brmp.model_pre import build_model_pre
 from brmp.model import build_model, parameters, scalar_parameter_map, scalar_parameter_names
 from brmp.fit import Samples, marginals, fitted, param_marginal
@@ -291,22 +291,10 @@ codegen_cases = [
 
 ]
 
-# TODO: Add ZOIB to numpyro.
-extra_codegen_cases = [
-    ('y ~ x',
-     [RealValued('y', min=0., max=1.)],
-     {},
-     ZeroOneInflatedBeta,
-     [],
-     [('b_0', 'Cauchy', {}),
-      ('prec', 'HalfCauchy', {}),
-      ('alpha', 'Beta', {}),
-      ('gamma', 'Beta', {})]),
-]
 
 # TODO: Extend this. Could check that the response is observed?
 @pytest.mark.parametrize('N', [1, 5])
-@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases + extra_codegen_cases)
+@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
 def test_pyro_codegen(N, formula_str, non_real_cols, contrasts, family, priors, expected):
     # Make dummy data.
     formula = parse(formula_str)
@@ -378,7 +366,7 @@ def test_numpyro_codegen(N, formula_str, non_real_cols, contrasts, family, prior
 
 @pytest.mark.parametrize('N', [0, 5])
 @pytest.mark.parametrize('backend', [pyro_backend, numpyro_backend])
-@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases + extra_codegen_cases)
+@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
 def test_sampling_from_prior_smoke(N, backend, formula_str, non_real_cols, contrasts, family, priors, expected):
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
@@ -503,7 +491,6 @@ def test_scalar_param_map_consistency():
      Binomial(num_trials=2),
      []),
     ('y ~ x', [Categorical('y', list('abc'))], Binomial(num_trials=1), []),
-    ('y ~ x', [RealValued('y', min=0.1, max=1.05)], ZeroOneInflatedBeta, []),
 ])
 def test_family_and_response_type_checks(formula_str, non_real_cols, family, priors):
     formula = parse(formula_str)
@@ -552,21 +539,6 @@ def test_family_and_response_type_checks(formula_str, non_real_cols, family, pri
         Binomial,
         [],
         r'(?i)prior missing', marks=pytest.mark.xfail),
-    ('y ~ x',
-     [RealValued('y', min=0., max=1.)],
-     ZeroOneInflatedBeta,
-     [Prior(('resp', 'prec'), Normal(0., 1.))],
-     r'(?i)invalid prior'),
-    ('y ~ x',
-     [RealValued('y', min=0., max=1.)],
-     ZeroOneInflatedBeta,
-     [Prior(('resp', 'alpha'), Normal(0., 1.))],
-     r'(?i)invalid prior'),
-    ('y ~ x',
-     [RealValued('y', min=0., max=1.)],
-     ZeroOneInflatedBeta,
-     [Prior(('resp', 'gamma'), Normal(0., 1.))],
-     r'(?i)invalid prior'),
 ])
 def test_prior_checks(formula_str, non_real_cols, family, priors, expected_error):
     formula = parse(formula_str)
@@ -1023,10 +995,6 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
      [Categorical('a', list('ab'))],
      Normal,
      {}),
-    ('y ~ 1',
-     [RealValued('y', min=0., max=1.)],
-     ZeroOneInflatedBeta,
-     {}),
     # Using this contrast means `a` is coded as two columns rather
     # than (the default) one. Because of this, it's crucial that
     # `fitted` uses the contrast when coding *new data*. This test
@@ -1043,10 +1011,6 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
 # test exercises that.
 @pytest.mark.parametrize('N2', [1, 8])
 def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, contrasts, N2):
-    if (family == ZeroOneInflatedBeta and
-        fitargs(0)['backend'] == numpyro_backend):
-        pytest.xfail('numpyro does not yet support ZeroOneInflatedBeta')
-
     N = 10
     S = 4
     cols = expand_columns(parse(formula_str), non_real_cols)
