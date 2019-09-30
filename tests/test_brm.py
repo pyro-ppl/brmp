@@ -23,7 +23,13 @@ from brmp.pyro_backend import backend as pyro_backend
 from brmp.numpyro_backend import backend as numpyro_backend
 from brmp.backend import data_from_numpy
 
-from tests.common import assert_equal
+def assert_equal(a, b):
+    assert type(a) == np.ndarray or type(a) == torch.Tensor
+    assert type(a) == type(b)
+    if type(a) == np.ndarray:
+        assert (a == b).all()
+    else:
+        assert torch.equal(a, b)
 
 default_params = dict(
     Normal     = dict(loc=0., scale=1.),
@@ -405,7 +411,7 @@ def test_expected_response_codegen(response_meta, family, args, expected, backen
         backend_args = [backend.from_numpy(arg) for arg in args]
         fn = backend.gen(desc).expected_response_fn
         return backend.to_numpy(fn(*backend_args))
-    assert_equal(expected_response(*args), expected)
+    assert np.allclose(expected_response(*args), expected)
 
 @pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
 @pytest.mark.parametrize('fitargs', [
