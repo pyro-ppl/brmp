@@ -973,8 +973,6 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
     assert coef_names(formula.terms, metadata, {}) == expected_names
 
 
-# I expect these to also pass with PYRO_TENSOR_TYPE='torch.FloatTensor'.
-
 @pytest.mark.parametrize('fitargs', [
     lambda S: dict(backend=pyro_backend, iter=S, warmup=0),
     lambda S: dict(backend=pyro_backend, iter=S//2, num_chains=2, warmup=0),
