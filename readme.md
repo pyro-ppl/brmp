@@ -80,7 +80,7 @@ See the baseball and Africa notebooks (linked below) for example usage.
 ### Examples
 
 These
-[notebooks](https://nbviewer.jupyter.org/github/null-a/pyro/tree/brmp/pyro/contrib/brm/examples/) show
+[notebooks](https://nbviewer.jupyter.org/github/pyro-ppl/brmp/tree/master/brmp/examples/) show
 examples of using the system to fit some simple models.
 
 ## Limitations
