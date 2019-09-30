@@ -11,7 +11,7 @@ from pyro.infer.mcmc.api import MCMC
 import pyro
 import pyro.poutine as poutine
 from pyro.infer import SVI, Trace_ELBO
-from pyro.contrib.autoguide import AutoMultivariateNormal
+from pyro.infer.autoguide import AutoMultivariateNormal
 from pyro.optim import Adam
 
 from brmp.backend import Backend, Model, apply_default_hmc_args
