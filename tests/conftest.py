@@ -3,6 +3,10 @@ from __future__ import absolute_import, division, print_function
 import pytest
 import pyro
 
+def pytest_configure(config):
+    config.addinivalue_line("markers",
+                            "init(rng_seed): initialize the RNG using the seed provided.")
+
 def pytest_collection_modifyitems(items):
     for item in items:
         if "init" not in item.keywords:
