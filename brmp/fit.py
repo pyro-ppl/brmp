@@ -27,7 +27,7 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
         # The repr of namedtuple ends up long and not very useful for
         # Fit. This is similar to the default implementation of repr
         # used for classes.
-        return '<brmp.fit.Fit at %s>'.format(hex(id(self)))
+        return '<brmp.fit.Fit at {}>'.format(hex(id(self)))
 
 Samples = namedtuple('Samples', ['raw_samples', 'get_param', 'location'])
 
