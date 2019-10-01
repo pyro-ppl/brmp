@@ -22,7 +22,13 @@ from brmp.backend import data_from_numpy
 # make up data to tinker with a model), it's not clear that deferring
 # having to give contrasts has a similar benefit.
 
-Fit = namedtuple('Fit', 'formula metadata contrasts data model_desc model samples backend')
+class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model samples backend')):
+    def __repr__(self):
+        # The repr of namedtuple ends up long and not very useful for
+        # Fit. This is similar to the default implementation of repr
+        # used for classes.
+        return '<brmp.fit.Fit at %s>'.format(hex(id(self)))
+
 Samples = namedtuple('Samples', ['raw_samples', 'get_param', 'location'])
 
 def param_marginal(fit, parameter_name):
