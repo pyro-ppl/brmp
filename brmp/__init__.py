@@ -73,8 +73,14 @@ class DefmResult:
         data = data_from_numpy(backend, self.data)
         return GenerateResult(self, backend, model, data)
 
-    # TODO: Could have `svi` and `nuts` methods do the obvious thing
-    # with the default backend?
+    def prior(self, *args, **kwargs):
+        return self.generate().prior(*args, **kwargs)
+
+    def nuts(self, *args, **kwargs):
+        return self.generate().nuts(*args, **kwargs)
+
+    def svi(self, *args, **kwargs):
+        return self.generate().svi(*args, **kwargs)
 
     def __repr__(self):
         return model_repr(self.desc)
