@@ -14,10 +14,6 @@ from brmp.backend import data_from_numpy
 
 _default_backend = pyro_backend
 
-def makecode(formula, df, family, priors, backend=pyro_backend):
-    desc = makedesc(formula, metadata_from_df(df), family, priors)
-    return backend.gen(desc).code
-
 def makedesc(formula, metadata, family, priors, code_lengths):
     assert type(formula) == Formula
     assert type(metadata) == Metadata
