@@ -121,7 +121,7 @@ def fitted(fit, what='expectation', data=None):
                   else data_from_numpy(fit.backend, predictors(fit.formula, data, fit.metadata, fit.contrasts)))
 
     if what == 'sample' or what == 'expectation':
-        args = [mu if name == 'mu' else get_param(name)
+        args = [mu if name == 'mu' else get_param(name, False)
                 for name in free_param_names(fit.model_desc.response.family)]
         response_fn = sample_response if what == 'sample' else expected_response
         return to_numpy(response_fn(*args))
@@ -167,9 +167,9 @@ def print_model(fit):
 
 # A back end agnostic wrapper around back end specific implementations
 # of `fit.samples.get_param`.
-def get_param(fit, name):
+def get_param(fit, name, preserve_chains=False):
     assert type(fit) == Fit
-    return fit.backend.to_numpy(fit.samples.get_param(name))
+    return fit.backend.to_numpy(fit.samples.get_param(name, preserve_chains))
 
 # TODO: If parameter and scalar parameter names never clash, perhaps
 # having a single lookup method would be convenient. Perhaps this
