@@ -17,17 +17,20 @@ from collections import namedtuple
 #
 # The raw samples collected by inference. Not currently used.
 #
-# `Samples#get_param` :: string -> ps
+# `Samples#get_param` :: (string, bool) -> ps
 #
 # This returns all of the samples collected for a particular parameter
 # (of the given name) as an instance of (backend specific) type `ps`.
-# By parameter we mean something like "b", the vector of all
-# population level coefficients. (The function `model.parameter_names`
-# describes the set of parameters implied by a given model.
-# `get_param` should support all of the parameter names returned by
-# `model.parameter_names` for the current model.) e.g. For the Pyro
-# backend this returns a torch tensor with shape number of samples by
-# length of parameter.
+# The boolean flag indicates whether the returned samples should be
+# grouped by MCMC chain. (Algorithms that don't support multiple
+# chains should group all samples by a single dummy chain when
+# necessary.) By parameter we mean something like "b", the vector of
+# all population level coefficients. (The function
+# `model.parameter_names` describes the set of parameters implied by a
+# given model. `get_param` should support all of the parameter names
+# returned by `model.parameter_names` for the current model.) e.g. For
+# the Pyro backend this returns a torch tensor with shape number of
+# samples by length of parameter.
 #
 # `Samples#location` :: dict string ps -> ps
 #
@@ -113,3 +116,22 @@ def apply_default_hmc_args(iter, warmup, num_chains):
     warmup = iter // 2 if warmup is None else warmup
     num_chains = 1 if num_chains is None else num_chains
     return iter, warmup, num_chains
+
+# Helpers for working with arrays of samples. These work with both
+# numpy and torch arrays.
+
+# (num_chains, num_samples, ...) -> (num_chains * num_samples, ...)
+def flatten(arr):
+    return arr.reshape((arr.shape[0] * arr.shape[1],) + arr.shape[2:])
+
+# (num_chains * num_samples, ...) -> (num_chains, num_samples, ...)
+def unflatten(arr, num_chains, num_samples):
+    return arr.reshape((num_chains, num_samples) + arr.shape[1:])
+
+def main():
+    import torch
+    t = torch.rand(2, 10, 3)
+    assert torch.equal(unflatten(flatten(t), 2, 10), t)
+
+if __name__ == '__main__':
+    main()

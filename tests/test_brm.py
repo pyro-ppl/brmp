@@ -416,13 +416,17 @@ def test_expected_response_codegen(response_meta, family, args, expected, backen
 @pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
 @pytest.mark.parametrize('fitargs', [
     dict(backend=pyro_backend, iter=1, warmup=0),
+    dict(backend=pyro_backend, iter=1, warmup=0, num_chains=2),
     dict(backend=pyro_backend, algo='svi', iter=1, num_samples=1),
     dict(backend=pyro_backend, algo='svi', iter=1, num_samples=1, subsample_size=1),
     # Set environment variable `RUN_SLOW=1` to run against the NumPyro
     # back end.
     pytest.param(
         dict(backend=numpyro_backend, iter=1, warmup=0),
-        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow'))
+        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow')),
+    pytest.param(
+        dict(backend=numpyro_backend, iter=1, warmup=0, num_chains=2),
+        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow')),
 ])
 def test_parameter_shapes(formula_str, non_real_cols, contrasts, family, priors, expected, fitargs):
     # Make dummy data.
@@ -435,15 +439,16 @@ def test_parameter_shapes(formula_str, non_real_cols, contrasts, family, priors,
     model = defm(formula_str, df, family, priors, contrasts)
     fit = model.fit(**fitargs)
 
+    num_chains = fitargs.get('num_chains', 1)
+
     # Check parameter sizes.
     for parameter in parameters(model.desc):
-        # Get the first (and only) sample.
+        expected_param_shape = parameter.shape
         samples = get_param(fit, parameter.name)
-        assert samples.shape[0] == 1 # Check the test spec. only generated one sample.
-        p = samples[0]
-        shape = p.shape
-        expected_shape = parameter.shape
-        assert shape == expected_shape
+        # A single sample is collected by each chain for all cases.
+        assert samples.shape == (num_chains,) + expected_param_shape
+        samples_with_chain_dim = get_param(fit, parameter.name, True)
+        assert samples_with_chain_dim.shape == (num_chains, 1) + expected_param_shape
 
 
 def test_scalar_param_map_consistency():

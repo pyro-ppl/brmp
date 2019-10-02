@@ -14,7 +14,7 @@ from pyro.infer import SVI, Trace_ELBO
 from pyro.infer.autoguide import AutoMultivariateNormal
 from pyro.optim import Adam
 
-from brmp.backend import Backend, Model, apply_default_hmc_args
+from brmp.backend import Backend, Model, apply_default_hmc_args, flatten, unflatten
 from brmp.fit import Samples
 from brmp.pyro_codegen import gen
 
@@ -32,10 +32,14 @@ def get_node_or_return_value(samples, name):
     #
     return torch.stack([getp(sample).detach() for sample in samples])
 
-def get_param(samples, name):
+def get_param(samples, name, preserve_chains):
     # Reminder to use correct interface.
     assert not name == 'mu', 'Use `location` to fetch `mu`.'
-    return get_node_or_return_value(samples, name)
+    # We insert a dummy "chain" dim here as demanded by the
+    # `get_param` interface. (We imagine that prior sampling & SVI
+    # always produce a single chain.)
+    param = get_node_or_return_value(samples, name)
+    return param.unsqueeze(0) if preserve_chains else param
 
 def location(modelfn, samples, data):
 
@@ -90,14 +94,17 @@ def from_numpy(arr):
 def run_model_on_samples_and_data(modelfn, samples, data):
     assert type(samples) == dict
     assert len(samples) > 0
-    S = list(samples.values())[0].shape[0]
-    assert all(arr.shape[0] == S for _, arr in samples.items())
+    num_chains, num_samples = next(iter(samples.values())).shape[0:2]
+    assert all(arr.shape[0:2] == (num_chains, num_samples) for arr in samples.values())
+
+    # Flatten the sample for easier iteration.
+    flat_samples = {k: flatten(arr) for k, arr in samples.items()}
 
     def run(i):
-        sample = {k: arr[i] for k, arr in samples.items()}
+        sample = {k: arr[i] for k, arr in flat_samples.items()}
         return poutine.condition(modelfn, sample)(**data)
 
-    return_values = [run(i) for i in range(S)]
+    return_values = [run(i) for i in range(num_chains * num_samples)]
 
     # TODO: It would probably be better to allocate output arrays and
     # fill them as we run the model. However, I'm holding off on
@@ -107,7 +114,8 @@ def run_model_on_samples_and_data(modelfn, samples, data):
     # We know the model structure is static, so names don't change
     # across executions.
     names = return_values[0].keys()
-    return {name: torch.stack([retval[name] for retval in return_values])
+    # Build output dict., restoring chain dim.
+    return {name: unflatten(torch.stack([retval[name] for retval in return_values]), num_chains, num_samples)
             for name in names}
 
 def nuts(data, model, iter=None, warmup=None, num_chains=None):
@@ -119,24 +127,36 @@ def nuts(data, model, iter=None, warmup=None, num_chains=None):
     nuts_kernel = NUTS(model.fn, jit_compile=False, adapt_step_size=True)
     mcmc = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup, num_chains=num_chains)
     mcmc.run(**data)
-    samples = mcmc.get_samples()
+
+    samples = mcmc.get_samples(group_by_chain=True)
+    # Pyro doesn't insert a chain dim when num_chains==1.
+    if num_chains == 1:
+        samples = {k: arr.unsqueeze(0) for k,arr in samples.items()}
+
     transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
 
     def loc(d):
         # Optimization: For the data used for inference, values for
         # `mu` are already computed and available from
         # `transformed_samples`.
+
+        # The `location` method on `Samples` isn't expected to
+        # preserve the chain dim so we flatten here.
         if d == data:
-            return transformed_samples['mu']
+            return flatten(transformed_samples['mu'])
         else:
             # TODO: This computes more than is necessary. (i.e. It
             # build additional tensors we immediately throw away.)
             # This is minor, but might be worth addressing eventually.
-            return run_model_on_samples_and_data(model.fn, samples, d)['mu']
+            return flatten(run_model_on_samples_and_data(model.fn, samples, d)['mu'])
 
     all_samples = dict(samples, **transformed_samples)
 
-    return Samples(all_samples, lambda name: all_samples[name], loc)
+    def get_param(name, preserve_chains):
+        param = all_samples[name]
+        return param if preserve_chains else flatten(param)
+
+    return Samples(all_samples, get_param, loc)
 
 # Ideally we'd simply use `arr[subsample]` to select out a mini batch,
 # but doing so is problematic when the design matrix is empty. (More
