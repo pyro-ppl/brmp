@@ -31,11 +31,6 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
 
 Samples = namedtuple('Samples', ['raw_samples', 'get_param', 'location'])
 
-def param_marginal(fit, parameter_name):
-    assert type(fit) == Fit
-    samples = fit.samples
-    return fit.backend.to_numpy(samples.get_param(parameter_name))
-
 default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
 
 def format_quantiles(qs):

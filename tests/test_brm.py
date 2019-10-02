@@ -18,7 +18,7 @@ from brmp.priors import Prior, get_response_prior, build_prior_tree
 from brmp.family import Family, Type, Normal, Binomial, Bernoulli, HalfCauchy, HalfNormal, LKJ
 from brmp.model_pre import build_model_pre
 from brmp.model import build_model, parameters, scalar_parameter_map, scalar_parameter_names
-from brmp.fit import Samples, marginals, fitted, param_marginal
+from brmp.fit import Samples, marginals, fitted, get_param
 from brmp.pyro_backend import backend as pyro_backend
 from brmp.numpyro_backend import backend as numpyro_backend
 from brmp.backend import data_from_numpy
@@ -438,7 +438,7 @@ def test_parameter_shapes(formula_str, non_real_cols, contrasts, family, priors,
     # Check parameter sizes.
     for parameter in parameters(model.desc):
         # Get the first (and only) sample.
-        samples = param_marginal(fit, parameter.name)
+        samples = get_param(fit, parameter.name)
         assert samples.shape[0] == 1 # Check the test spec. only generated one sample.
         p = samples[0]
         shape = p.shape
