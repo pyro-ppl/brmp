@@ -1030,7 +1030,7 @@ def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, con
         assert np.all(np.isfinite(arr))
         assert arr.shape == expected_shape
     num_coefs = len(scalar_parameter_names(fit.model_desc))
-    chk(marginals(fit).array, (num_coefs, 7)) # num coefs x num stats
+    chk(marginals(fit).array, (num_coefs, 9)) # num coefs x num stats
     chk(fitted(fit), (S, N))
     chk(fitted(fit, 'linear'), (S, N))
     chk(fitted(fit, 'response'), (S, N))
