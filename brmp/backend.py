@@ -116,14 +116,3 @@ def apply_default_hmc_args(iter, warmup, num_chains):
     warmup = iter // 2 if warmup is None else warmup
     num_chains = 1 if num_chains is None else num_chains
     return iter, warmup, num_chains
-
-# Helpers for working with arrays of samples. These work with both
-# numpy and torch arrays.
-
-# (num_chains, num_samples, ...) -> (num_chains * num_samples, ...)
-def flatten(arr):
-    return arr.reshape((arr.shape[0] * arr.shape[1],) + arr.shape[2:])
-
-# (num_chains * num_samples, ...) -> (num_chains, num_samples, ...)
-def unflatten(arr, num_chains, num_samples):
-    return arr.reshape((num_chains, num_samples) + arr.shape[1:])
