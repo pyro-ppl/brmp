@@ -14,9 +14,10 @@ from pyro.infer import SVI, Trace_ELBO
 from pyro.infer.autoguide import AutoMultivariateNormal
 from pyro.optim import Adam
 
-from brmp.backend import Backend, Model, apply_default_hmc_args, flatten, unflatten
+from brmp.backend import Backend, Model, apply_default_hmc_args
 from brmp.fit import Samples
 from brmp.pyro_codegen import gen
+from brmp.utils import flatten, unflatten
 
 def get_node_or_return_value(samples, name):
     def getp(sample):
