@@ -24,7 +24,7 @@ from collections import namedtuple
 # By parameter we mean something like "b", the vector of all
 # population level coefficients. (The function `model.parameter_names`
 # describes the set of parameters implied by a given model.
-# `get_param` should support all of parameter names returned by
+# `get_param` should support all of the parameter names returned by
 # `model.parameter_names` for the current model.) e.g. For the Pyro
 # backend this returns a torch tensor with shape number of samples by
 # length of parameter.
@@ -35,7 +35,7 @@ from collections import namedtuple
 # the model and stored in the backend specific representation) and
 # returns the value of `mu` (the output of the model before applying
 # any inverse link function) for each combination of sample and
-# element (data point)of D. (D may or may not be the data on which
+# element (data point) of D. (D may or may not be the data on which
 # inference was performed.) For Pyro, this would return a torch tensor
 # with shape number of samples by len(D).
 #
@@ -58,28 +58,28 @@ from collections import namedtuple
 # will use this internally to perform inference. (However it's useful
 # to be able to get at this for debugging.)
 #
-# `inv_link_fn`
+# `inv_link_fn` :: ps -> ps
 #
-# A method of type ps -> ps implementing the model's inverse link
-# function. This used by `fitted` to map (element-wise) the output of
+# A method implementing the model's inverse link function. This is
+# used by `fitted` to map (element-wise) the output of
 # `fit.Samples#location` to the location parameter of the response
 # distribution.
 #
-# `expected_response_fn`
+# `expected_response_fn` :: (ps, ps, ...) -> ps
 #
 #
 # TODO: Explain the order of the arguments.
 #
-# A method of type (ps, ps, ...) -> ps that computes (element-wise)
-# the mean of the response distribution of the model. It is expected
-# that callers will ensure that one of the arguments will be a number
-# of samples by number of data points collection of model outputs.
-# (e.g. The output of `Samples#location`.) The expectation is that
-# (internally) this will be passed through the inverse link function
-# and used as the location parameter of the response distribution. For
-# each of the remaining parameters of the response distribution the
-# caller should also pass a number of samples by 1 collection of
-# samples parameter values. (Only the location parameter can depend on
+# A method that computes (element-wise) the mean of the response
+# distribution of the model. It is expected that callers will ensure
+# that one of the arguments will be a number of samples by number of
+# data points collection of model outputs. (e.g. The output of
+# `Samples#location`.) The expectation is that (internally) this will
+# be passed through the inverse link function and used as the location
+# parameter of the response distribution. For each of the remaining
+# parameters of the response distribution the caller should also pass
+# a number of samples by 1 collection of sampled parameter values.
+# (The shapes differ because only the location parameter can depend on
 # the data at present.) This method is used internally by `fitted`.
 #
 #
