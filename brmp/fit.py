@@ -2,11 +2,13 @@ from collections import namedtuple
 
 import numpy as np
 import pandas as pd
+import numpyro.diagnostics as diags
 
 from brmp.model import model_repr, parameter_names, scalar_parameter_map, scalar_parameter_names
 from brmp.family import free_param_names
 from brmp.design import predictors, metadata_from_df
 from brmp.backend import data_from_numpy
+from brmp.utils import flatten
 
 # `Fit` carries around `formula`, `metadata` and `contrasts` for the
 # sole purpose of being able to encode any new data passed to
@@ -139,6 +141,28 @@ def summary(arr, qs=default_quantiles, row_labels=None):
     col_labels = ['mean', 'sd'] + format_quantiles(qs)
     return ArrReprWrapper(marginal_stats(arr, qs), row_labels, col_labels)
 
+def gelman_rubin(samples):
+    if ((samples.shape[0] < 2 and samples.shape[1] < 4) or
+        (samples.shape[0] >= 2 and samples.shape[1] < 2)):
+        return None # Too few chains or samples.
+    elif samples.shape[0] >= 2:
+        return diags.gelman_rubin(samples)
+    else:
+        return diags.split_gelman_rubin(samples)
+
+def effective_sample_size(samples):
+    if samples.shape[1] < 2:
+        return None # Too few samples.
+    else:
+        return diags.effective_sample_size(samples)
+
+def compute_diag_or_default(diag, samples):
+    val = diag(samples)
+    if val is not None:
+        return val
+    else:
+        return np.zeros((samples.shape[2],))
+
 # Similar to the following:
 # https://rdrr.io/cran/rstan/man/stanfit-method-summary.html
 
@@ -157,9 +181,13 @@ def marginals(fit, qs=default_quantiles):
     names = scalar_parameter_names(fit.model_desc)
     # TODO: Every call to `get_scalar_param` rebuilds the scalar
     # parameter map.
-    vecs = [get_scalar_param(fit, name) for name in names]
-    col_labels = ['mean', 'sd'] + format_quantiles(qs)
-    arr = marginal_stats(np.stack(vecs, axis=1), qs)
+    vecs = [get_scalar_param(fit, name, True) for name in names]
+    col_labels = ['mean', 'sd'] + format_quantiles(qs) + ['n_eff', 'r_hat']
+    samples = np.stack(vecs, axis=2)
+    stats_arr = marginal_stats(flatten(samples), qs)
+    n_eff = compute_diag_or_default(effective_sample_size, samples)
+    r_hat = compute_diag_or_default(gelman_rubin, samples)
+    arr = np.hstack([stats_arr, n_eff[...,np.newaxis], r_hat[...,np.newaxis]])
     return ArrReprWrapper(arr, names, col_labels)
 
 def print_model(fit):
@@ -174,7 +202,7 @@ def get_param(fit, name, preserve_chains=False):
 # TODO: If parameter and scalar parameter names never clash, perhaps
 # having a single lookup method would be convenient. Perhaps this
 # could be wired up to `fit.samples[...]`?
-def get_scalar_param(fit, name):
+def get_scalar_param(fit, name, preserve_chains=False):
     assert type(fit) == Fit
     m = scalar_parameter_map(fit.model_desc)
     res = [p for (n, p) in m if n == name]
@@ -182,6 +210,7 @@ def get_scalar_param(fit, name):
     if len(res) == 0:
         raise KeyError('unknown parameter name: {}'.format(name))
     param_name, index = res[0]
-    # Construct a slice to pick out the given index at all rows.
-    slc = (slice(None, None, None),) + index
-    return get_param(fit, param_name)[slc]
+    # Construct a slice to pick out the given index at all chains (if
+    # present) and all samples.
+    slc = (Ellipsis,) + index
+    return get_param(fit, param_name, preserve_chains)[slc]
