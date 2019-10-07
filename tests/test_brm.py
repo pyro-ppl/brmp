@@ -11,7 +11,7 @@ from pyro.distributions import Independent
 from jax import random
 import numpyro.handlers as numpyro
 
-from brmp import brm, defm, makedesc
+from brmp import brm, defm, makedesc, DefmResult
 from brmp.formula import parse, Formula, _1, Term, OrderedSet, allfactors
 from brmp.design import Categorical, RealValued, Integral, makedata, coef_names, CategoricalCoding, NumericCoding, code_terms, dummy_df, metadata_from_df, metadata_from_cols, make_column_lookup, code_lengths
 from brmp.priors import Prior, get_response_prior, build_prior_tree
@@ -436,13 +436,15 @@ def test_parameter_shapes(formula_str, non_real_cols, contrasts, family, priors,
     df = dummy_df(cols, N)
 
     # Define model, and generate a single posterior sample.
-    model = defm(formula_str, df, family, priors, contrasts)
-    fit = model.fit(**fitargs)
+    metadata = metadata_from_cols(cols)
+    desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
+    data = makedata(formula, df, metadata, contrasts)
+    fit = DefmResult(formula, metadata, contrasts, desc, data).fit(**fitargs)
 
     num_chains = fitargs.get('num_chains', 1)
 
     # Check parameter sizes.
-    for parameter in parameters(model.desc):
+    for parameter in parameters(fit.model_desc):
         expected_param_shape = parameter.shape
         samples = get_param(fit, parameter.name)
         # A single sample is collected by each chain for all cases.
