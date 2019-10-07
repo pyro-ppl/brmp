@@ -127,11 +127,3 @@ def flatten(arr):
 # (num_chains * num_samples, ...) -> (num_chains, num_samples, ...)
 def unflatten(arr, num_chains, num_samples):
     return arr.reshape((num_chains, num_samples) + arr.shape[1:])
-
-def main():
-    import torch
-    t = torch.rand(2, 10, 3)
-    assert torch.equal(unflatten(flatten(t), 2, 10), t)
-
-if __name__ == '__main__':
-    main()
