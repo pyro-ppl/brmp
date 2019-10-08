@@ -8,7 +8,7 @@ from jax.config import config; config.update("jax_platform_name", "cpu")
 import numpyro.handlers as handler
 from numpyro.mcmc import MCMC, NUTS
 
-from brmp.backend import Backend, Model, apply_default_hmc_args
+from brmp.backend import Backend, Model, apply_default_hmc_args, flatten, unflatten
 from brmp.fit import Samples
 from brmp.numpyro_codegen import gen
 
@@ -18,11 +18,12 @@ from brmp.numpyro_codegen import gen
 # bs: dict from parameter names to JAX numpy arrays
 # ps: JAX numpy array
 
-def get_param(samples, name):
+def get_param(samples, name, preserve_chains):
     assert type(samples) == dict
     # Reminder to use correct interface.
     assert not name == 'mu', 'Use `location` to fetch `mu`.'
-    return samples[name]
+    param = samples[name]
+    return param if preserve_chains else flatten(param)
 
 # Extract the underlying numpy array (rather than using JAX numpy) to
 # match the interface exactly.
@@ -39,15 +40,22 @@ def from_numpy(data):
 
 # TODO: Better name.
 def run_model_on_samples_and_data(modelfn, samples, data):
-    return vmap(lambda sample: handler.substitute(modelfn, sample)(**data, mode='prior_and_mu'))(samples)
+    assert type(samples) == dict
+    assert len(samples) > 0
+    num_chains, num_samples = next(iter(samples.values())).shape[0:2]
+    assert all(arr.shape[0:2] == (num_chains, num_samples) for arr in samples.values())
+    flat_samples = {k: flatten(arr) for k, arr in samples.items()}
+    out = vmap(lambda sample: handler.substitute(modelfn, sample)(**data, mode='prior_and_mu'))(flat_samples)
+    # Restore chain dim.
+    return {k: unflatten(arr, num_chains, num_samples) for k, arr in out.items()}
 
 def location(original_data, samples, transformed_samples, model_fn, new_data):
     # Optimization: For the data used for inference, values for `mu`
     # are already computed and available from `transformed_samples`.
     if new_data == original_data:
-        return transformed_samples['mu']
+        return flatten(transformed_samples['mu'])
     else:
-        return run_model_on_samples_and_data(model_fn, samples, new_data)['mu']
+        return flatten(run_model_on_samples_and_data(model_fn, samples, new_data)['mu'])
 
 def nuts(data, model, seed=None, iter=None, warmup=None, num_chains=None):
     assert type(data) == dict
@@ -66,7 +74,7 @@ def nuts(data, model, seed=None, iter=None, warmup=None, num_chains=None):
     # `num_chains` > 1 to achieve parallel chains.
     mcmc = MCMC(kernel, warmup, iter, num_chains=num_chains)
     mcmc.run(rng, **data)
-    samples = mcmc.get_samples()
+    samples = mcmc.get_samples(group_by_chain=True)
 
     # Here we re-run the model on the samples in order to collect
     # transformed parameters. (e.g. `b`, `mu`, etc.) Theses are made
@@ -99,7 +107,9 @@ def prior(data, model, num_samples, seed=None):
         # vectorization, OrderedDicts, as used by the trace, don't.)
         return {k: node['value'] for k,node in model_tr.items()}
 
-    samples = vmap(get_model_trace)(rngs)
+    flat_samples = vmap(get_model_trace)(rngs)
+    # Insert dummy "chain" dim.
+    samples = {k: np.expand_dims(arr, 0) for k, arr in flat_samples.items()}
     transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
     all_samples = dict(samples, **transformed_samples)
 
