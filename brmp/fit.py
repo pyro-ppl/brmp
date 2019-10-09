@@ -161,7 +161,7 @@ def compute_diag_or_default(diag, samples):
     if val is not None:
         return val
     else:
-        return np.zeros((samples.shape[2],))
+        return np.full((samples.shape[2],), np.nan)
 
 # Similar to the following:
 # https://rdrr.io/cran/rstan/man/stanfit-method-summary.html
