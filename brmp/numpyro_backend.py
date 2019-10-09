@@ -8,9 +8,10 @@ from jax.config import config; config.update("jax_platform_name", "cpu")
 import numpyro.handlers as handler
 from numpyro.mcmc import MCMC, NUTS
 
-from brmp.backend import Backend, Model, apply_default_hmc_args, flatten, unflatten
+from brmp.backend import Backend, Model, apply_default_hmc_args
 from brmp.fit import Samples
 from brmp.numpyro_codegen import gen
+from brmp.utils import flatten, unflatten
 
 # The types described in the comments in pyro_backend.py as follows
 # in this back end:
