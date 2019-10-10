@@ -1032,7 +1032,13 @@ def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, con
         assert np.all(np.isfinite(arr))
         assert arr.shape == expected_shape
     num_coefs = len(scalar_parameter_names(fit.model_desc))
-    chk(marginals(fit).array, (num_coefs, 9)) # num coefs x num stats
+
+    marr = marginals(fit).array
+    assert marr.shape == (num_coefs, 9) # num coefs x num stats
+    # Don't check finiteness of n_eff and r_hat, which are frequently
+    # nan with few samples
+    assert np.all(np.isfinite(marr[:,:-2]))
+
     chk(fitted(fit), (S, N))
     chk(fitted(fit, 'linear'), (S, N))
     chk(fitted(fit, 'response'), (S, N))
