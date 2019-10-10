@@ -103,14 +103,15 @@ class GenerateResult():
         samples = getattr(self.backend, algo)(self.data, self.model, *args, **kwargs)
         return Fit(self.defm_result.formula, self.defm_result.metadata, self.defm_result.contrasts, self.data, self.defm_result.desc, self.model, samples, self.backend)
 
-    def prior(self, *args, **kwargs):
-        return self._run_algo('prior', *args, **kwargs)
+    def prior(self, num_samples=10, *args, **kwargs):
+        return self._run_algo('prior', num_samples, *args, **kwargs)
 
-    def nuts(self, *args, **kwargs):
-        return self._run_algo('nuts', *args, **kwargs)
+    def nuts(self, iter=10, warmup=None, num_chains=1, *args, **kwargs):
+        warmup = iter // 2 if warmup is None else warmup
+        return self._run_algo('nuts', iter, warmup, num_chains, *args, **kwargs)
 
-    def svi(self, *args, **kwargs):
-        return self._run_algo('svi', *args, **kwargs)
+    def svi(self, iter=10, num_samples=10, *args, **kwargs):
+        return self._run_algo('svi', iter, num_samples, *args, **kwargs)
 
 
 def brm(formula_str, df, family=None, priors=None, **kwargs):
