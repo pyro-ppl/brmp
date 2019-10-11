@@ -54,6 +54,7 @@ profile_default/
 ipython_config.py
 
 # Environments
+.idea
 .env
 .venv
 env/
