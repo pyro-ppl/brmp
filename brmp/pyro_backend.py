@@ -14,7 +14,7 @@ from pyro.infer import SVI, Trace_ELBO
 from pyro.infer.autoguide import AutoMultivariateNormal
 from pyro.optim import Adam
 
-from brmp.backend import Backend, Model, apply_default_hmc_args
+from brmp.backend import Backend, Model
 from brmp.fit import Samples
 from brmp.pyro_codegen import gen
 from brmp.utils import flatten, unflatten
@@ -119,11 +119,12 @@ def run_model_on_samples_and_data(modelfn, samples, data):
     return {name: unflatten(torch.stack([retval[name] for retval in return_values]), num_chains, num_samples)
             for name in names}
 
-def nuts(data, model, iter=None, warmup=None, num_chains=None):
+def nuts(data, model, iter, warmup, num_chains):
     assert type(data) == dict
     assert type(model) == Model
-
-    iter, warmup, num_chains = apply_default_hmc_args(iter, warmup, num_chains)
+    assert type(iter) == int
+    assert type(warmup) == int
+    assert type(num_chains) == int
 
     nuts_kernel = NUTS(model.fn, jit_compile=False, adapt_step_size=True)
     mcmc = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup, num_chains=num_chains)
@@ -181,10 +182,9 @@ def get_mini_batch(arr, subsample):
     else:
         return arr[subsample]
 
-def svi(data, model, iter=10, num_samples=10, autoguide=None, optim=None, subsample_size=None):
+def svi(data, model, iter, num_samples, autoguide=None, optim=None, subsample_size=None):
     assert type(data) == dict
     assert type(model) == Model
-
     assert type(iter) == int
     assert type(num_samples) == int
     assert autoguide is None or callable(autoguide)

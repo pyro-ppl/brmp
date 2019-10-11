@@ -8,7 +8,7 @@ from jax.config import config; config.update("jax_platform_name", "cpu")
 import numpyro.handlers as handler
 from numpyro.mcmc import MCMC, NUTS
 
-from brmp.backend import Backend, Model, apply_default_hmc_args
+from brmp.backend import Backend, Model
 from brmp.fit import Samples
 from brmp.numpyro_codegen import gen
 from brmp.utils import flatten, unflatten
@@ -58,12 +58,13 @@ def location(original_data, samples, transformed_samples, model_fn, new_data):
     else:
         return flatten(run_model_on_samples_and_data(model_fn, samples, new_data)['mu'])
 
-def nuts(data, model, seed=None, iter=None, warmup=None, num_chains=None):
+def nuts(data, model, iter, warmup, num_chains, seed=None):
     assert type(data) == dict
     assert type(model) == Model
+    assert type(iter) == int
+    assert type(warmup) == int
+    assert type(num_chains) == int
     assert seed is None or type(seed) == int
-
-    iter, warmup, num_chains = apply_default_hmc_args(iter, warmup, num_chains)
 
     if seed is None:
         seed = np.random.randint(0, 2**32, dtype=np.uint32).astype(np.int32)
