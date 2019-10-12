@@ -428,6 +428,8 @@ def test_expected_response_codegen(response_meta, family, args, expected, backen
         dict(backend=numpyro_backend, iter=1, warmup=0, num_chains=2),
         marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow')),
 ])
+# TODO: Remove on next Pyro release.
+@pytest.mark.xfail('CI' in os.environ, reason='Failure when num_chains > num_cpu; fixed in Pyro master.')
 def test_parameter_shapes(formula_str, non_real_cols, contrasts, family, priors, expected, fitargs):
     # Make dummy data.
     N = 5
@@ -1021,6 +1023,8 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
 # metadata in order ensure to be compatible with the model, and this
 # test exercises that.
 @pytest.mark.parametrize('N2', [1, 8])
+# TODO: Remove on next Pyro release.
+@pytest.mark.xfail('CI' in os.environ, reason='Failure when num_chains > num_cpu; fixed in Pyro master.')
 def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, contrasts, N2):
     N = 10
     S = 4
