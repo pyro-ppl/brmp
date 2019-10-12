@@ -8,5 +8,5 @@ setup(name='brmp',
         'numpyro>=0.2.0',
       ],
       extras_require={
-        'test': ['pytest']
+        'test': ['flake8', 'pytest']
       })
