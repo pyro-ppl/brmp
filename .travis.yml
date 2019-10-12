@@ -15,7 +15,7 @@ dist: xenial
 install:
     - pip install -U pip
     # TODO: Use pyro release version when available
-    - pip install git+https://github.com/pyro-ppl/pyro/pyro.get@dev
+    - pip install git+https://github.com/pyro-ppl/pyro.get@dev
     - pip install -e .
     - pip freeze
 
