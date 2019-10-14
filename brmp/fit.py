@@ -7,10 +7,8 @@ import pandas as pd
 from brmp.backend import data_from_numpy
 from brmp.design import predictors
 from brmp.family import free_param_names
-from brmp.model import (model_repr, scalar_parameter_map,
-                        scalar_parameter_names)
+from brmp.model import model_repr, scalar_parameter_map, scalar_parameter_names
 from brmp.utils import flatten
-
 
 # `Fit` carries around `formula`, `metadata` and `contrasts` for the
 # sole purpose of being able to encode any new data passed to

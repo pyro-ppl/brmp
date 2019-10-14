@@ -3,14 +3,13 @@ from functools import partial
 import numpy as np
 import numpyro.handlers as handler
 from jax import random, vmap
+from jax.config import config
 from numpyro.mcmc import MCMC, NUTS
 
 from brmp.backend import Backend, Model
 from brmp.fit import Samples
 from brmp.numpyro_codegen import gen
 from brmp.utils import flatten, unflatten
-
-from jax.config import config
 
 config.update("jax_platform_name", "cpu")
 

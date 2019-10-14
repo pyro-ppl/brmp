@@ -15,12 +15,11 @@ from brmp.design import (Categorical, CategoricalCoding, Integral,
                          NumericCoding, RealValued, code_lengths, code_terms,
                          coef_names, dummy_df, make_column_lookup, makedata,
                          metadata_from_cols, metadata_from_df)
-from brmp.family import (LKJ, Bernoulli, Binomial, HalfCauchy,
-                         HalfNormal, Normal)
+from brmp.family import (LKJ, Bernoulli, Binomial, HalfCauchy, HalfNormal,
+                         Normal)
 from brmp.fit import Samples, fitted, get_param, marginals
 from brmp.formula import Formula, OrderedSet, Term, _1, allfactors, parse
-from brmp.model import (parameters, scalar_parameter_map,
-                        scalar_parameter_names)
+from brmp.model import parameters, scalar_parameter_map, scalar_parameter_names
 from brmp.model_pre import build_model_pre
 from brmp.numpyro_backend import backend as numpyro_backend
 from brmp.priors import Prior, build_prior_tree
