@@ -47,6 +47,10 @@ exclude_patterns = []
 
 # -- Options for HTML output -------------------------------------------------
 
+# https://github.com/readthedocs/sphinx_rtd_theme/issues/117
+def setup(app):
+   app.add_stylesheet('theme_overrides.css')
+
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
