@@ -33,6 +33,54 @@ def get_response_prior(family, parameter):
 # the hope is that a brms-like interface can be put in front of this.
 
 Prior = namedtuple('Prior', 'path prior')
+"""
+
+A :class:`~brmp.prior.Prior` instance associates a prior distribution with one
+or more parameters of a model. One or more such instances may be passed to
+:func:`~brmp.defm` to override its default choice of priors.
+
+The parameters of the model to which a prior should be applied are specified
+using a path. The following examples illustrate how this works:
+
+.. list-table::
+   :widths: auto
+   :header-rows: 1
+
+   * - Path
+     - Selected Parameters
+   * - ``('b',)``
+     - All population level coefficients
+   * - ``('b', 'intercept')``
+     - The population level intercept
+   * - ``('b', 'x')``
+     - The population level coefficient ``x``
+   * - ``('sd',)``
+     - All standard deviations in all groups
+   * - ``('sd', 'a')``
+     - All standard deviations in the group which groups by column ``a``
+   * - ``('sd', 'a:b')``
+     - All standard deviations in the group which groups by columns ``a`` and ``b``
+   * - ``('sd', 'a', 'intercept')``
+     - The standard deviation of the intercept in the group which groups by column ``a``
+   * - ``('cor',)``
+     - All correlation matrices
+   * - ``('cor', 'a')``
+     - The correlation matrix of the group which groups by column ``a``
+   * - ``('cor', 'a:b')``
+     - The correlation matrix of the group which groups by columns ``a`` and ``b``
+   * - ``('resp', `sigma`)``
+     - The ``sigma`` parameter of the response distribution
+
+Example::
+
+  Prior(('b', 'intercept'), Normal(0., 1.))
+
+:param path: A path describing one or more parameters of the model.
+:type path: tuple
+:param prior: A prior distribution, given as a :class:`~brmp.family.Family`
+              with all of its parameters specified.
+:type prior: brmp.family.Family
+"""
 
 def walk(node, path):
     assert type(node) == Node

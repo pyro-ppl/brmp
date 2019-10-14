@@ -74,10 +74,47 @@ Node = namedtuple('Node', 'op l r')
 # using the name of the grouping column, which would be ambiguous
 # without the assumption. brms does this too.
 
+# TODO: I don't think attaching these docs to the "private" `Formula`
+# class makes much sense. What's a better alternative?
 Formula = namedtuple('Formula',
                      ['response',   # response column name
                       'terms',      # an OrderedSet of population level terms
                       'groups'])    # list of groups
+"""
+Represents an lme4 formula.
+
+.. list-table::
+   :widths: auto
+
+   * - ``~``
+     - A valid formula contains exactly one occurrence of ``~`` . The LHS gives
+       the name of the scalar response variable. The RHS describes the
+       structure of the model.
+   * - ``+``
+     - A combination of terms.
+   * - ``:``
+     - An interaction between two terms. Can also appear on the RHS of ``|`` or
+       ``||`` to specify grouping by multiple factors.
+   * - ``|``
+     - Introduces a group-level term. (i.e. random effect.)
+   * - ``||``
+     - Introduces a group-level term, omitting modelling of group-level correlations.
+   * - ``1``
+     - Intercept term. Note that intercept terms are not added automatically.
+
+The following examples are all parsed as valid formulae:
+
+.. code-block:: text
+
+  y ~ x
+  y ~ 1 + x
+  y ~ 1 + x1:x2
+  y ~ 1 + x1 + (1 + x2 | a)
+  y ~ 1 + x1 + (1 + x2 || a:b)
+
+"""
+
+
 
 Group = namedtuple('Group',
                    ['terms',        # an OrderedSet of group-level terms

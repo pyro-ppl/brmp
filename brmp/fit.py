@@ -108,6 +108,42 @@ def layout_table(rows):
 # https://rdrr.io/cran/brms/man/fitted.brmsfit.html
 
 def fitted(fit, what='expectation', data=None):
+    """
+    Produces predictions from the fitted model.
+
+    Predicted values are computed for each sample collected during inference,
+    and for each row in the data set.
+
+    :param fit: A model fit.
+    :type fit: brmp.fit.Fit
+    :param what: The value to predict. Valid arguments and their effect are described below:
+
+                 .. list-table::
+                    :widths: auto
+
+                    * - ``'expectation'``
+                      - Computes the expected value of the response distribution.
+                    * - ``'sample'``
+                      - Draws a sample from the response distribution.
+                    * - ``'response'``
+                      - Computes the output of the model followed by any
+                        inverse link function. i.e. The value of the location
+                        parameter of the response distribution.
+                    * - ``'linear'``
+                      - Computes the output of the model prior to the application
+                        of any inverse link function.
+
+    :type what: str
+    :param data: The data from which to compute the predictions. When omitted,
+                 the data on which the model was fit is used.
+
+
+    :type data: pandas.DataFrame
+    :return: An array with shape ``(S, N)``. Where ``S`` is the number of samples taken
+             during inference and ``N`` is the number of rows in the data set used for prediction.
+    :rtype: numpy.ndarray
+
+    """
     assert type(fit) == Fit
     assert what in ['sample', 'expectation', 'linear', 'response']
     assert data is None or type(data) is pd.DataFrame
@@ -177,6 +213,26 @@ def compute_diag_or_default(diag, samples):
 # be to do this without performing any unnecessary slicing. (Though
 # this sounds fiddly.)
 def marginals(fit, qs=default_quantiles):
+    """Produces a table containing statistics of the marginal
+    distibutions of the parameters of the fitted model.
+
+    :param fit: A model fit.
+    :type fit: brmp.fit.Fit
+    :param qs: A list of quantiles to include in the output.
+    :type qs: list
+    :return: A table of marginal statistics.
+    :rtype: brmp.fit.ArrReprWrapper
+
+    Example::
+
+      fit = defm('y ~ x', df).fit()
+      print(marginals(fit))
+
+      #        mean    sd  2.5%   25%   50%   75% 97.5% n_eff r_hat
+      # b_x    0.42  0.33 -0.11  0.14  0.48  0.65  0.88  5.18  1.00
+      # sigma  0.78  0.28  0.48  0.61  0.68  0.87  1.32  5.28  1.10
+
+    """
     assert type(fit) == Fit
     names = scalar_parameter_names(fit.model_desc)
     # TODO: Every call to `get_scalar_param` rebuilds the scalar
@@ -202,7 +258,28 @@ def get_param(fit, name, preserve_chains=False):
 # TODO: If parameter and scalar parameter names never clash, perhaps
 # having a single lookup method would be convenient. Perhaps this
 # could be wired up to `fit.samples[...]`?
+
+# TODO: Mention other ways of obtaining valid parameter names?
+
 def get_scalar_param(fit, name, preserve_chains=False):
+    """
+    Extracts the values sampled for a single parameter from a model fit.
+
+    :param fit: A model fit.
+    :type fit: brmp.fit.Fit
+    :param name: The name of a parameter of the model. Valid names are those
+                 shown in the output of :func:`~brmp.fit.marginals`.
+    :type name: str
+    :param preserve_chains: Whether to group samples by the MCMC chain on which
+                            they were collected.
+    :type preserve_chains: bool
+    :return: An array with shape ``(S,)`` when ``preserve_chains=False``, ``(C, S)``
+             otherwise. Where ``S`` is the number of samples taken during inference,
+             and ``C`` is the number of MCMC chains run.
+
+    :rtype: numpy.ndarray
+
+    """
     assert type(fit) == Fit
     m = scalar_parameter_map(fit.model_desc)
     res = [p for (n, p) in m if n == name]

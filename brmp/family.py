@@ -61,28 +61,52 @@ Normal     = Family('Normal',
                     [param('mu', Type['Real']()), param('sigma', Type['PosReal']())],
                     const(Type['Real']()),
                     Link('mu', LinkFn.identity))
+"""
+:param mu: mean
+:param sigma: standard deviation
+"""
 Bernoulli  = Family('Bernoulli',
                     [param('probs', Type['UnitInterval']())],
                     const(Type['Boolean']()),
                     Link('probs', LinkFn.logit))
+"""
+:param probs: success probability
+"""
 Cauchy     = Family('Cauchy',
                     [param('loc', Type['Real']()), param('scale', Type['PosReal']())],
                     const(Type['Real']()), None)
+"""
+:param loc: location
+:param scale: scale
+"""
 HalfCauchy = Family('HalfCauchy',
                     [param('scale', Type['PosReal']())],
                     const(Type['PosReal']()), None)
+"""
+:param scale: scale
+"""
 LKJ        = Family('LKJ',
                     [param('eta', Type['PosReal']())],
                     const(Type['CorrCholesky']()), None)
+"""
+:param eta: shape
+"""
 Binomial   = Family('Binomial',
                     [param('num_trials', Type['IntegerRange'](0, None)),
                      param('probs', Type['UnitInterval']())],
                     lambda num_trials: Type['IntegerRange'](0, num_trials),
                     Link('probs', LinkFn.logit))
+"""
+:param num_trials: number of trials
+:param probs: success probability
+"""
 HalfNormal = Family('HalfNormal',
                     [param('sigma', Type['PosReal']())],
                     const(Type['PosReal']()),
                     None)
+"""
+:param sigma: scale
+"""
 
 def apply1(family, name, value):
     if name not in [p.name for p in family.params]:
