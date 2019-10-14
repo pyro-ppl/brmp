@@ -27,4 +27,4 @@ jobs:
           name: "unit tests"
           python: 3.6
           script:
-              - pytest -vs --tb=short
+              - make test
