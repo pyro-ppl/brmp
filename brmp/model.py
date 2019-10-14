@@ -1,15 +1,16 @@
 from collections import namedtuple
 
-from brmp.utils import unzip
 from brmp.family import Family, family_repr
-from brmp.priors import select, Node, cols2str
 from brmp.model_pre import ModelDescPre
+from brmp.priors import Node, cols2str, select
+from brmp.utils import unzip
 
 # Abstract model description.
 ModelDesc = namedtuple('ModelDesc', 'population groups response')
 Population = namedtuple('Population', 'coefs priors')
 Group = namedtuple('Group', 'columns levels coefs sd_priors corr_prior')
 Response = namedtuple('Response', 'family nonlocparams priors')
+
 
 # Add information from the prior tree to the pre-model description.
 def build_model(model_desc_pre, prior_tree):
@@ -25,7 +26,6 @@ def build_model(model_desc_pre, prior_tree):
 
     groups = []
     for group in model_desc_pre.groups:
-
         grp_node_name = cols2str(group.columns)
 
         # If the pre-model indicates there is a corr prior, look it up
@@ -33,7 +33,8 @@ def build_model(model_desc_pre, prior_tree):
         corr_prior = select(prior_tree, ('cor', grp_node_name)).prior_edit.prior if group.corr else None
         assert corr_prior is None or type(corr_prior) == Family
 
-        sd_coefs, sd_priors = unzip([(n.name, n.prior_edit.prior) for n in select(prior_tree, ('sd', grp_node_name)).children])
+        sd_coefs, sd_priors = unzip(
+            [(n.name, n.prior_edit.prior) for n in select(prior_tree, ('sd', grp_node_name)).children])
 
         # Sanity check. Assert that the coef names pulled from the
         # tree match those in the pre-model.
@@ -54,8 +55,10 @@ def build_model(model_desc_pre, prior_tree):
 def model_repr(model):
     assert type(model) == ModelDesc
     out = []
+
     def write(s):
         out.append(s)
+
     write('=' * 40)
     write('Population')
     write('-' * 40)
@@ -87,8 +90,10 @@ def model_repr(model):
 
 Parameter = namedtuple('Parameter', ['name', 'shape'])
 
+
 def parameter_names(model):
     return [parameter.name for parameter in parameters(model)]
+
 
 # This describes the set of parameters implied by a particular model.
 # Any backend is expected to produce models the make this set of
@@ -102,8 +107,9 @@ def parameters(model):
             [Parameter('sd_{}'.format(i), (len(group.coefs),))
              for i, group in enumerate(model.groups)] +
             [Parameter('L_{}'.format(i), (len(group.coefs), len(group.coefs)))
-             for i, group in enumerate(model.groups) if not group.corr_prior is None] +
+             for i, group in enumerate(model.groups) if group.corr_prior is not None] +
             [Parameter(param.name, (1,)) for param in model.response.nonlocparams])
+
 
 # [ (scalar_param_name, (param_name, (ix0, ix1, ...)), ... ]
 
@@ -124,6 +130,7 @@ def scalar_parameter_map(model):
     for param in model.response.nonlocparams:
         out.append((param.name, (param.name, (0,))))
     return out
+
 
 def scalar_parameter_names(model):
     return [name for (name, _) in scalar_parameter_map(model)]

@@ -1,23 +1,22 @@
-from sys import stderr
 import time
 from functools import partial
+from sys import stderr
 
 import numpy as np
-import torch
-
-from pyro.infer.mcmc import NUTS
-from pyro.infer.mcmc.api import MCMC
-
 import pyro
 import pyro.poutine as poutine
+import torch
 from pyro.infer import SVI, Trace_ELBO
 from pyro.infer.autoguide import AutoMultivariateNormal
+from pyro.infer.mcmc import NUTS
+from pyro.infer.mcmc.api import MCMC
 from pyro.optim import Adam
 
 from brmp.backend import Backend, Model
 from brmp.fit import Samples
 from brmp.pyro_codegen import gen
 from brmp.utils import flatten, unflatten
+
 
 def get_node_or_return_value(samples, name):
     def getp(sample):
@@ -33,6 +32,7 @@ def get_node_or_return_value(samples, name):
     #
     return torch.stack([getp(sample).detach() for sample in samples])
 
+
 def get_param(samples, name, preserve_chains):
     # Reminder to use correct interface.
     assert not name == 'mu', 'Use `location` to fetch `mu`.'
@@ -42,8 +42,8 @@ def get_param(samples, name, preserve_chains):
     param = get_node_or_return_value(samples, name)
     return param.unsqueeze(0) if preserve_chains else param
 
-def location(modelfn, samples, data):
 
+def location(modelfn, samples, data):
     # Re-run the model, taking values from the given samples at
     # `sample` sites, and using the given data to compute `mu`.
 
@@ -52,8 +52,10 @@ def location(modelfn, samples, data):
 
     return torch.stack([f(s).detach() for s in samples])
 
+
 def to_numpy(param_samples):
     return param_samples.numpy()
+
 
 # Convert numpy arrays to torch tensors. Arrays of floats use torch's
 # default dtype.
@@ -81,6 +83,7 @@ def from_numpy(arr):
         if torch.is_floating_point(out) and not out.dtype == default_dtype:
             out = out.type(default_dtype)
         return out
+
 
 # TODO: Ideally this would be vectorized. (i.e. We'd compute the
 # model's return value for all samples in parallel.) Pyro's
@@ -119,6 +122,7 @@ def run_model_on_samples_and_data(modelfn, samples, data):
     return {name: unflatten(torch.stack([retval[name] for retval in return_values]), num_chains, num_samples)
             for name in names}
 
+
 def nuts(data, model, iter, warmup, num_chains):
     assert type(data) == dict
     assert type(model) == Model
@@ -133,7 +137,7 @@ def nuts(data, model, iter, warmup, num_chains):
     samples = mcmc.get_samples(group_by_chain=True)
     # Pyro doesn't insert a chain dim when num_chains==1.
     if num_chains == 1:
-        samples = {k: arr.unsqueeze(0) for k,arr in samples.items()}
+        samples = {k: arr.unsqueeze(0) for k, arr in samples.items()}
 
     transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
 
@@ -160,6 +164,7 @@ def nuts(data, model, iter, warmup, num_chains):
 
     return Samples(all_samples, get_param, loc)
 
+
 # Ideally we'd simply use `arr[subsample]` to select out a mini batch,
 # but doing so is problematic when the design matrix is empty. (More
 # detail below.) This function exists to work around the problem.
@@ -182,6 +187,7 @@ def get_mini_batch(arr, subsample):
     else:
         return arr[subsample]
 
+
 def svi(data, model, iter, num_samples, autoguide=None, optim=None, subsample_size=None):
     assert type(data) == dict
     assert type(model) == Model
@@ -190,7 +196,7 @@ def svi(data, model, iter, num_samples, autoguide=None, optim=None, subsample_si
     assert autoguide is None or callable(autoguide)
 
     N = next(data.values().__iter__()).shape[0]
-    assert all(arr.shape[0] == N for arr in  data.values())
+    assert all(arr.shape[0] == N for arr in data.values())
     assert (subsample_size is None or
             type(subsample_size) == int and 0 < subsample_size < N)
 
@@ -219,8 +225,8 @@ def svi(data, model, iter, num_samples, autoguide=None, optim=None, subsample_si
             data_for_step = {k: get_mini_batch(arr, subsample) for k, arr in data.items()}
         loss = svi.step(dfN=dfN, subsample=subsample, **data_for_step)
         t1 = time.time()
-        if t1 - t0 > 0.5 or (i+1) == iter:
-            iter_str = str(i+1).rjust(max_iter_str_width)
+        if t1 - t0 > 0.5 or (i + 1) == iter:
+            iter_str = str(i + 1).rjust(max_iter_str_width)
             out = 'iter: {} | loss: {:.3f}'.format(iter_str, loss)
             max_out_len = max(max_out_len, len(out))
             # Sending the ANSI code to clear the line doesn't seem to
@@ -253,8 +259,8 @@ def svi(data, model, iter, num_samples, autoguide=None, optim=None, subsample_si
 
     return Samples(samples, partial(get_param, samples), loc)
 
-def prior(data, model, num_samples):
 
+def prior(data, model, num_samples):
     def get_model_trace():
         return poutine.trace(model.fn).get_trace(mode='prior_only', **data)
 
@@ -264,5 +270,6 @@ def prior(data, model, num_samples):
         return location(model.fn, samples, d)
 
     return Samples(samples, partial(get_param, samples), loc)
+
 
 backend = Backend('Pyro', gen, prior, nuts, svi, from_numpy, to_numpy)

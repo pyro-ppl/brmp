@@ -24,7 +24,6 @@ author = 'brmp authors'
 
 # -- General configuration ---------------------------------------------------
 
-import sphinx_rtd_theme
 
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
@@ -49,7 +48,8 @@ exclude_patterns = []
 
 # https://github.com/readthedocs/sphinx_rtd_theme/issues/117
 def setup(app):
-   app.add_stylesheet('theme_overrides.css')
+    app.add_stylesheet('theme_overrides.css')
+
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
@@ -68,4 +68,5 @@ html_static_path = ['_static']
 
 intersphinx_mapping = {'python': ('https://docs.python.org/3/', None),
                        'numpy': ('http://docs.scipy.org/doc/numpy/', None),
-                       'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),}
+                       'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
+                       }
