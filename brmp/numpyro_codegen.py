@@ -1,17 +1,19 @@
 import re
 
 import numpy as np
-
 from jax import random
 from numpyro.handlers import seed
 
-from brmp.family import Family, Normal, LinkFn, args, free_param_names
-from brmp.model import ModelDesc, Group
 from brmp.backend import Model
+from brmp.family import Family, LinkFn, Normal, args, free_param_names
+from brmp.model import Group, ModelDesc
+
 
 def gen_expanded_scalar(val, shape):
     assert type(val) in [float, int]
-    return 'chk_shape(np.array({}).broadcast([{dims}]), tuple([{dims}]))'.format(val, dims=', '.join(str(dim) for dim in shape))
+    return 'chk_shape(np.array({}).broadcast([{dims}]), tuple([{dims}]))'.format(val, dims=', '.join(
+        str(dim) for dim in shape))
+
 
 def gendist(family, args, shape):
     assert type(family) == Family
@@ -26,6 +28,7 @@ def gendist(family, args, shape):
     assert all(type(dim) in [int, str] for dim in shape)
     args_code = [arg if type(arg) == str else gen_expanded_scalar(arg, shape) for arg in args]
     return '{}({})'.format(family.name, ', '.join(args_code))
+
 
 # `vectorize` is false during regular model evaluation. In this
 # setting this is a distribution over an N (num. of rows in the data
@@ -46,7 +49,7 @@ def gen_response_dist(model, vectorize=False):
     # This function assumes that the variables S/N, mu, and any other
     # free parameters of the distribution will already be in scope.
 
-    shape=['S', 'N'] if vectorize else ['N']
+    shape = ['S', 'N'] if vectorize else ['N']
 
     # TODO: Optimisations (for numerical stability/perf.) are
     # available for some response family/link function pairs. (Though
@@ -65,13 +68,16 @@ def gen_response_dist(model, vectorize=False):
             return 'chk_shape(np.tile({}, (1, N)), (S, N))'.format(param.name)
         else:
             return 'chk_shape({}.broadcast([N]).reshape(-1), (N,))'.format(param.name)
+
     response_args = [response_arg(p) for p in model.response.family.params]
     return gendist(model.response.family, response_args, shape=shape)
 
+
 def lkj_corr_cholesky(size, shape):
-    assert type(size) == int # the size of the matrix
-    assert type(shape) == float # shape parameter of distribution
+    assert type(size) == int  # the size of the matrix
+    assert type(shape) == float  # shape parameter of distribution
     return 'LKJCholesky({}, np.array({}))'.format(size, shape)
+
 
 def sample(name, distribution, obs=None):
     args = ['"{}"'.format(name),
@@ -80,21 +86,25 @@ def sample(name, distribution, obs=None):
         args.append('obs={}'.format(obs))
     return '{} = sample({})'.format(name, ', '.join(args))
 
+
 def indent(line):
     return '    {}'.format(line)
+
 
 def method(name, parameters, body):
     assert type(body) == list
     assert type(parameters) == list
     return ['def {}({}):'.format(name, ', '.join(parameters))] + [indent(line) for line in body]
 
+
 def comment(s):
     return '# {}'.format(s)
+
 
 def genprior(varname, prior_desc):
     assert type(varname) == str
     assert type(prior_desc) == list
-    assert all(type(p)    == tuple and
+    assert all(type(p) == tuple and
                type(p[0]) == Family and
                type(p[1]) == int
                for p in prior_desc)
@@ -109,7 +119,8 @@ def genprior(varname, prior_desc):
 
     if len(prior_desc) > 0:
         # Concatenate the segments to produce the final vector.
-        code.append('{} = np.hstack([{}])'.format(varname, ', '.join('{}_{}'.format(varname, i) for i in range(len(prior_desc)))))
+        code.append('{} = np.hstack([{}])'.format(varname, ', '.join(
+            '{}_{}'.format(varname, i) for i in range(len(prior_desc)))))
     else:
         code.append('{} = np.array([])'.format(varname))
 
@@ -120,7 +131,7 @@ def genprior(varname, prior_desc):
 # generates code to sample group level priors and to accumulate the
 # groups contribution to mu.
 def gengroup(i, group):
-    assert type(i) == int # A unique int assigned to each group.
+    assert type(i) == int  # A unique int assigned to each group.
     assert type(group) == Group
 
     cmt = comment('Group {}: factor={}'.format(i, ':'.join(group.columns)))
@@ -189,6 +200,7 @@ def gengroup(i, group):
 
     return code, mu_code
 
+
 def geninvlinkbody(linkfn, code):
     if linkfn == LinkFn.identity:
         return code
@@ -196,6 +208,7 @@ def geninvlinkbody(linkfn, code):
         return 'sigmoid({})'.format(code)
     else:
         raise NotImplementedError('code generation for link function {} not implemented'.format(linkfn))
+
 
 # TODO: Re-evaluate whether it really makes sense to have these
 # implemented by each back end. An alternative is to implement link
@@ -210,6 +223,7 @@ def geninvlinkfn(model):
     body = geninvlinkbody(model.response.family.link.fn, 'x')
     return '\n'.join(method('invlink', ['x'], ['return {}'.format(body)]))
 
+
 def gen_response_fn(model, mode):
     assert mode in ['expectation', 'sample']
     distcode = 'dist.{}'.format(gen_response_dist(model, vectorize=True))
@@ -220,6 +234,7 @@ def gen_response_fn(model, mode):
             "return {}".format(retval)]
     return '\n'.join(method('expected_response', args, body))
 
+
 # TODO: I'm missing opportunities to vectorise here. Adjacent segments
 # that share a family and differ only in parameters can be handled
 # with a single `sample` statement with suitable parameters.
@@ -227,16 +242,16 @@ def gen_response_fn(model, mode):
 # e.g.
 # contig(list('abb')) == [('a', 1), ('b', 2)]
 def contig(xs):
-    assert type(xs) == list or type(xs) == tuple # Though really more general than this.
-    assert all(x is not None for x in xs) # Since None used as initial value of `cur`.
+    assert type(xs) == list or type(xs) == tuple  # Though really more general than this.
+    assert all(x is not None for x in xs)  # Since None used as initial value of `cur`.
     cur = None
     segments = []
     for i, x in enumerate(xs):
         if x == cur:
-            segments[-1][1].append(i) # Extend segment.
+            segments[-1][1].append(i)  # Extend segment.
         else:
             cur = x
-            segments.append((cur, [i])) # New segment.
+            segments.append((cur, [i]))  # New segment.
     # Post-process.
     segments = [(x, len(ix)) for (x, ix) in segments]
     return segments
@@ -291,7 +306,7 @@ def genmodel(model):
     for param, param_prior in zip(model.response.nonlocparams, model.response.priors):
         body.append(sample(param.name, gendist(param_prior, args(param_prior), [1])))
 
-    #body.append('with pyro.plate("obs", N):')
+    # body.append('with pyro.plate("obs", N):')
 
     # TODO: This condition allows us to run the model forward from
     # within `location` (the function that is part of the backend
@@ -307,7 +322,7 @@ def genmodel(model):
     returned_params = (['mu', 'b'] +
                        ['sd_{}'.format(i) for i in range(num_groups)] +
                        ['r_{}'.format(i) for i in range(num_groups)])
-    retval =  '{{{}}}'.format(', '.join('\'{}\': {}'.format(p, p) for p in returned_params))
+    retval = '{{{}}}'.format(', '.join('\'{}\': {}'.format(p, p) for p in returned_params))
     body.append('return {}'.format(retval))
 
     params = (['X'] +
@@ -316,21 +331,25 @@ def genmodel(model):
               ['y_obs=None', 'mode="full"'])
     return '\n'.join(method('model', params, body))
 
+
 def eval_method(code):
     match = re.search(r'^def +(\w+)\(', code)
     assert match is not None
     method_name = match.group(1)
-    import jax.numpy as np
-    from jax.scipy.special import expit as sigmoid
-    import numpy as onp
-    import numpyro.distributions as dist
-    from numpyro import sample
+    import jax.numpy as np  # noqa: F401
+    from jax.scipy.special import expit as sigmoid  # noqa: F401
+    import numpy as onp  # noqa: F401
+    import numpyro.distributions as dist  # noqa: F401
+    from numpyro import sample  # noqa: F401
+
     def chk_shape(arr, expected_shape):
         assert arr.shape == expected_shape
         return arr
+
     g = locals()
     exec(code, g)
     return g[method_name]
+
 
 def gen(model_desc):
     assert type(model_desc) == ModelDesc
@@ -342,7 +361,7 @@ def gen(model_desc):
     expected_response_fn = eval_method(expected_response_code)
     # TODO: Give the use control over the seed used here. Ideally do
     # something that works uniformly across back ends.
-    rng_seed = np.random.randint(0, 2**32, dtype=np.uint32).astype(np.int32)
+    rng_seed = np.random.randint(0, 2 ** 32, dtype=np.uint32).astype(np.int32)
     rng = random.PRNGKey(rng_seed)
     sample_response_code = gen_response_fn(model_desc, mode='sample')
     sample_response_fn = seed(eval_method(sample_response_code), rng)

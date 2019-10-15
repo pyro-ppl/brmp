@@ -14,7 +14,7 @@ dist: xenial
 
 install:
     - pip install -U pip
-    - pip install -e .
+    - pip install -e .[test]
     - pip freeze
 
 branches:

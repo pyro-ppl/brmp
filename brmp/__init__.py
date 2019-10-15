@@ -1,18 +1,18 @@
 import numpy as np
 import pandas as pd
 
-from brmp.formula import parse, Formula
-from brmp.design import makedata, Metadata, metadata_from_df, code_lengths
-from brmp.fit import Fit
-from brmp.backend import Backend
+from brmp.backend import Backend, data_from_numpy
+from brmp.design import Metadata, code_lengths, makedata, metadata_from_df
 from brmp.family import Family, Normal
-from brmp.priors import build_prior_tree
-from brmp.model_pre import build_model_pre
+from brmp.fit import Fit
+from brmp.formula import Formula, parse
 from brmp.model import build_model, model_repr
+from brmp.model_pre import build_model_pre
+from brmp.priors import build_prior_tree
 from brmp.pyro_backend import backend as pyro_backend
-from brmp.backend import data_from_numpy
 
 _default_backend = pyro_backend
+
 
 def makedesc(formula, metadata, family, priors, code_lengths):
     assert type(formula) == Formula
@@ -22,6 +22,7 @@ def makedesc(formula, metadata, family, priors, code_lengths):
     model_desc_pre = build_model_pre(formula, metadata, family, code_lengths)
     prior_tree = build_prior_tree(model_desc_pre, priors)
     return build_model(model_desc_pre, prior_tree)
+
 
 def defm(formula_str, df, family=None, priors=None, contrasts=None):
     """
@@ -77,6 +78,7 @@ def defm(formula_str, df, family=None, priors=None, contrasts=None):
     desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
     data = makedata(formula, df, metadata, contrasts)
     return DefmResult(formula, metadata, contrasts, desc, data)
+
 
 # A wrapper around a pair of model and data. Has a friendly `repr` and
 # makes it easy to fit the model.
@@ -143,6 +145,7 @@ class DefmResult:
     def __repr__(self):
         return model_repr(self.desc)
 
+
 # A wrapper around the result of calling DefmResult#generate. Exists
 # to support the following interface:
 #
@@ -163,7 +166,8 @@ class GenerateResult():
 
     def _run_algo(self, algo, *args, **kwargs):
         samples = getattr(self.backend, algo)(self.data, self.model, *args, **kwargs)
-        return Fit(self.defm_result.formula, self.defm_result.metadata, self.defm_result.contrasts, self.data, self.defm_result.desc, self.model, samples, self.backend)
+        return Fit(self.defm_result.formula, self.defm_result.metadata, self.defm_result.contrasts, self.data,
+                   self.defm_result.desc, self.model, samples, self.backend)
 
     def prior(self, num_samples=10, *args, **kwargs):
         """
