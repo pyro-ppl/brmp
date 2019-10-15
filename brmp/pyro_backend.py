@@ -17,7 +17,8 @@ from pyro.optim import Adam
 from brmp.backend import Backend, Model
 from brmp.fit import Samples
 from brmp.pyro_codegen import gen
-from brmp.utils import flatten, unflatten
+from brmp.utils import flatten, unflatten, traceback_generated
+
 
 def get_node_or_return_value(samples, name):
     def getp(sample):
@@ -135,7 +136,8 @@ def nuts(data, model, iter, warmup, num_chains):
     if num_chains == 1:
         samples = {k: arr.unsqueeze(0) for k,arr in samples.items()}
 
-    transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
+    with traceback_generated(model.code):
+        transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
 
     def loc(d):
         # Optimization: For the data used for inference, values for
