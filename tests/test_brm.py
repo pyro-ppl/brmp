@@ -16,7 +16,7 @@ from brmp.design import (Categorical, CategoricalCoding, Integral,
                          metadata_from_cols, metadata_from_df)
 from brmp.family import (LKJ, Bernoulli, Binomial, HalfCauchy, HalfNormal,
                          Normal)
-from brmp.fit import Samples, fitted, get_param, marginals
+from brmp.fit import Samples
 from brmp.formula import Formula, OrderedSet, Term, _1, allfactors, parse
 from brmp.model import parameters, scalar_parameter_map, scalar_parameter_names
 from brmp.model_pre import build_model_pre
@@ -449,10 +449,10 @@ def test_parameter_shapes(formula_str, non_real_cols, contrasts, family, priors,
     # Check parameter sizes.
     for parameter in parameters(fit.model_desc):
         expected_param_shape = parameter.shape
-        samples = get_param(fit, parameter.name)
+        samples = fit.get_param(parameter.name)
         # A single sample is collected by each chain for all cases.
         assert samples.shape == (num_chains,) + expected_param_shape
-        samples_with_chain_dim = get_param(fit, parameter.name, True)
+        samples_with_chain_dim = fit.get_param(parameter.name, True)
         assert samples_with_chain_dim.shape == (num_chains, 1) + expected_param_shape
 
 
@@ -1016,7 +1016,7 @@ def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, con
     fit = DefmResult(formula, metadata, contrasts, desc, data).fit(**fitargs(S))
 
     # Sanity check output for `marginals`.
-    arr = marginals(fit).array
+    arr = fit.marginals().array
     num_coefs = len(scalar_parameter_names(fit.model_desc))
     assert arr.shape == (num_coefs, 9)  # num coefs x num stats
     # Don't check finiteness of n_eff and r_hat, which are frequently
@@ -1027,11 +1027,11 @@ def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, con
     def chk(arr, expected_shape):
         assert np.all(np.isfinite(arr))
         assert arr.shape == expected_shape
-    chk(fitted(fit), (S, N))
-    chk(fitted(fit, 'linear'), (S, N))
-    chk(fitted(fit, 'response'), (S, N))
-    chk(fitted(fit, 'sample'), (S, N))
-    chk(fitted(fit, data=dummy_df(cols, N)), (S, N))
+    chk(fit.fitted(), (S, N))
+    chk(fit.fitted('linear'), (S, N))
+    chk(fit.fitted('response'), (S, N))
+    chk(fit.fitted('sample'), (S, N))
+    chk(fit.fitted(data=dummy_df(cols, N)), (S, N))
 
 
 # Testing with N2=1 ensures that for a model with categorical
@@ -1053,6 +1053,6 @@ def test_fitted_on_new_data(N2):
     df = dummy_df(cols, N)
     fit = defm(formula_str, df, Normal, contrasts=contrasts).fit(iter=S)
     new_data = dummy_df(cols, N2)
-    arr = fitted(fit, data=new_data)
+    arr = fit.fitted(data=new_data)
     assert np.all(np.isfinite(arr))
     assert arr.shape == (S, N2)

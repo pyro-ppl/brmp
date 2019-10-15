@@ -7,8 +7,10 @@ import pandas as pd
 from brmp.backend import data_from_numpy
 from brmp.design import predictors
 from brmp.family import free_param_names
-from brmp.model import model_repr, scalar_parameter_map, scalar_parameter_names
+from brmp.model import scalar_parameter_map, scalar_parameter_names
 from brmp.utils import flatten
+
+default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
 
 # `Fit` carries around `formula`, `metadata` and `contrasts` for the
 # sole purpose of being able to encode any new data passed to
@@ -26,6 +28,166 @@ from brmp.utils import flatten
 
 
 class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model samples backend')):
+
+    # TODO: This doesn't match the brms interface, but the deviation
+    # aren't improvements either. Figure out what to do about that.
+
+    # brms                                               | brmp
+    # -----------------------------------------------------------------------------------
+    # fitted(fit, summary=FALSE)                         | fitted(fit)
+    # fitted(dpar='mu', scale='linear', summary=FALSE)   | fitted(fit, 'linear')
+    # fitted(dpar='mu', scale='response', summary=FALSE) | fitted(fit, 'response')
+    # fitted(fit, newdata=..., summary=FALSE)            | fitted(fit, data=...)
+    # fitted(fit, ..., summary=TRUE)                     | summary(fitted(fit, ...))
+    # predict(fit, summary=FALSE)                        | fitted(fit, 'sample')
+    # predict(fit, summary=TRUE)                         | summary(fitted(fit, 'sample'))
+
+    # https://rdrr.io/cran/brms/man/fitted.brmsfit.html
+
+    def fitted(self, what='expectation', data=None):
+        """
+        Produces predictions from the fitted model.
+
+        Predicted values are computed for each sample collected during inference,
+        and for each row in the data set.
+
+        :param what: The value to predict. Valid arguments and their effect are described below:
+
+                     .. list-table::
+                        :widths: auto
+
+                        * - ``'expectation'``
+                          - Computes the expected value of the response distribution.
+                        * - ``'sample'``
+                          - Draws a sample from the response distribution.
+                        * - ``'response'``
+                          - Computes the output of the model followed by any
+                            inverse link function. i.e. The value of the location
+                            parameter of the response distribution.
+                        * - ``'linear'``
+                          - Computes the output of the model prior to the application
+                            of any inverse link function.
+
+        :type what: str
+        :param data: The data from which to compute the predictions. When omitted,
+                     the data on which the model was fit is used.
+
+
+        :type data: pandas.DataFrame
+        :return: An array with shape ``(S, N)``. Where ``S`` is the number of samples taken
+                 during inference and ``N`` is the number of rows in the data set used for prediction.
+        :rtype: numpy.ndarray
+
+        """
+        assert what in ['sample', 'expectation', 'linear', 'response']
+        assert data is None or type(data) is pd.DataFrame
+
+        get_param = self.samples.get_param
+        location = self.samples.location
+        to_numpy = self.backend.to_numpy
+        expected_response = self.model.expected_response_fn
+        sample_response = self.model.sample_response_fn
+        inv_link = self.model.inv_link_fn
+
+        mu = location(self.data if data is None
+                      else data_from_numpy(self.backend, predictors(self.formula, data, self.metadata, self.contrasts)))
+
+        if what == 'sample' or what == 'expectation':
+            args = [mu if name == 'mu' else get_param(name, False)
+                    for name in free_param_names(self.model_desc.response.family)]
+            response_fn = sample_response if what == 'sample' else expected_response
+            return to_numpy(response_fn(*args))
+        elif what == 'linear':
+            return to_numpy(mu)
+        elif what == 'response':
+            return to_numpy(inv_link(mu))
+        else:
+            raise ValueError('Unhandled value of the `what` parameter encountered.')
+
+    # Similar to the following:
+    # https://rdrr.io/cran/rstan/man/stanfit-method-summary.html
+
+    # TODO: This produces the same output as the old implementation of
+    # `marginal`, though it's less efficient. Can the previous efficiency
+    # be recovered? The problem is that we pull out each individual scalar
+    # parameter as a vector and then stack those, rather than just stack
+    # entire parameters as before. One thought is that such an
+    # optimisation might be best pushed into `get_scalar_param`. i.e. This
+    # might accept a list of a parameter names and return the
+    # corresponding scalar parameters stacked into a matrix. The aim would
+    # be to do this without performing any unnecessary slicing. (Though
+    # this sounds fiddly.)
+    def marginals(self, qs=default_quantiles):
+        """Produces a table containing statistics of the marginal
+        distibutions of the parameters of the fitted model.
+
+        :param qs: A list of quantiles to include in the output.
+        :type qs: list
+        :return: A table of marginal statistics.
+        :rtype: brmp.fit.ArrReprWrapper
+
+        Example::
+
+          fit = defm('y ~ x', df).fit()
+          print(fit.marginals())
+
+          #        mean    sd  2.5%   25%   50%   75% 97.5% n_eff r_hat
+          # b_x    0.42  0.33 -0.11  0.14  0.48  0.65  0.88  5.18  1.00
+          # sigma  0.78  0.28  0.48  0.61  0.68  0.87  1.32  5.28  1.10
+
+        """
+        names = scalar_parameter_names(self.model_desc)
+        # TODO: Every call to `get_scalar_param` rebuilds the scalar
+        # parameter map.
+        vecs = [self.get_scalar_param(name, True) for name in names]
+        col_labels = ['mean', 'sd'] + format_quantiles(qs) + ['n_eff', 'r_hat']
+        samples = np.stack(vecs, axis=2)
+        stats_arr = marginal_stats(flatten(samples), qs)
+        n_eff = compute_diag_or_default(effective_sample_size, samples)
+        r_hat = compute_diag_or_default(gelman_rubin, samples)
+        arr = np.hstack([stats_arr, n_eff[..., np.newaxis], r_hat[..., np.newaxis]])
+        return ArrReprWrapper(arr, names, col_labels)
+
+    # A back end agnostic wrapper around back end specific implementations
+    # of `fit.samples.get_param`.
+    def get_param(self, name, preserve_chains=False):
+        return self.backend.to_numpy(self.samples.get_param(name, preserve_chains))
+
+    # TODO: If parameter and scalar parameter names never clash, perhaps
+    # having a single lookup method would be convenient. Perhaps this
+    # could be wired up to `fit.samples[...]`?
+
+    # TODO: Mention other ways of obtaining valid parameter names?
+
+    def get_scalar_param(self, name, preserve_chains=False):
+        """
+        Extracts the values sampled for a single parameter from a model fit.
+
+        :param name: The name of a parameter of the model. Valid names are those
+                     shown in the output of :func:`~brmp.fit.marginals`.
+        :type name: str
+        :param preserve_chains: Whether to group samples by the MCMC chain on which
+                                they were collected.
+        :type preserve_chains: bool
+        :return: An array with shape ``(S,)`` when ``preserve_chains=False``, ``(C, S)``
+                 otherwise. Where ``S`` is the number of samples taken during inference,
+                 and ``C`` is the number of MCMC chains run.
+
+        :rtype: numpy.ndarray
+
+        """
+        m = scalar_parameter_map(self.model_desc)
+        res = [p for (n, p) in m if n == name]
+        assert len(res) < 2
+        if len(res) == 0:
+            raise KeyError('unknown parameter name: {}'.format(name))
+        param_name, index = res[0]
+        # Construct a slice to pick out the given index at all chains (if
+        # present) and all samples.
+        slc = (Ellipsis,) + index
+        return self.get_param(param_name, preserve_chains)[slc]
+
+    # TODO: Consider delegating to `marginals` or similar?
     def __repr__(self):
         # The repr of namedtuple ends up long and not very useful for
         # Fit. This is similar to the default implementation of repr
@@ -34,8 +196,6 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
 
 
 Samples = namedtuple('Samples', ['raw_samples', 'get_param', 'location'])
-
-default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
 
 
 def format_quantiles(qs):
@@ -100,85 +260,6 @@ def layout_table(rows):
     return '\n'.join(fmt.format(*row) for row in rows)
 
 
-# TODO: This doesn't match the brms interface, but the deviation
-# aren't improvements either. Figure out what to do about that.
-
-# brms                                               | brmp
-# -----------------------------------------------------------------------------------
-# fitted(fit, summary=FALSE)                         | fitted(fit)
-# fitted(dpar='mu', scale='linear', summary=FALSE)   | fitted(fit, 'linear')
-# fitted(dpar='mu', scale='response', summary=FALSE) | fitted(fit, 'response')
-# fitted(fit, newdata=..., summary=FALSE)            | fitted(fit, data=...)
-# fitted(fit, ..., summary=TRUE)                     | summary(fitted(fit, ...))
-# predict(fit, summary=FALSE)                        | fitted(fit, 'sample')
-# predict(fit, summary=TRUE)                         | summary(fitted(fit, 'sample'))
-
-# https://rdrr.io/cran/brms/man/fitted.brmsfit.html
-
-def fitted(fit, what='expectation', data=None):
-    """
-    Produces predictions from the fitted model.
-
-    Predicted values are computed for each sample collected during inference,
-    and for each row in the data set.
-
-    :param fit: A model fit.
-    :type fit: brmp.fit.Fit
-    :param what: The value to predict. Valid arguments and their effect are described below:
-
-                 .. list-table::
-                    :widths: auto
-
-                    * - ``'expectation'``
-                      - Computes the expected value of the response distribution.
-                    * - ``'sample'``
-                      - Draws a sample from the response distribution.
-                    * - ``'response'``
-                      - Computes the output of the model followed by any
-                        inverse link function. i.e. The value of the location
-                        parameter of the response distribution.
-                    * - ``'linear'``
-                      - Computes the output of the model prior to the application
-                        of any inverse link function.
-
-    :type what: str
-    :param data: The data from which to compute the predictions. When omitted,
-                 the data on which the model was fit is used.
-
-
-    :type data: pandas.DataFrame
-    :return: An array with shape ``(S, N)``. Where ``S`` is the number of samples taken
-             during inference and ``N`` is the number of rows in the data set used for prediction.
-    :rtype: numpy.ndarray
-
-    """
-    assert type(fit) == Fit
-    assert what in ['sample', 'expectation', 'linear', 'response']
-    assert data is None or type(data) is pd.DataFrame
-
-    get_param = fit.samples.get_param
-    location = fit.samples.location
-    to_numpy = fit.backend.to_numpy
-    expected_response = fit.model.expected_response_fn
-    sample_response = fit.model.sample_response_fn
-    inv_link = fit.model.inv_link_fn
-
-    mu = location(fit.data if data is None
-                  else data_from_numpy(fit.backend, predictors(fit.formula, data, fit.metadata, fit.contrasts)))
-
-    if what == 'sample' or what == 'expectation':
-        args = [mu if name == 'mu' else get_param(name, False)
-                for name in free_param_names(fit.model_desc.response.family)]
-        response_fn = sample_response if what == 'sample' else expected_response
-        return to_numpy(response_fn(*args))
-    elif what == 'linear':
-        return to_numpy(mu)
-    elif what == 'response':
-        return to_numpy(inv_link(mu))
-    else:
-        raise ValueError('Unhandled value of the `what` parameter encountered.')
-
-
 # TODO: We could follow brms and make this available via a `summary`
 # flag on `fitted`?
 def summary(arr, qs=default_quantiles, row_labels=None):
@@ -209,100 +290,3 @@ def compute_diag_or_default(diag, samples):
         return val
     else:
         return np.full((samples.shape[2],), np.nan)
-
-
-# Similar to the following:
-# https://rdrr.io/cran/rstan/man/stanfit-method-summary.html
-
-# TODO: This produces the same output as the old implementation of
-# `marginal`, though it's less efficient. Can the previous efficiency
-# be recovered? The problem is that we pull out each individual scalar
-# parameter as a vector and then stack those, rather than just stack
-# entire parameters as before. One thought is that such an
-# optimisation might be best pushed into `get_scalar_param`. i.e. This
-# might accept a list of a parameter names and return the
-# corresponding scalar parameters stacked into a matrix. The aim would
-# be to do this without performing any unnecessary slicing. (Though
-# this sounds fiddly.)
-def marginals(fit, qs=default_quantiles):
-    """Produces a table containing statistics of the marginal
-    distibutions of the parameters of the fitted model.
-
-    :param fit: A model fit.
-    :type fit: brmp.fit.Fit
-    :param qs: A list of quantiles to include in the output.
-    :type qs: list
-    :return: A table of marginal statistics.
-    :rtype: brmp.fit.ArrReprWrapper
-
-    Example::
-
-      fit = defm('y ~ x', df).fit()
-      print(marginals(fit))
-
-      #        mean    sd  2.5%   25%   50%   75% 97.5% n_eff r_hat
-      # b_x    0.42  0.33 -0.11  0.14  0.48  0.65  0.88  5.18  1.00
-      # sigma  0.78  0.28  0.48  0.61  0.68  0.87  1.32  5.28  1.10
-
-    """
-    assert type(fit) == Fit
-    names = scalar_parameter_names(fit.model_desc)
-    # TODO: Every call to `get_scalar_param` rebuilds the scalar
-    # parameter map.
-    vecs = [get_scalar_param(fit, name, True) for name in names]
-    col_labels = ['mean', 'sd'] + format_quantiles(qs) + ['n_eff', 'r_hat']
-    samples = np.stack(vecs, axis=2)
-    stats_arr = marginal_stats(flatten(samples), qs)
-    n_eff = compute_diag_or_default(effective_sample_size, samples)
-    r_hat = compute_diag_or_default(gelman_rubin, samples)
-    arr = np.hstack([stats_arr, n_eff[..., np.newaxis], r_hat[..., np.newaxis]])
-    return ArrReprWrapper(arr, names, col_labels)
-
-
-def print_model(fit):
-    print(model_repr(fit.model_desc))
-
-
-# A back end agnostic wrapper around back end specific implementations
-# of `fit.samples.get_param`.
-def get_param(fit, name, preserve_chains=False):
-    assert type(fit) == Fit
-    return fit.backend.to_numpy(fit.samples.get_param(name, preserve_chains))
-
-
-# TODO: If parameter and scalar parameter names never clash, perhaps
-# having a single lookup method would be convenient. Perhaps this
-# could be wired up to `fit.samples[...]`?
-
-# TODO: Mention other ways of obtaining valid parameter names?
-
-def get_scalar_param(fit, name, preserve_chains=False):
-    """
-    Extracts the values sampled for a single parameter from a model fit.
-
-    :param fit: A model fit.
-    :type fit: brmp.fit.Fit
-    :param name: The name of a parameter of the model. Valid names are those
-                 shown in the output of :func:`~brmp.fit.marginals`.
-    :type name: str
-    :param preserve_chains: Whether to group samples by the MCMC chain on which
-                            they were collected.
-    :type preserve_chains: bool
-    :return: An array with shape ``(S,)`` when ``preserve_chains=False``, ``(C, S)``
-             otherwise. Where ``S`` is the number of samples taken during inference,
-             and ``C`` is the number of MCMC chains run.
-
-    :rtype: numpy.ndarray
-
-    """
-    assert type(fit) == Fit
-    m = scalar_parameter_map(fit.model_desc)
-    res = [p for (n, p) in m if n == name]
-    assert len(res) < 2
-    if len(res) == 0:
-        raise KeyError('unknown parameter name: {}'.format(name))
-    param_name, index = res[0]
-    # Construct a slice to pick out the given index at all chains (if
-    # present) and all samples.
-    slc = (Ellipsis,) + index
-    return get_param(fit, param_name, preserve_chains)[slc]
