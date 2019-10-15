@@ -1,13 +1,13 @@
 from collections import namedtuple
 
 import numpy as np
-import pandas as pd
 import numpyro.diagnostics as diags
+import pandas as pd
 
-from brmp.model import model_repr, parameter_names, scalar_parameter_map, scalar_parameter_names
-from brmp.family import free_param_names
-from brmp.design import predictors, metadata_from_df
 from brmp.backend import data_from_numpy
+from brmp.design import predictors
+from brmp.family import free_param_names
+from brmp.model import model_repr, scalar_parameter_map, scalar_parameter_names
 from brmp.utils import flatten
 
 # `Fit` carries around `formula`, `metadata` and `contrasts` for the
@@ -24,6 +24,7 @@ from brmp.utils import flatten
 # make up data to tinker with a model), it's not clear that deferring
 # having to give contrasts has a similar benefit.
 
+
 class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model samples backend')):
     def __repr__(self):
         # The repr of namedtuple ends up long and not very useful for
@@ -31,12 +32,15 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
         # used for classes.
         return '<brmp.fit.Fit at {}>'.format(hex(id(self)))
 
+
 Samples = namedtuple('Samples', ['raw_samples', 'get_param', 'location'])
 
 default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
 
+
 def format_quantiles(qs):
     return ['{:g}%'.format(q * 100) for q in qs]
+
 
 # Computes statistics for an array produced by `marginal`.
 def marginal_stats(arr, qs):
@@ -48,6 +52,7 @@ def marginal_stats(arr, qs):
     quantiles = np.quantile(arr, qs, 0)
     stacked = np.hstack((mean.reshape((-1, 1)), sd.reshape((-1, 1)), quantiles.T))
     return stacked
+
 
 # TODO: Would it be better to replace these tables with pandas data
 # frames? They also let you get at the underlying data as a numpy
@@ -65,8 +70,10 @@ class ArrReprWrapper:
         # Format a float. 2 decimal places, space for sign.
         def ff(x):
             return '{: .2f}'.format(x)
+
         table = [[ff(c) for c in r] for r in self.array.tolist()]
         return layout_table(add_labels(table, self.col_labels, self.row_labels))
+
 
 def add_labels(table, col_labels, row_labels):
     assert type(table) == list
@@ -79,8 +86,8 @@ def add_labels(table, col_labels, row_labels):
         out = [[name] + r for r, name in zip(out, rlabels)]
     return out
 
+
 def layout_table(rows):
-    out = []
     num_rows = len(rows)
     assert num_rows > 0
     num_cols = len(rows[0])
@@ -91,6 +98,7 @@ def layout_table(rows):
             max_widths[i] = max(max_widths[i], len(cell))
     fmt = ' '.join('{{:>{}}}'.format(mw) for mw in max_widths)
     return '\n'.join(fmt.format(*row) for row in rows)
+
 
 # TODO: This doesn't match the brms interface, but the deviation
 # aren't improvements either. Figure out what to do about that.
@@ -148,12 +156,12 @@ def fitted(fit, what='expectation', data=None):
     assert what in ['sample', 'expectation', 'linear', 'response']
     assert data is None or type(data) is pd.DataFrame
 
-    get_param         = fit.samples.get_param
-    location          = fit.samples.location
-    to_numpy          = fit.backend.to_numpy
+    get_param = fit.samples.get_param
+    location = fit.samples.location
+    to_numpy = fit.backend.to_numpy
     expected_response = fit.model.expected_response_fn
-    sample_response   = fit.model.sample_response_fn
-    inv_link          = fit.model.inv_link_fn
+    sample_response = fit.model.sample_response_fn
+    inv_link = fit.model.inv_link_fn
 
     mu = location(fit.data if data is None
                   else data_from_numpy(fit.backend, predictors(fit.formula, data, fit.metadata, fit.contrasts)))
@@ -168,7 +176,7 @@ def fitted(fit, what='expectation', data=None):
     elif what == 'response':
         return to_numpy(inv_link(mu))
     else:
-        raise 'Unhandled value of the `what` parameter encountered.'
+        raise ValueError('Unhandled value of the `what` parameter encountered.')
 
 
 # TODO: We could follow brms and make this available via a `summary`
@@ -177,20 +185,23 @@ def summary(arr, qs=default_quantiles, row_labels=None):
     col_labels = ['mean', 'sd'] + format_quantiles(qs)
     return ArrReprWrapper(marginal_stats(arr, qs), row_labels, col_labels)
 
+
 def gelman_rubin(samples):
     if ((samples.shape[0] < 2 and samples.shape[1] < 4) or
-        (samples.shape[0] >= 2 and samples.shape[1] < 2)):
-        return None # Too few chains or samples.
+            (samples.shape[0] >= 2 and samples.shape[1] < 2)):
+        return None  # Too few chains or samples.
     elif samples.shape[0] >= 2:
         return diags.gelman_rubin(samples)
     else:
         return diags.split_gelman_rubin(samples)
 
+
 def effective_sample_size(samples):
     if samples.shape[1] < 2:
-        return None # Too few samples.
+        return None  # Too few samples.
     else:
         return diags.effective_sample_size(samples)
+
 
 def compute_diag_or_default(diag, samples):
     val = diag(samples)
@@ -198,6 +209,7 @@ def compute_diag_or_default(diag, samples):
         return val
     else:
         return np.full((samples.shape[2],), np.nan)
+
 
 # Similar to the following:
 # https://rdrr.io/cran/rstan/man/stanfit-method-summary.html
@@ -243,17 +255,20 @@ def marginals(fit, qs=default_quantiles):
     stats_arr = marginal_stats(flatten(samples), qs)
     n_eff = compute_diag_or_default(effective_sample_size, samples)
     r_hat = compute_diag_or_default(gelman_rubin, samples)
-    arr = np.hstack([stats_arr, n_eff[...,np.newaxis], r_hat[...,np.newaxis]])
+    arr = np.hstack([stats_arr, n_eff[..., np.newaxis], r_hat[..., np.newaxis]])
     return ArrReprWrapper(arr, names, col_labels)
+
 
 def print_model(fit):
     print(model_repr(fit.model_desc))
+
 
 # A back end agnostic wrapper around back end specific implementations
 # of `fit.samples.get_param`.
 def get_param(fit, name, preserve_chains=False):
     assert type(fit) == Fit
     return fit.backend.to_numpy(fit.samples.get_param(name, preserve_chains))
+
 
 # TODO: If parameter and scalar parameter names never clash, perhaps
 # having a single lookup method would be convenient. Perhaps this

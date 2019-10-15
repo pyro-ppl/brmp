@@ -1,11 +1,14 @@
 import re
-from brmp.family import Family, LinkFn, Normal, args, free_param_names
-from brmp.model import ModelDesc, Group
+
 from brmp.backend import Model
+from brmp.family import Family, LinkFn, Normal, args, free_param_names
+from brmp.model import Group, ModelDesc
+
 
 def gen_expanded_scalar(val, shape):
     assert type(val) in [float, int]
     return 'torch.tensor({}).expand({})'.format(val, ', '.join(str(dim) for dim in shape))
+
 
 def gendist(family, args, shape, batch):
     assert type(family) == Family
@@ -32,8 +35,9 @@ def gendist(family, args, shape, batch):
         out = out + '.to_event({})'.format(len(shape))
     return out
 
+
 def gen_response_dist(model, vectorize=False):
-    shape=['S', 'N'] if vectorize else ['N']
+    shape = ['S', 'N'] if vectorize else ['N']
 
     # TODO: Optimisations (for numerical stability/perf.) are
     # available for some response family/link function pairs. (Though
@@ -47,16 +51,19 @@ def gen_response_dist(model, vectorize=False):
         if param.name == model.response.family.link.param:
             return geninvlinkbody(model.response.family.link.fn, 'mu')
         elif param.value is not None:
-            return param.value # Will be made into an expanded tensor by `gendist`.
+            return param.value  # Will be made into an expanded tensor by `gendist`.
         else:
             return '{}.expand({})'.format(param.name, ', '.join(shape))
+
     response_args = [response_arg(p) for p in model.response.family.params]
     return gendist(model.response.family, response_args, shape=shape, batch=True)
 
+
 def lkj_corr_cholesky(size, shape):
-    assert type(size) == int # the size of the matrix
-    assert type(shape) == float # shape parameter of distribution
+    assert type(size) == int  # the size of the matrix
+    assert type(shape) == float  # shape parameter of distribution
     return 'LKJCorrCholesky({}, torch.tensor({}))'.format(size, shape)
+
 
 def sample(name, distribution, obs=None):
     args = ['"{}"'.format(name),
@@ -65,21 +72,25 @@ def sample(name, distribution, obs=None):
         args.append('obs={}'.format(obs))
     return '{} = pyro.sample({})'.format(name, ', '.join(args))
 
+
 def indent(line):
     return '    {}'.format(line)
+
 
 def method(name, parameters, body):
     assert type(body) == list
     assert type(parameters) == list
     return ['def {}({}):'.format(name, ', '.join(parameters))] + [indent(line) for line in body]
 
+
 def comment(s):
     return '# {}'.format(s)
+
 
 def genprior(varname, prior_desc):
     assert type(varname) == str
     assert type(prior_desc) == list
-    assert all(type(p)    == tuple and
+    assert all(type(p) == tuple and
                type(p[0]) == Family and
                type(p[1]) == int
                for p in prior_desc)
@@ -94,7 +105,8 @@ def genprior(varname, prior_desc):
 
     if len(prior_desc) > 0:
         # Concatenate the segments to produce the final vector.
-        code.append('{} = torch.cat([{}])'.format(varname, ', '.join('{}_{}'.format(varname, i) for i in range(len(prior_desc)))))
+        code.append('{} = torch.cat([{}])'.format(varname, ', '.join(
+            '{}_{}'.format(varname, i) for i in range(len(prior_desc)))))
     else:
         code.append('{} = torch.tensor([])'.format(varname))
 
@@ -105,7 +117,7 @@ def genprior(varname, prior_desc):
 # generates code to sample group level priors and to accumulate the
 # groups contribution to mu.
 def gengroup(i, group):
-    assert type(i) == int # A unique int assigned to each group.
+    assert type(i) == int  # A unique int assigned to each group.
     assert type(group) == Group
 
     cmt = comment('Group {}: factor={}'.format(i, ':'.join(group.columns)))
@@ -174,6 +186,7 @@ def gengroup(i, group):
 
     return code, mu_code
 
+
 def geninvlinkbody(linkfn, code):
     if linkfn == LinkFn.identity:
         return code
@@ -181,6 +194,7 @@ def geninvlinkbody(linkfn, code):
         return 'torch.sigmoid({})'.format(code)
     else:
         raise NotImplementedError('code generation for link function {} not implemented'.format(linkfn))
+
 
 # TODO: Re-evaluate whether it really makes sense to have these
 # implemented by each back end. An alternative is to implement link
@@ -195,6 +209,7 @@ def geninvlinkfn(model):
     body = geninvlinkbody(model.response.family.link.fn, 'x')
     return '\n'.join(method('invlink', ['x'], ['return {}'.format(body)]))
 
+
 def gen_response_fn(model, mode):
     assert mode in ['expectation', 'sample']
     distcode = 'dist.{}'.format(gen_response_dist(model, vectorize=True))
@@ -205,6 +220,7 @@ def gen_response_fn(model, mode):
             "return {}".format(retval)]
     return '\n'.join(method('expected_response', args, body))
 
+
 # TODO: I'm missing opportunities to vectorise here. Adjacent segments
 # that share a family and differ only in parameters can be handled
 # with a single `sample` statement with suitable parameters.
@@ -212,16 +228,16 @@ def gen_response_fn(model, mode):
 # e.g.
 # contig(list('abb')) == [('a', 1), ('b', 2)]
 def contig(xs):
-    assert type(xs) == list or type(xs) == tuple # Though really more general than this.
-    assert all(x is not None for x in xs) # Since None used as initial value of `cur`.
+    assert type(xs) == list or type(xs) == tuple  # Though really more general than this.
+    assert all(x is not None for x in xs)  # Since None used as initial value of `cur`.
     cur = None
     segments = []
     for i, x in enumerate(xs):
         if x == cur:
-            segments[-1][1].append(i) # Extend segment.
+            segments[-1][1].append(i)  # Extend segment.
         else:
             cur = x
-            segments.append((cur, [i])) # New segment.
+            segments.append((cur, [i]))  # New segment.
     # Post-process.
     segments = [(x, len(ix)) for (x, ix) in segments]
     return segments
@@ -234,7 +250,7 @@ def genmodel(model):
     body = []
 
     body.append('assert mode == "full" or mode == "prior_and_mu" or mode == "prior_only"')
-    body.append('assert (subsample is None) == (dfN is None)') # Expect both or neither.
+    body.append('assert (subsample is None) == (dfN is None)')  # Expect both or neither.
 
     body.append('assert type(X) == torch.Tensor')
     body.append('N = X.shape[0]')
@@ -293,7 +309,7 @@ def genmodel(model):
     returned_params = (['mu', 'b'] +
                        ['sd_{}'.format(i) for i in range(num_groups)] +
                        ['r_{}'.format(i) for i in range(num_groups)])
-    retval =  '{{{}}}'.format(', '.join('\'{}\': {}'.format(p, p) for p in returned_params))
+    retval = '{{{}}}'.format(', '.join('\'{}\': {}'.format(p, p) for p in returned_params))
     body.append('')
     body.append('return {}'.format(retval))
 
@@ -303,16 +319,18 @@ def genmodel(model):
               ['y_obs=None', 'dfN=None', 'subsample=None', 'mode="full"'])
     return '\n'.join(method('model', params, body))
 
+
 def eval_method(code):
     match = re.search(r'^def +(\w+)\(', code)
     assert match is not None
     method_name = match.group(1)
-    import torch
-    import pyro
-    import pyro.distributions as dist
+    import torch  # noqa: F401
+    import pyro  # noqa: F401
+    import pyro.distributions as dist  # noqa: F401
     g = locals()
     exec(code, g)
     return g[method_name]
+
 
 def gen(model_desc):
     assert type(model_desc) == ModelDesc
