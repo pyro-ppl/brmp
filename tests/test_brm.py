@@ -3,12 +3,11 @@ import os
 import numpy as np
 import numpyro.handlers as numpyro
 import pandas as pd
-import pyro.poutine as poutine
 import pytest
 import torch
 from jax import random
-from pyro.distributions import Independent
 
+import pyro.poutine as poutine
 from brmp import DefmResult, defm, makedesc
 from brmp.backend import data_from_numpy
 from brmp.design import (Categorical, CategoricalCoding, Integral,
@@ -24,6 +23,7 @@ from brmp.model_pre import build_model_pre
 from brmp.numpyro_backend import backend as numpyro_backend
 from brmp.priors import Prior, build_prior_tree
 from brmp.pyro_backend import backend as pyro_backend
+from pyro.distributions import Independent
 
 
 def assert_equal(a, b):

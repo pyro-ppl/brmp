@@ -7,6 +7,7 @@ from numpyro.handlers import seed
 from brmp.backend import Model
 from brmp.family import Family, LinkFn, Normal, args, free_param_names
 from brmp.model import Group, ModelDesc
+from brmp.utils import traceback_generated
 
 
 def gen_expanded_scalar(val, shape):
@@ -348,7 +349,7 @@ def eval_method(code):
 
     g = locals()
     exec(code, g)
-    return g[method_name]
+    return traceback_generated(fn=g[method_name], code=code)
 
 
 def gen(model_desc):

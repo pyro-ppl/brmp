@@ -1,5 +1,6 @@
 import traceback
 
+
 def join(lists):
     return sum(lists, [])
 
@@ -34,23 +35,34 @@ class traceback_generated(object):
     :param str code: String representation of the code being run.
     :raises: ModelSpecificationError
     """
-    def __init__(self, code):
+    def __init__(self, fn=None, code=None):
+        self.fn = fn
+        if not isinstance(code, str):
+            raise ValueError('Invalid code string provided.')
         self.code = code
+
+    def __call__(self, *args, **kwargs):
+        if self.fn:
+            with self:
+                return self.fn(*args, **kwargs)
+        raise ValueError('No `fn` provided for __call__')
 
     def __enter__(self):
         pass
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        if not exc_tb:
+            return
         tb_info = traceback.extract_tb(exc_tb)
         filename, line, fn, _ = tb_info[-1]
         line = line - 1
         # only augment if exception is from generated code.
         if filename == '<string>':
             exc_lines = self.code.split('\n')
-            exc_lines = '\n'.join(exc_lines[:line] +
-                                  [exc_lines[line] + '\t<<< ==== ERROR ===='] +
-                                  exc_lines[line + 1:])
-            raise ModelSpecificationError(f'Exception in model code: \n\n {exc_lines}') from exc_type
+            prefix_str = [' ' * 8] * len(exc_lines)
+            prefix_str[line] = 'ERR >>> '
+            exc_str = '\n'.join([''.join(x) for x in zip(prefix_str, exc_lines)])
+            raise ModelSpecificationError(f'Exception in model code: \n\n {exc_str}') from exc_type
 
 
 class ModelSpecificationError(BaseException):
