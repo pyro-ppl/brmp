@@ -428,21 +428,9 @@ def test_expected_response_codegen(response_meta, family, args, expected, backen
 
 @pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
 @pytest.mark.parametrize('fitargs', [
-    dict(backend=pyro_backend, iter=1, warmup=0),
-    dict(backend=pyro_backend, iter=1, warmup=0, num_chains=2),
-    dict(backend=pyro_backend, algo='svi', iter=1, num_samples=1),
-    dict(backend=pyro_backend, algo='svi', iter=1, num_samples=1, subsample_size=1),
-    # Set environment variable `RUN_SLOW=1` to run against the NumPyro
-    # back end.
-    pytest.param(
-        dict(backend=numpyro_backend, iter=1, warmup=0),
-        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow')),
-    pytest.param(
-        dict(backend=numpyro_backend, iter=1, warmup=0, num_chains=2),
-        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow')),
+    dict(backend=pyro_backend, num_samples=1, algo='prior'),
+    dict(backend=numpyro_backend, num_samples=1, algo='prior'),
 ])
-# TODO: Remove on next Pyro release.
-@pytest.mark.xfail('CI' in os.environ, reason='Failure when num_chains > num_cpu; fixed in Pyro master.')
 def test_parameter_shapes(formula_str, non_real_cols, contrasts, family, priors, expected, fitargs):
     # Make dummy data.
     N = 5
