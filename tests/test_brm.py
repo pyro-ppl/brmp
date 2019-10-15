@@ -999,73 +999,72 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
 
 
 @pytest.mark.parametrize('fitargs', [
+    lambda S: dict(backend=pyro_backend, algo='prior', num_samples=S),
     lambda S: dict(backend=pyro_backend, iter=S, warmup=0),
     lambda S: dict(backend=pyro_backend, iter=S // 2, num_chains=2, warmup=0),
     lambda S: dict(backend=pyro_backend, algo='svi', iter=1, num_samples=S),
-    lambda S: dict(backend=pyro_backend, algo='prior', num_samples=S),
-    # Set environment variable `RUN_SLOW=1` to run against the NumPyro
-    # back end.
-    pytest.param(
-        lambda S: dict(backend=numpyro_backend, iter=S, warmup=0),
-        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow')),
-    pytest.param(
-        lambda S: dict(backend=numpyro_backend, iter=S // 2, num_chains=2, warmup=0),
-        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow')),
-    pytest.param(
-        lambda S: dict(backend=numpyro_backend, algo='prior', num_samples=S),
-        marks=pytest.mark.skipif(not os.environ.get('RUN_SLOW', ''), reason='slow')),
+    lambda S: dict(backend=pyro_backend, algo='svi', iter=1, num_samples=S, subsample_size=1),
+    lambda S: dict(backend=numpyro_backend, algo='prior', num_samples=S),
+    lambda S: dict(backend=numpyro_backend, iter=S, warmup=0),
+    lambda S: dict(backend=numpyro_backend, iter=S // 2, num_chains=2, warmup=0),
 ])
 @pytest.mark.parametrize('formula_str, non_real_cols, family, contrasts', [
-    ('y ~ 1 + x + (1 | a)',
-     [Categorical('a', list('ab'))],
+    ('y ~ 1 + a + x + (1 | b)',
+     [Categorical('a', ['a0', 'a1']), Categorical('b', ['b0', 'b1'])],
      Normal,
      {}),
-    ('y ~ 1 + a',
-     [Categorical('a', list('ab'))],
-     Normal,
-     {}),
-    # Using this contrast means `a` is coded as two columns rather
-    # than (the default) one. Because of this, it's crucial that
-    # `fitted` uses the contrast when coding *new data*. This test
-    # would fail if that didn't happen.
-    ('y ~ 1 + a',
-     [Categorical('a', list('ab'))],
-     Normal,
-     {'a': np.array([[-1, -1], [1, 1]])}),
 ])
-# Testing with N2=1 ensure that for model with categorical
-# factors/columns, "new data" can only include a proper subset of the
-# available levels. Such data must be coded using the original
-# metadata in order ensure to be compatible with the model, and this
-# test exercises that.
-@pytest.mark.parametrize('N2', [1, 8])
 # TODO: Remove on next Pyro release.
 @pytest.mark.xfail('CI' in os.environ, reason='Failure when num_chains > num_cpu; fixed in Pyro master.')
-def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, contrasts, N2):
+def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, contrasts):
     N = 10
     S = 4
-    cols = expand_columns(parse(formula_str), non_real_cols)
+    formula = parse(formula_str)
+    cols = expand_columns(formula, non_real_cols)
     df = dummy_df(cols, N)
-    print(df)
-    fit = defm(formula_str, df, family, contrasts=contrasts).fit(**fitargs(S))
+    metadata = metadata_from_cols(cols)
+    desc = makedesc(formula, metadata, family, [], code_lengths(contrasts))
+    data = makedata(formula, df, metadata, contrasts)
+    fit = DefmResult(formula, metadata, contrasts, desc, data).fit(**fitargs(S))
 
+    # Sanity check output for `marginals`.
+    arr = marginals(fit).array
+    num_coefs = len(scalar_parameter_names(fit.model_desc))
+    assert arr.shape == (num_coefs, 9)  # num coefs x num stats
+    # Don't check finiteness of n_eff and r_hat, which are frequently
+    # nan with few samples
+    assert np.all(np.isfinite(arr[:, :-2]))
+
+    # Sanity check output of `fitted`.
     def chk(arr, expected_shape):
         assert np.all(np.isfinite(arr))
         assert arr.shape == expected_shape
-
-    num_coefs = len(scalar_parameter_names(fit.model_desc))
-
-    marr = marginals(fit).array
-    assert marr.shape == (num_coefs, 9)  # num coefs x num stats
-    # Don't check finiteness of n_eff and r_hat, which are frequently
-    # nan with few samples
-    assert np.all(np.isfinite(marr[:, :-2]))
-
     chk(fitted(fit), (S, N))
     chk(fitted(fit, 'linear'), (S, N))
     chk(fitted(fit, 'response'), (S, N))
     chk(fitted(fit, 'sample'), (S, N))
-    # Applying `fitted` to new data.
-    df2 = dummy_df(cols, N2)
-    print(df2)
-    chk(fitted(fit, data=df2), (S, N2))
+    chk(fitted(fit, data=dummy_df(cols, N)), (S, N))
+
+
+# Testing with N2=1 ensures that for a model with categorical
+# factors/columns, `new_data` can only include a proper subset of the
+# available levels. Such data must be coded using the original
+# metadata in order ensure to be compatible with the model, and this
+# test exercises that.
+@pytest.mark.parametrize('N2', [1, 8])
+def test_fitted_on_new_data(N2):
+    S = 4
+    N = 10
+    formula_str = 'y ~ 1 + a'
+    # Using this contrast means `a` is coded as two columns rather
+    # than (the default) one. Because of this, it's crucial that
+    # `fitted` uses the contrast when coding *new data*. This test
+    # would fail if that didn't happen.
+    contrasts = {'a': np.array([[-1, -1], [1, 1]])}
+    cols = expand_columns(parse(formula_str), [Categorical('a', ['a0', 'a1'])])
+    df = dummy_df(cols, N)
+    fit = defm(formula_str, df, Normal, contrasts=contrasts).fit(iter=S)
+    new_data = dummy_df(cols, N2)
+    arr = fitted(fit, data=new_data)
+    assert np.all(np.isfinite(arr))
+    assert arr.shape == (S, N2)
