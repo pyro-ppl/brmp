@@ -18,7 +18,4 @@ lint: FORCE
 test: lint FORCE
 	pytest -vs tests --tb=short
 
-test-all: lint FORCE
-	RUN_SLOW=1 pytest -vs tests --tb=short
-
 FORCE:
