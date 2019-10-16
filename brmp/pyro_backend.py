@@ -3,19 +3,19 @@ from functools import partial
 from sys import stderr
 
 import numpy as np
+import torch
+
 import pyro
 import pyro.poutine as poutine
-import torch
+from brmp.backend import Backend, Model
+from brmp.fit import Samples
+from brmp.pyro_codegen import gen
+from brmp.utils import flatten, unflatten
 from pyro.infer import SVI, Trace_ELBO
 from pyro.infer.autoguide import AutoMultivariateNormal
 from pyro.infer.mcmc import NUTS
 from pyro.infer.mcmc.api import MCMC
 from pyro.optim import Adam
-
-from brmp.backend import Backend, Model
-from brmp.fit import Samples
-from brmp.pyro_codegen import gen
-from brmp.utils import flatten, unflatten
 
 
 def get_node_or_return_value(samples, name):
