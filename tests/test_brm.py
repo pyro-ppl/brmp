@@ -324,7 +324,7 @@ def test_pyro_codegen(N, formula_str, non_real_cols, contrasts, family, priors, 
     # Generate model function and data.
     modelfn = pyro_backend.gen(desc).fn
 
-    df = dummy_df(cols, N)
+    df = dummy_df(cols, N, allow_non_exhaustive=True)
     data = data_from_numpy(pyro_backend, makedata(formula, df, metadata, contrasts))
 
     # Check sample sites.
@@ -357,7 +357,7 @@ def test_numpyro_codegen(N, formula_str, non_real_cols, contrasts, family, prior
     # Generate model function and data.
     modelfn = numpyro_backend.gen(desc).fn
 
-    df = dummy_df(cols, N)
+    df = dummy_df(cols, N, allow_non_exhaustive=True)
     data = data_from_numpy(numpyro_backend, makedata(formula, df, metadata, contrasts))
 
     # Check sample sites.
@@ -388,7 +388,7 @@ def test_sampling_from_prior_smoke(N, backend, formula_str, non_real_cols, contr
     metadata = metadata_from_cols(cols)  # Use full metadata for same reason given in comment in codegen test.
     desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
     model = backend.gen(desc)
-    df = dummy_df(cols, N)
+    df = dummy_df(cols, N, allow_non_exhaustive=True)
     data = data_from_numpy(backend, makedata(formula, df, metadata, contrasts))
     samples = backend.prior(data, model, num_samples=10)
     assert type(samples) == Samples
@@ -436,7 +436,7 @@ def test_parameter_shapes(formula_str, non_real_cols, contrasts, family, priors,
     N = 5
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
-    df = dummy_df(cols, N)
+    df = dummy_df(cols, N, allow_non_exhaustive=True)
 
     # Define model, and generate a single posterior sample.
     metadata = metadata_from_cols(cols)
@@ -1052,7 +1052,7 @@ def test_fitted_on_new_data(N2):
     cols = expand_columns(parse(formula_str), [Categorical('a', ['a0', 'a1'])])
     df = dummy_df(cols, N)
     fit = defm(formula_str, df, Normal, contrasts=contrasts).fit(iter=S)
-    new_data = dummy_df(cols, N2)
+    new_data = dummy_df(cols, N2, allow_non_exhaustive=True)
     arr = fit.fitted(data=new_data)
     assert np.all(np.isfinite(arr))
     assert arr.shape == (S, N2)
