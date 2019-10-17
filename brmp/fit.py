@@ -85,9 +85,9 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
         get_param = self.samples.get_param
         location = self.samples.location
         to_numpy = self.backend.to_numpy
-        expected_response = self.model.expected_response_fn
-        sample_response = self.model.sample_response_fn
-        inv_link = self.model.inv_link_fn
+        expected_response = self.backend.expected_response
+        sample_response = self.backend.sample_response
+        inv_link = self.backend.inv_link
 
         mu = location(self.data if data is None
                       else data_from_numpy(self.backend, predictors(self.formula, data, self.metadata, self.contrasts)))
@@ -96,11 +96,11 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
             args = [mu if name == 'mu' else get_param(name, False)
                     for name in free_param_names(self.model_desc.response.family)]
             response_fn = sample_response if what == 'sample' else expected_response
-            return to_numpy(response_fn(*args))
+            return to_numpy(response_fn(self.model, *args))
         elif what == 'linear':
             return to_numpy(mu)
         elif what == 'response':
-            return to_numpy(inv_link(mu))
+            return to_numpy(inv_link(self.model, mu))
         else:
             raise ValueError('Unhandled value of the `what` parameter encountered.')
 

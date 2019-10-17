@@ -128,6 +128,23 @@ def prior(data, model, num_samples, seed=None):
     return Samples(all_samples, partial(get_param, all_samples), loc)
 
 
+# This particular back end implements this by generating additional
+# code but other approaches are possible.
+def sample_response(model, *args):
+    assert type(model) == Model
+    return model.sample_response_fn(*args)
+
+
+def expected_response(model, *args):
+    assert type(model) == Model
+    return model.expected_response_fn(*args)
+
+
+def inv_link(model, mu):
+    assert type(model) == Model
+    return model.inv_link_fn(mu)
+
+
 # TODO: Make it possible to run inference on a gpu.
 
-backend = Backend('NumPyro', gen, prior, nuts, svi, from_numpy, to_numpy)
+backend = Backend('NumPyro', gen, prior, nuts, svi, sample_response, expected_response, inv_link, from_numpy, to_numpy)
