@@ -1,9 +1,5 @@
 import re
 
-import numpy as np
-from jax import random
-from numpyro.handlers import seed
-
 from brmp.backend import Model
 from brmp.family import Family, LinkFn, Normal, args, free_param_names
 from brmp.model import Group, ModelDesc
@@ -359,12 +355,8 @@ def gen(model_desc):
     inv_link_fn = eval_method(inv_link_code)
     expected_response_code = gen_response_fn(model_desc, mode='expectation')
     expected_response_fn = eval_method(expected_response_code)
-    # TODO: Give the use control over the seed used here. Ideally do
-    # something that works uniformly across back ends.
-    rng_seed = np.random.randint(0, 2 ** 32, dtype=np.uint32).astype(np.int32)
-    rng = random.PRNGKey(rng_seed)
     sample_response_code = gen_response_fn(model_desc, mode='sample')
-    sample_response_fn = seed(eval_method(sample_response_code), rng)
+    sample_response_fn = eval_method(sample_response_code)
     return Model(fn, code,
                  inv_link_fn, inv_link_code,
                  expected_response_fn, expected_response_code,

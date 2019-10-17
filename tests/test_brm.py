@@ -1126,3 +1126,8 @@ def test_rng_seed(fitargs):
     fit2 = model.fit(seed=1, **fitargs)
     assert (fit0.fitted() == fit1.fitted()).all()
     assert not (fit1.fitted() == fit2.fitted()).all()
+    fitted0 = fit0.fitted(what='sample', seed=0)
+    fitted1 = fit0.fitted(what='sample', seed=0)
+    fitted2 = fit0.fitted(what='sample', seed=1)
+    assert (fitted0 == fitted1).all()
+    assert not (fitted1 == fitted2).all()

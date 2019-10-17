@@ -291,9 +291,11 @@ def prior(data, model, num_samples, seed):
 
 # This particular back end implements this by generating additional
 # code but other approaches are possible.
-def sample_response(model, *args):
+def sample_response(model, seed, *args):
     assert type(model) == Model
-    return model.sample_response_fn(*args)
+    assert seed is None or type(seed) is int
+    with seed_ctx_mgr(seed):
+        return model.sample_response_fn(*args)
 
 
 def expected_response(model, *args):
