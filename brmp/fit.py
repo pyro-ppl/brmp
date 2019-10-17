@@ -34,13 +34,13 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
 
     # brms                                               | brmp
     # -----------------------------------------------------------------------------------
-    # fitted(fit, summary=FALSE)                         | fitted(fit)
-    # fitted(dpar='mu', scale='linear', summary=FALSE)   | fitted(fit, 'linear')
-    # fitted(dpar='mu', scale='response', summary=FALSE) | fitted(fit, 'response')
-    # fitted(fit, newdata=..., summary=FALSE)            | fitted(fit, data=...)
-    # fitted(fit, ..., summary=TRUE)                     | summary(fitted(fit, ...))
-    # predict(fit, summary=FALSE)                        | fitted(fit, 'sample')
-    # predict(fit, summary=TRUE)                         | summary(fitted(fit, 'sample'))
+    # fitted(fit, summary=FALSE)                         | fit.fitted()
+    # fitted(dpar='mu', scale='linear', summary=FALSE)   | fit.fitted('linear')
+    # fitted(dpar='mu', scale='response', summary=FALSE) | fit.fitted('response')
+    # fitted(fit, newdata=..., summary=FALSE)            | fit.fitted(data=...)
+    # fitted(fit, ..., summary=TRUE)                     | summary(fit.fitted(...))
+    # predict(fit, summary=FALSE)                        | fit.fitted('sample')
+    # predict(fit, summary=TRUE)                         | summary(fit.fitted('sample'))
 
     # https://rdrr.io/cran/brms/man/fitted.brmsfit.html
 
