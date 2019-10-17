@@ -444,7 +444,7 @@ def test_sampling_from_prior_smoke(N, backend, formula_str, non_real_cols, contr
     model = backend.gen(desc)
     df = dummy_df(cols, N, allow_non_exhaustive=True)
     data = data_from_numpy(backend, makedata(formula, df, metadata, contrasts))
-    samples = backend.prior(data, model, num_samples=10)
+    samples = backend.prior(data, model, num_samples=10, seed=None)
     assert type(samples) == Samples
 
 
@@ -1109,3 +1109,20 @@ def test_fitted_on_new_data(N2):
     arr = fit.fitted(data=new_data)
     assert np.all(np.isfinite(arr))
     assert arr.shape == (S, N2)
+
+
+@pytest.mark.parametrize('fitargs', [
+    dict(backend=pyro_backend, algo='prior', num_samples=10),
+    dict(backend=pyro_backend, algo='nuts', iter=10, warmup=0),
+    dict(backend=pyro_backend, algo='svi', iter=10, num_samples=10),
+    dict(backend=numpyro_backend, algo='prior', num_samples=10),
+    dict(backend=numpyro_backend, algo='nuts', iter=10, warmup=0),
+])
+def test_rng_seed(fitargs):
+    df = pd.DataFrame({'y': [0., 0.1, 0.2]})
+    model = defm('y ~ 1', df)
+    fit0 = model.fit(seed=0, **fitargs)
+    fit1 = model.fit(seed=0, **fitargs)
+    fit2 = model.fit(seed=1, **fitargs)
+    assert (fit0.fitted() == fit1.fitted()).all()
+    assert not (fit1.fitted() == fit2.fitted()).all()

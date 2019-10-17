@@ -1,6 +1,7 @@
 import time
 from functools import partial
 from sys import stderr
+from contextlib import nullcontext
 
 import numpy as np
 import torch
@@ -16,6 +17,12 @@ from pyro.infer.autoguide import AutoMultivariateNormal
 from pyro.infer.mcmc import NUTS
 from pyro.infer.mcmc.api import MCMC
 from pyro.optim import Adam
+
+
+# A wrapper around the Pyro seed handler, providing handling for the
+# case where seed=None.
+def seed_ctx_mgr(seed):
+    return nullcontext() if seed is None else poutine.handlers.seed(rng_seed=seed)
 
 
 def get_node_or_return_value(samples, name):
@@ -123,16 +130,18 @@ def run_model_on_samples_and_data(modelfn, samples, data):
             for name in names}
 
 
-def nuts(data, model, iter, warmup, num_chains):
+def nuts(data, model, iter, warmup, num_chains, seed):
     assert type(data) == dict
     assert type(model) == Model
     assert type(iter) == int
     assert type(warmup) == int
     assert type(num_chains) == int
+    assert seed is None or type(seed) == int
 
-    nuts_kernel = NUTS(model.fn, jit_compile=False, adapt_step_size=True)
-    mcmc = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup, num_chains=num_chains)
-    mcmc.run(**data)
+    with seed_ctx_mgr(seed):
+        nuts_kernel = NUTS(model.fn, jit_compile=False, adapt_step_size=True)
+        mcmc = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup, num_chains=num_chains)
+        mcmc.run(**data)
 
     samples = mcmc.get_samples(group_by_chain=True)
     transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
@@ -184,11 +193,12 @@ def get_mini_batch(arr, subsample):
         return arr[subsample]
 
 
-def svi(data, model, iter, num_samples, autoguide=None, optim=None, subsample_size=None):
+def svi(data, model, iter, num_samples, seed, autoguide=None, optim=None, subsample_size=None):
     assert type(data) == dict
     assert type(model) == Model
     assert type(iter) == int
     assert type(num_samples) == int
+    assert seed is None or type(seed) == int
     assert autoguide is None or callable(autoguide)
 
     N = next(data.values().__iter__()).shape[0]
@@ -210,40 +220,42 @@ def svi(data, model, iter, num_samples, autoguide=None, optim=None, subsample_si
     max_iter_str_width = len(str(iter))
     max_out_len = 0
 
-    for i in range(iter):
-        if subsample_size is None:
-            dfN = None
-            subsample = None
-            data_for_step = data
-        else:
-            dfN = N
-            subsample = torch.randint(0, N, (subsample_size,)).long()
-            data_for_step = {k: get_mini_batch(arr, subsample) for k, arr in data.items()}
-        loss = svi.step(dfN=dfN, subsample=subsample, **data_for_step)
-        t1 = time.time()
-        if t1 - t0 > 0.5 or (i + 1) == iter:
-            iter_str = str(i + 1).rjust(max_iter_str_width)
-            out = 'iter: {} | loss: {:.3f}'.format(iter_str, loss)
-            max_out_len = max(max_out_len, len(out))
-            # Sending the ANSI code to clear the line doesn't seem to
-            # work in notebooks, so instead we pad the output with
-            # enough spaces to ensure we overwrite all previous input.
-            print('\r{}'.format(out.ljust(max_out_len)), end='', file=stderr)
-            t0 = t1
-    print(file=stderr)
+    with seed_ctx_mgr(seed):
 
-    # We run the guide to generate traces from the (approx.)
-    # posterior. We also run the model against those traces in order
-    # to compute transformed parameters, such as `b`, etc.
-    def get_model_trace():
-        guide_tr = poutine.trace(guide).get_trace()
-        model_tr = poutine.trace(poutine.replay(model.fn, trace=guide_tr)).get_trace(mode='prior_only', **data)
-        return model_tr
+        for i in range(iter):
+            if subsample_size is None:
+                dfN = None
+                subsample = None
+                data_for_step = data
+            else:
+                dfN = N
+                subsample = torch.randint(0, N, (subsample_size,)).long()
+                data_for_step = {k: get_mini_batch(arr, subsample) for k, arr in data.items()}
+            loss = svi.step(dfN=dfN, subsample=subsample, **data_for_step)
+            t1 = time.time()
+            if t1 - t0 > 0.5 or (i + 1) == iter:
+                iter_str = str(i + 1).rjust(max_iter_str_width)
+                out = 'iter: {} | loss: {:.3f}'.format(iter_str, loss)
+                max_out_len = max(max_out_len, len(out))
+                # Sending the ANSI code to clear the line doesn't seem to
+                # work in notebooks, so instead we pad the output with
+                # enough spaces to ensure we overwrite all previous input.
+                print('\r{}'.format(out.ljust(max_out_len)), end='', file=stderr)
+                t0 = t1
+        print(file=stderr)
 
-    # Represent the posterior as a bunch of samples, ignoring the
-    # possibility that we might plausibly be able to figure out e.g.
-    # posterior maginals from the variational parameters.
-    samples = [get_model_trace() for _ in range(num_samples)]
+        # We run the guide to generate traces from the (approx.)
+        # posterior. We also run the model against those traces in order
+        # to compute transformed parameters, such as `b`, etc.
+        def get_model_trace():
+            guide_tr = poutine.trace(guide).get_trace()
+            model_tr = poutine.trace(poutine.replay(model.fn, trace=guide_tr)).get_trace(mode='prior_only', **data)
+            return model_tr
+
+        # Represent the posterior as a bunch of samples, ignoring the
+        # possibility that we might plausibly be able to figure out e.g.
+        # posterior maginals from the variational parameters.
+        samples = [get_model_trace() for _ in range(num_samples)]
 
     # Unlike the NUTS case, we don't eagerly compute `mu` (for the
     # data set used for inference) when building `Samples#raw_samples`.
@@ -256,11 +268,14 @@ def svi(data, model, iter, num_samples, autoguide=None, optim=None, subsample_si
     return Samples(samples, partial(get_param, samples), loc)
 
 
-def prior(data, model, num_samples):
+def prior(data, model, num_samples, seed):
+    assert seed is None or type(seed) == int
+
     def get_model_trace():
         return poutine.trace(model.fn).get_trace(mode='prior_only', **data)
 
-    samples = [get_model_trace() for _ in range(num_samples)]
+    with seed_ctx_mgr(seed):
+        samples = [get_model_trace() for _ in range(num_samples)]
 
     def loc(d):
         return location(model.fn, samples, d)
