@@ -324,7 +324,7 @@ def test_pyro_codegen(N, formula_str, non_real_cols, contrasts, family, priors, 
     # Generate model function and data.
     modelfn = pyro_backend.gen(desc).fn
 
-    df = dummy_df(cols, N)
+    df = dummy_df(cols, N, allow_non_exhaustive=True)
     data = data_from_numpy(pyro_backend, makedata(formula, df, metadata, contrasts))
 
     # Check sample sites.
@@ -357,7 +357,7 @@ def test_numpyro_codegen(N, formula_str, non_real_cols, contrasts, family, prior
     # Generate model function and data.
     modelfn = numpyro_backend.gen(desc).fn
 
-    df = dummy_df(cols, N)
+    df = dummy_df(cols, N, allow_non_exhaustive=True)
     data = data_from_numpy(numpyro_backend, makedata(formula, df, metadata, contrasts))
 
     # Check sample sites.
@@ -379,6 +379,60 @@ def test_numpyro_codegen(N, formula_str, non_real_cols, contrasts, family, prior
             assert_equal(val._value, np.broadcast_to(expected_val, val.shape))
 
 
+@pytest.mark.parametrize('formula_str, cols, expected', [
+    ('y ~ 1 + x',
+     [],
+     lambda df, coef: coef('b_intercept') + df['x'] * coef('b_x')),
+    ('y ~ a',
+     [Categorical('a', ['a0', 'a1', 'a2'])],
+     lambda df, coef: ((df['a'] == 'a0') * coef('b_a[a0]') +
+                       (df['a'] == 'a1') * coef('b_a[a1]') +
+                       (df['a'] == 'a2') * coef('b_a[a2]'))),
+    ('y ~ 1 + a',
+     [Categorical('a', ['a0', 'a1', 'a2'])],
+     lambda df, coef: (coef('b_intercept') +
+                       (df['a'] == 'a1') * coef('b_a[a1]') +
+                       (df['a'] == 'a2') * coef('b_a[a2]'))),
+    ('y ~ x1:x2',
+     [],
+     lambda df, coef: df['x1'] * df['x2'] * coef('b_x1:x2')),
+    ('y ~ a:x',
+     [Categorical('a', ['a0', 'a1'])],
+     lambda df, coef: (((df['a'] == 'a0') * df['x'] * coef('b_a[a0]:x')) +
+                       ((df['a'] == 'a1') * df['x'] * coef('b_a[a1]:x')))),
+    ('y ~ 1 + x | a',
+     [Categorical('a', ['a0', 'a1'])],
+     lambda df, coef: ((df['a'] == 'a0') * (coef('r_a[a0,intercept]') + df['x'] * coef('r_a[a0,x]')) +
+                       (df['a'] == 'a1') * (coef('r_a[a1,intercept]') + df['x'] * coef('r_a[a1,x]')))),
+    ('y ~ 1 + x | a:b',
+     [Categorical('a', ['a0', 'a1']), Categorical('b', ['b0', 'b1'])],
+     lambda df, coef: (((df['a'] == 'a0') & (df['b'] == 'b0')) *
+                       (coef('r_a:b[a0_b0,intercept]') + df['x'] * coef('r_a:b[a0_b0,x]')) +
+                       ((df['a'] == 'a1') & (df['b'] == 'b0')) *
+                       (coef('r_a:b[a1_b0,intercept]') + df['x'] * coef('r_a:b[a1_b0,x]')) +
+                       ((df['a'] == 'a0') & (df['b'] == 'b1')) *
+                       (coef('r_a:b[a0_b1,intercept]') + df['x'] * coef('r_a:b[a0_b1,x]')) +
+                       ((df['a'] == 'a1') & (df['b'] == 'b1')) *
+                       (coef('r_a:b[a1_b1,intercept]') + df['x'] * coef('r_a:b[a1_b1,x]')))),
+    ('y ~ 1 + (x1 | a) + (x2 | b)',
+     [Categorical('a', ['a0', 'a1']), Categorical('b', ['b0', 'b1'])],
+     lambda df, coef: (coef('b_intercept') +
+                       (df['a'] == 'a0') * df['x1'] * coef('r_a[a0,x1]') +
+                       (df['a'] == 'a1') * df['x1'] * coef('r_a[a1,x1]') +
+                       (df['b'] == 'b0') * df['x2'] * coef('r_b[b0,x2]') +
+                       (df['b'] == 'b1') * df['x2'] * coef('r_b[b1,x2]'))),
+])
+@pytest.mark.parametrize('backend', [pyro_backend, numpyro_backend])
+def test_mu_correctness(formula_str, cols, backend, expected):
+    df = dummy_df(expand_columns(parse(formula_str), cols), 10)
+    fit = defm(formula_str, df).generate(backend).prior(num_samples=1)
+    # Pick out the one (and only) sample drawn.
+    actual_mu = fit.fitted(what='linear')[0]
+    # `expected` is assumed to return a data frame.
+    expected_mu = expected(df, fit.get_scalar_param).to_numpy(np.float32)
+    assert np.allclose(actual_mu, expected_mu)
+
+
 @pytest.mark.parametrize('N', [0, 5])
 @pytest.mark.parametrize('backend', [pyro_backend, numpyro_backend])
 @pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
@@ -388,7 +442,7 @@ def test_sampling_from_prior_smoke(N, backend, formula_str, non_real_cols, contr
     metadata = metadata_from_cols(cols)  # Use full metadata for same reason given in comment in codegen test.
     desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
     model = backend.gen(desc)
-    df = dummy_df(cols, N)
+    df = dummy_df(cols, N, allow_non_exhaustive=True)
     data = data_from_numpy(backend, makedata(formula, df, metadata, contrasts))
     samples = backend.prior(data, model, num_samples=10)
     assert type(samples) == Samples
@@ -436,7 +490,7 @@ def test_parameter_shapes(formula_str, non_real_cols, contrasts, family, priors,
     N = 5
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
-    df = dummy_df(cols, N)
+    df = dummy_df(cols, N, allow_non_exhaustive=True)
 
     # Define model, and generate a single posterior sample.
     metadata = metadata_from_cols(cols)
@@ -1052,7 +1106,7 @@ def test_fitted_on_new_data(N2):
     cols = expand_columns(parse(formula_str), [Categorical('a', ['a0', 'a1'])])
     df = dummy_df(cols, N)
     fit = defm(formula_str, df, Normal, contrasts=contrasts).fit(iter=S)
-    new_data = dummy_df(cols, N2)
+    new_data = dummy_df(cols, N2, allow_non_exhaustive=True)
     arr = fit.fitted(data=new_data)
     assert np.all(np.isfinite(arr))
     assert arr.shape == (S, N2)
