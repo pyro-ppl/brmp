@@ -1,10 +1,10 @@
 import math
-import itertools
 
 import torch
 import torch.nn as nn
 import torch.nn.init as init
 from torch.nn.functional import one_hot
+
 
 class QIndep(nn.Module):
     def __init__(self, num_coef, num_designs):
@@ -17,7 +17,7 @@ class QIndep(nn.Module):
         self.num_designs = num_designs
         self.net = nn.Sequential(BatchLinear(num_designs, 1, 100),
                                  nn.ReLU(),
-                                 BatchLinear(num_designs, 100,50),
+                                 BatchLinear(num_designs, 100, 50),
                                  nn.ReLU(),
                                  BatchLinear(num_designs, 50, num_coef),
                                  nn.Sigmoid())
@@ -64,10 +64,12 @@ def bits2long(t):
     assert out.shape == batch_dims
     return out
 
+
 # e.g. int2bits(3,4) => [0,0,1,1]
 def int2bits(i, width):
     assert i < 2**width
     return [int(b) for b in ('{:0'+str(width)+'b}').format(i)]
+
 
 # All of the target values (as bit vectors) that satisfy \theta_coef == 1.
 #
@@ -89,6 +91,7 @@ def int2bits(i, width):
 def target_values_for_marginal(coef, num_coef):
     values = [bits for bits in (int2bits(i, num_coef) for i in range(2**num_coef)) if bits[coef] == 1]
     return torch.tensor(values)
+
 
 # e.g.
 # bits2onehot(torch.tensor([[[0,0,0], [0,0,1]]
@@ -150,6 +153,7 @@ class QFull(nn.Module):
         cols = torch.stack([bits2long(target_values_for_marginal(i, self.num_coef)) for i in range(self.num_coef)])
         return torch.sum(torch.exp(logprobs[..., cols]), -1)
 
+
 # Note that if (a degenerate configuration of) this is used to compare
 # the performance of vectorizing over designs vs. using separate nets
 # then I ought to revert `forward` to using `matmul` and comment out
@@ -157,7 +161,6 @@ class QFull(nn.Module):
 # `nn.Linear` uses `addmm` internally, which is faster the adding the
 # bias separately, hence commenting out makes for a fairer test. (The
 # existence of `baddbmm` does't change the proceeding.)
-
 class BatchLinear(nn.Module):
     def __init__(self, batch_size, in_features, out_features):
         super(BatchLinear, self).__init__()
@@ -177,7 +180,7 @@ class BatchLinear(nn.Module):
     # Given an input of shape `(batch_size, N, in_features)`, this
     # returns a tensor with shape `(batch_size, N, out_features)`.
     def forward(self, inp):
-        #return torch.matmul(inp, self.weight) + self.bias
+        # return torch.matmul(inp, self.weight) + self.bias
         return torch.baddbmm(self.bias, inp, self.weight)
 
 

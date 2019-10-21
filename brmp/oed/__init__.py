@@ -15,7 +15,8 @@ from brmp.backend import data_from_numpy
 from brmp.pyro_backend import backend as pyro_backend
 from brmp.fit import Fit
 
-from brmp.oed.nets import QIndep, QFull
+from brmp.oed.nets import QIndep, QFull # noqa: 401
+
 
 # Provides a convenient interface for performing sequential OED.
 
@@ -36,8 +37,13 @@ from brmp.oed.nets import QIndep, QFull
 # oed.design_space()
 # oed.data_so_far
 
+def null(*args):
+    return None
+
+
 class SequentialOED:
-    def __init__(self, formula_str, cols, family=Normal, priors=[], contrasts={}, target_coefs=[], backend=pyro_backend):
+    def __init__(self, formula_str, cols, family=Normal, priors=[],
+                 contrasts={}, target_coefs=[], backend=pyro_backend):
         formula = parse(formula_str)
         metadata = metadata_from_cols(cols)
         model_desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
@@ -72,7 +78,7 @@ class SequentialOED:
     def next_trial(self, callback=None, verbose=False, **kwargs):
 
         if callback is None:
-            callback = lambda *args: None
+            callback = null
 
         design_space = self.design_space(**kwargs)
         design_space_df = design_space_to_df(self.dscols, design_space)
@@ -85,14 +91,15 @@ class SequentialOED:
         if len(self.data_so_far) == 0:
             samples = self.backend.prior(dsf, self.model, num_samples=self.num_samples)
         else:
-            samples = self.backend.nuts(dsf, self.model, iter=self.num_samples, warmup=self.num_samples // 2, num_chains=1)
+            samples = self.backend.nuts(dsf, self.model, iter=self.num_samples,
+                                        warmup=self.num_samples // 2, num_chains=1)
         fit = Fit(self.formula, self.metadata, self.contrasts, dsf, self.model_desc, self.model, samples, self.backend)
 
         # Values sampled for (population-level) target coefs. (numpy array.)
         latent_samples = [fit.get_scalar_param('b_{}'.format(tc)) for tc in self.target_coefs]
 
         # Draw samples from p(y|theta;d)
-        y_samples = fit.fitted('sample', design_space_df) # numpy array.
+        y_samples = fit.fitted('sample', design_space_df)  # numpy array.
 
         # All ANN work is done using PyTorch, so convert samples from
         # numpy to torch ready for what follows.
@@ -110,9 +117,10 @@ class SequentialOED:
         assert inputs.shape == (len(design_space), self.num_samples, 1)
 
         # Estimate EIGs
-        Q = QFull # QIndep
+        Q = QFull  # QIndep
         vectorize = True
-        eigs, cbvals, elapsed = (est_eig_vec if vectorize else est_eig)(Q, targets, inputs, design_space, self.target_coefs, callback, verbose)
+        est_eig_fn = est_eig_vec if vectorize else est_eig
+        eigs, cbvals, elapsed = est_eig_fn(Q, targets, inputs, design_space, self.target_coefs, callback, verbose)
         if verbose:
             print('Elapsed: {}'.format(elapsed))
 
@@ -128,6 +136,7 @@ class SequentialOED:
 
 def argmax(lst):
     return torch.argmax(torch.tensor(lst)).item()
+
 
 # Estimate the EIG for each design.
 def est_eig(Q, targets, inputs, design_space, target_coefs, callback, verbose):
@@ -151,6 +160,7 @@ def est_eig(Q, targets, inputs, design_space, target_coefs, callback, verbose):
         cbvals.append(callback(q_net, inputs_i, targets, [design], target_coefs)[0])
 
     return eigs, cbvals, elapsed
+
 
 # Estimate the EIG for each design. (Vectorized over designs.)
 def est_eig_vec(Q, targets, inputs, design_space, target_coefs, callback, verbose):
@@ -179,10 +189,10 @@ def optimise(net, inputs, targets, verbose):
         loss.backward()
         optimizer.step()
         if (i+1) % 100 == 0 and verbose:
-            print('{:5d} | {:.6f}'.format(i+1,loss.item()))
+            print('{:5d} | {:.6f}'.format(i+1, loss.item()))
 
     if verbose:
-       print('--------------------')
+        print('--------------------')
 
 
 def empty_df_from_cols(cols):
@@ -234,6 +244,7 @@ def design_space(names, metadata, **levels_lookup):
     all_possible_vals = list(itertools.product(*[levels(name) for name in names]))
     return all_possible_vals
 
+
 def design_space_to_df(dscols, design_space):
     return pd.DataFrame(dict((name, pd.Categorical(col))
                              for name, col in zip(dscols, list(zip(*design_space)))))
@@ -255,7 +266,7 @@ def extend_df_with_result(formula, meta, data_so_far, design, result):
 def df_append_row(df, row):
     assert type(row) == dict
     row_df = pd.DataFrame({k: pd.Categorical([v]) if is_categorical_dtype(df[k]) else [v]
-                           for k,v in row.items()})
+                           for k, v in row.items()})
     out = df.append(row_df, sort=False)
     # Simply appending a new df produces a new df in which
     # (sometimes!?!) a column that was categorical in the two inputs
