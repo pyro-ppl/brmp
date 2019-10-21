@@ -13,7 +13,7 @@ from brmp.design import Metadata, makedata, metadata_from_cols, RealValued, Cate
 from brmp.family import Normal
 from brmp.backend import data_from_numpy
 from brmp.pyro_backend import backend as pyro_backend
-from brmp.fit import Fit, get_scalar_param, fitted
+from brmp.fit import Fit
 
 from brmp.oed.nets import QIndep, QFull
 
@@ -85,14 +85,14 @@ class SequentialOED:
         if len(self.data_so_far) == 0:
             samples = self.backend.prior(dsf, self.model, num_samples=self.num_samples)
         else:
-            samples = self.backend.nuts(dsf, self.model, iter=self.num_samples)
+            samples = self.backend.nuts(dsf, self.model, iter=self.num_samples, warmup=self.num_samples // 2, num_chains=1)
         fit = Fit(self.formula, self.metadata, self.contrasts, dsf, self.model_desc, self.model, samples, self.backend)
 
         # Values sampled for (population-level) target coefs. (numpy array.)
-        latent_samples = [get_scalar_param(fit, 'b_{}'.format(tc)) for tc in self.target_coefs]
+        latent_samples = [fit.get_scalar_param('b_{}'.format(tc)) for tc in self.target_coefs]
 
         # Draw samples from p(y|theta;d)
-        y_samples = fitted(fit, 'sample', design_space_df) # numpy array.
+        y_samples = fit.fitted('sample', design_space_df) # numpy array.
 
         # All ANN work is done using PyTorch, so convert samples from
         # numpy to torch ready for what follows.

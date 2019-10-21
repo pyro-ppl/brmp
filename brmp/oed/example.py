@@ -5,7 +5,6 @@ from matplotlib import pyplot as plt
 from brmp.design import RealValued, Categorical
 from brmp.priors import Prior
 from brmp.family import Normal, HalfNormal
-from brmp.fit import marginals
 from brmp.oed import SequentialOED
 
 def get_float_input(msg):
@@ -103,7 +102,7 @@ def main():
 
     for _ in range(1000):
         design, dstar, eigs, fit, plot_data = oed.next_trial(callback=collect_plot_data, verbose=True)
-        print(marginals(fit))
+        print(fit.marginals())
         print('EIGs:')
         print(eigs)
         print('Next trial: {}'.format(design))
