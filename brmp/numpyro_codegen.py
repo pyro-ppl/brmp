@@ -115,15 +115,14 @@ def genprior(varname, prior_desc):
     for i, (prior, length) in enumerate(prior_desc):
         code.append(sample('{}_{}'.format(varname, i), gendist(prior, args(prior), [length])))
 
-    # TODO: Optimisation -- avoid `torch.concat` when only sample is
-    # drawn. (Binding the sampled value directly to `varname`.)
-
-    if len(prior_desc) > 0:
-        # Concatenate the segments to produce the final vector.
-        code.append('{} = np.hstack([{}])'.format(varname, ', '.join(
-            '{}_{}'.format(varname, i) for i in range(len(prior_desc)))))
-    else:
+    if len(prior_desc) == 0:
         code.append('{} = np.array([])'.format(varname))
+    elif len(prior_desc) == 1:
+        code.append(f'{varname} = {varname}_0')
+    else:
+        # Concatenate the segments to produce the final vector.
+        varname_coefs = ", ".join(f'{varname}_{i}' for i in range(len(prior_desc)))
+        code.append(f'{varname} = np.hstack([{varname_coefs}])')
 
     return code
 
