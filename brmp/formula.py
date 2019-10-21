@@ -1,9 +1,10 @@
-import re
-from enum import Enum
-from collections import namedtuple
 import itertools
+import re
+from collections import namedtuple
+from enum import Enum
 
 from brmp.utils import join
+
 
 # Maintains order.
 def unique(xs):
@@ -15,6 +16,7 @@ def unique(xs):
             seen.add(x)
     return out
 
+
 class OrderedSet():
     def __init__(self, *items, items_are_unique=False):
         # For most methods on this class `items` could be an arbitrary
@@ -25,23 +27,31 @@ class OrderedSet():
         # list would work too.
         self.items = tuple(items if items_are_unique else unique(items))
         self.fset = frozenset(self.items)
-        assert len(self.fset) == len(self.items) # `unique` ensures nodups
+        assert len(self.fset) == len(self.items)  # `unique` ensures nodups
+
     def __hash__(self):
         return hash((OrderedSet, self.fset))
+
     def __eq__(self, other):
         return self.fset == other.fset
+
     def __iter__(self):
         return self.items.__iter__()
+
     def __next__(self):
         return self.items.__next__()
+
     def __len__(self):
         return len(self.items)
+
     def __getitem__(self, i):
         return self.items[i]
+
     def __repr__(self):
         return '<{}>'.format(','.join(str(item) for item in self.items))
+
     def union(self, other):
-        items = self.items + tuple(x for x in other.items if not x in self.fset)
+        items = self.items + tuple(x for x in other.items if x not in self.fset)
         return OrderedSet(*items, items_are_unique=True)
 
 
@@ -52,11 +62,11 @@ Op = namedtuple('Op', 'name assoc precedence')
 Var = namedtuple('Var', 'name')
 
 OPS = {
-    ':':  Op(':',  Assoc.L, 5),
-    '+':  Op('+',  Assoc.L, 4),
+    ':': Op(':', Assoc.L, 5),
+    '+': Op('+', Assoc.L, 4),
     '||': Op('||', Assoc.L, 3),
-    '|':  Op('|',  Assoc.L, 3),
-    '~':  Op('~',  Assoc.L, 2),
+    '|': Op('|', Assoc.L, 3),
+    '~': Op('~', Assoc.L, 2),
 }
 
 # AST
@@ -74,33 +84,72 @@ Node = namedtuple('Node', 'op l r')
 # using the name of the grouping column, which would be ambiguous
 # without the assumption. brms does this too.
 
+# TODO: I don't think attaching these docs to the "private" `Formula`
+# class makes much sense. What's a better alternative?
 Formula = namedtuple('Formula',
-                     ['response',   # response column name
-                      'terms',      # an OrderedSet of population level terms
-                      'groups'])    # list of groups
+                     ['response',  # response column name
+                      'terms',  # an OrderedSet of population level terms
+                      'groups'])  # list of groups
+"""
+Represents an lme4 formula.
+
+.. list-table::
+   :widths: auto
+
+   * - ``~``
+     - A valid formula contains exactly one occurrence of ``~`` . The LHS gives
+       the name of the scalar response variable. The RHS describes the
+       structure of the model.
+   * - ``+``
+     - A combination of terms.
+   * - ``:``
+     - An interaction between two terms. Can also appear on the RHS of ``|`` or
+       ``||`` to specify grouping by multiple factors.
+   * - ``|``
+     - Introduces a group-level term. (i.e. random effect.)
+   * - ``||``
+     - Introduces a group-level term, omitting modelling of group-level correlations.
+   * - ``1``
+     - Intercept term. Note that intercept terms are not added automatically.
+
+The following examples are all parsed as valid formulae:
+
+.. code-block:: text
+
+  y ~ x
+  y ~ 1 + x
+  y ~ 1 + x1:x2
+  y ~ 1 + x1 + (1 + x2 | a)
+  y ~ 1 + x1 + (1 + x2 || a:b)
+
+"""
 
 Group = namedtuple('Group',
-                   ['terms',        # an OrderedSet of group-level terms
-                    'columns',      # names of grouping columns
-                    'corr'])        # model correlation between coeffs?
-
+                   ['terms',  # an OrderedSet of group-level terms
+                    'columns',  # names of grouping columns
+                    'corr'])  # model correlation between coeffs?
 
 # TODO: Make it possible to union terms directly? (Could use in the
 # `:` case of eval.)
 Term = namedtuple('Term',
-                  ['factors']) # Factors in the Patsy sense. An OrderedSet.
-_1 = Term(OrderedSet()) # Intercept
+                  ['factors'])  # Factors in the Patsy sense. An OrderedSet.
+_1 = Term(OrderedSet())  # Intercept
+
 
 def allfactors(formula):
     assert type(formula) == Formula
+
     def all_from_terms(terms):
         return join(list(term.factors) for term in terms)
+
     return ([formula.response] +
             all_from_terms(formula.terms) +
             join(all_from_terms(group.terms) + group.columns for group in formula.groups))
 
+
 def tokenize(inp):
     return [str2token(s) for s in re.findall(r'\b\w+\b|[()~+:]|\|\|?', inp)]
+
 
 def str2token(s):
     if s in OPS:
@@ -111,6 +160,7 @@ def str2token(s):
         return Paren.R
     else:
         return Var(s)
+
 
 # https://en.wikipedia.org/wiki/Shunting-yard_algorithm
 # TODO: Add better error handling. (Wiki article has some extra checks
@@ -141,6 +191,7 @@ def shunt(tokens):
         output.append(opstack.pop())
     return output
 
+
 # Evaluate rpn (as produced by `shunt`) to an ast.
 def rpn2ast(tokens):
     out = []
@@ -156,6 +207,7 @@ def rpn2ast(tokens):
             raise Exception('unhandled token type')
     assert len(out) == 1
     return out[0]
+
 
 # Returns an ordered set of population-level terms and a list of
 # groups.
@@ -195,6 +247,7 @@ def eval_rhs(ast, allow_groups=True):
         # use. e.g. When nested groups are present.
         raise Exception('unhandled ast')
 
+
 # Evaluate the expression to the right of the `|` or `||` in a group
 # to a list of factor names.
 # e.g. `a:b:c` -> ['a', 'b', 'c']
@@ -210,6 +263,7 @@ def eval_group_rhs(ast):
         # that the whole group can be included in the message?
         raise Exception('unhandled ast')
 
+
 # Evaluate a formula of the form `y ~ <rhs>`, where the rhs is a sum
 # of population terms and groups.
 def evalf(ast):
@@ -219,11 +273,14 @@ def evalf(ast):
     terms, groups = eval_rhs(ast.r)
     return Formula(ast.l.value, terms, groups)
 
+
 def parse(s):
     return evalf(rpn2ast(shunt(tokenize(s))))
 
+
 def main():
     print(parse('y ~ x1 + x2 + (1 + x3 | x4) + x5:x6'))
+
 
 if __name__ == '__main__':
     main()

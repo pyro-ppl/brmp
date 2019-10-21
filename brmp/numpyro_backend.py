@@ -1,16 +1,18 @@
 from functools import partial
 
 import numpy as np
-
-from jax import random, vmap
-from jax.config import config; config.update("jax_platform_name", "cpu")
-
 import numpyro.handlers as handler
+from jax import random, vmap
+from jax.config import config
 from numpyro.mcmc import MCMC, NUTS
 
-from brmp.backend import Backend, Model, apply_default_hmc_args
+from brmp.backend import Backend, Model
 from brmp.fit import Samples
 from brmp.numpyro_codegen import gen
+from brmp.utils import flatten, unflatten
+
+config.update("jax_platform_name", "cpu")
+
 
 # The types described in the comments in pyro_backend.py as follows
 # in this back end:
@@ -18,16 +20,19 @@ from brmp.numpyro_codegen import gen
 # bs: dict from parameter names to JAX numpy arrays
 # ps: JAX numpy array
 
-def get_param(samples, name):
+def get_param(samples, name, preserve_chains):
     assert type(samples) == dict
     # Reminder to use correct interface.
     assert not name == 'mu', 'Use `location` to fetch `mu`.'
-    return samples[name]
+    param = samples[name]
+    return param if preserve_chains else flatten(param)
+
 
 # Extract the underlying numpy array (rather than using JAX numpy) to
 # match the interface exactly.
 def to_numpy(param_samples):
     return param_samples._value if hasattr(param_samples, '_value') else param_samples
+
 
 # I would ideally like to transform the numpy array into a JAX array
 # here, in order to comply with the interface as closely as possible.
@@ -37,27 +42,38 @@ def to_numpy(param_samples):
 def from_numpy(data):
     return data
 
+
 # TODO: Better name.
 def run_model_on_samples_and_data(modelfn, samples, data):
-    return vmap(lambda sample: handler.substitute(modelfn, sample)(**data, mode='prior_and_mu'))(samples)
+    assert type(samples) == dict
+    assert len(samples) > 0
+    num_chains, num_samples = next(iter(samples.values())).shape[0:2]
+    assert all(arr.shape[0:2] == (num_chains, num_samples) for arr in samples.values())
+    flat_samples = {k: flatten(arr) for k, arr in samples.items()}
+    out = vmap(lambda sample: handler.substitute(modelfn, sample)(**data, mode='prior_and_mu'))(flat_samples)
+    # Restore chain dim.
+    return {k: unflatten(arr, num_chains, num_samples) for k, arr in out.items()}
+
 
 def location(original_data, samples, transformed_samples, model_fn, new_data):
     # Optimization: For the data used for inference, values for `mu`
     # are already computed and available from `transformed_samples`.
     if new_data == original_data:
-        return transformed_samples['mu']
+        return flatten(transformed_samples['mu'])
     else:
-        return run_model_on_samples_and_data(model_fn, samples, new_data)['mu']
+        return flatten(run_model_on_samples_and_data(model_fn, samples, new_data)['mu'])
 
-def nuts(data, model, seed=None, iter=None, warmup=None, num_chains=None):
+
+def nuts(data, model, iter, warmup, num_chains, seed=None):
     assert type(data) == dict
     assert type(model) == Model
+    assert type(iter) == int
+    assert type(warmup) == int
+    assert type(num_chains) == int
     assert seed is None or type(seed) == int
 
-    iter, warmup, num_chains = apply_default_hmc_args(iter, warmup, num_chains)
-
     if seed is None:
-        seed = np.random.randint(0, 2**32, dtype=np.uint32).astype(np.int32)
+        seed = np.random.randint(0, 2 ** 32, dtype=np.uint32).astype(np.int32)
     rng = random.PRNGKey(seed)
 
     kernel = NUTS(model.fn)
@@ -66,7 +82,7 @@ def nuts(data, model, seed=None, iter=None, warmup=None, num_chains=None):
     # `num_chains` > 1 to achieve parallel chains.
     mcmc = MCMC(kernel, warmup, iter, num_chains=num_chains)
     mcmc.run(rng, **data)
-    samples = mcmc.get_samples()
+    samples = mcmc.get_samples(group_by_chain=True)
 
     # Here we re-run the model on the samples in order to collect
     # transformed parameters. (e.g. `b`, `mu`, etc.) Theses are made
@@ -78,8 +94,10 @@ def nuts(data, model, seed=None, iter=None, warmup=None, num_chains=None):
 
     return Samples(all_samples, partial(get_param, all_samples), loc)
 
+
 def svi(*args, **kwargs):
     raise NotImplementedError
+
 
 def prior(data, model, num_samples, seed=None):
     assert type(data) == dict
@@ -88,7 +106,7 @@ def prior(data, model, num_samples, seed=None):
     assert seed is None or type(seed) == int
 
     if seed is None:
-        seed = np.random.randint(0, 2**32, dtype=np.uint32).astype(np.int32)
+        seed = np.random.randint(0, 2 ** 32, dtype=np.uint32).astype(np.int32)
     rngs = random.split(random.PRNGKey(seed), num_samples)
 
     def get_model_trace(rng):
@@ -97,9 +115,11 @@ def prior(data, model, num_samples, seed=None):
         # Unpack the bits of the trace we're interested in into a dict
         # in order to support vectorization. (dicts support
         # vectorization, OrderedDicts, as used by the trace, don't.)
-        return {k: node['value'] for k,node in model_tr.items()}
+        return {k: node['value'] for k, node in model_tr.items()}
 
-    samples = vmap(get_model_trace)(rngs)
+    flat_samples = vmap(get_model_trace)(rngs)
+    # Insert dummy "chain" dim.
+    samples = {k: np.expand_dims(arr, 0) for k, arr in flat_samples.items()}
     transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
     all_samples = dict(samples, **transformed_samples)
 

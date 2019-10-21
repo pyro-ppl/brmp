@@ -1,8 +1,10 @@
 from collections import namedtuple
 
+from brmp.design import Categorical, Integral, Metadata, RealValued, coef_names
+from brmp.family import (Family, Type, family_repr, nonlocparams,
+                         support_depends_on_args)
 from brmp.formula import Formula, allfactors
-from brmp.design import Metadata, coef_names, RealValued, Categorical, Integral
-from brmp.family import Family, Type, nonlocparams, support_depends_on_args, family_repr
+
 
 def family_matches_response(formula, metadata, family):
     assert type(formula) == Formula
@@ -38,14 +40,17 @@ def family_matches_response(formula, metadata, family):
     else:
         return False
 
+
 def check_family_matches_response(formula, metadata, family):
     assert type(metadata) == Metadata
     if not family_matches_response(formula, metadata, family):
         # TODO: This could be more informative. e.g. If choosing
         # Bernoulli fails, is the problem that the response is
         # numeric, or that it has more than two levels?
-        error = 'The response distribution "{}" is not compatible with the type or contents of the response column "{}".'
+        error = 'The response distribution "{}" is not compatible with the type or contents of the ' \
+                'response column "{}".'
         raise Exception(error.format(family_repr(family), formula.response))
+
 
 # `ModelDescPre` is an intermediate step towards a full `ModelDesc`.
 # At this stage we know how the data will be coded, and therefore know
@@ -61,6 +66,7 @@ PopulationPre = namedtuple('PopulationPre', 'coefs')
 GroupPre = namedtuple('GroupPre', 'columns levels coefs corr')
 ResponsePre = namedtuple('ResponsePre', 'family nonlocparams')
 
+
 def build_model_pre(formula, metadata, family, custom_code_lengths):
     assert type(formula) == Formula
     assert type(metadata) == Metadata
@@ -73,7 +79,9 @@ def build_model_pre(formula, metadata, family, custom_code_lengths):
 
     gs = []
     for group in formula.groups:
-        assert all(type(metadata.column(col)) == Categorical for col in group.columns), 'grouping columns must be a factor'
+        assert all(
+            type(metadata.column(col)) == Categorical for col in group.columns), \
+            'grouping columns must be a factor'
         coefs = coef_names(group.terms, metadata, custom_code_lengths)
         g = GroupPre(group.columns, metadata.levels(group.columns), coefs, group.corr and len(coefs) > 1)
         gs.append(g)

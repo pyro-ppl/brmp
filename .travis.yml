@@ -1,0 +1,30 @@
+language: python
+
+sudo: false
+
+env:
+    global:
+        - PYTHONPATH=$PWD:$PYTHONPATH
+
+cache:
+    directories:
+        - $HOME/.data
+
+dist: xenial
+
+install:
+    - pip install -U pip
+    - pip install -e .[test]
+    - pip freeze
+
+branches:
+    only:
+        - master
+
+jobs:
+    include:
+        - stage: unit
+          name: "unit tests"
+          python: 3.6
+          script:
+              - make test

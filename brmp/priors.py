@@ -1,12 +1,8 @@
-from collections import namedtuple, defaultdict
-from pprint import pprint as pp
+from collections import defaultdict, namedtuple
 
-import pandas as pd
-
+from brmp.family import LKJ, Cauchy, Family, HalfCauchy, Type, fully_applied
+from brmp.model_pre import GroupPre, ModelDescPre, PopulationPre
 from brmp.utils import join
-from brmp.formula import Formula
-from brmp.model_pre import ModelDescPre, PopulationPre, GroupPre
-from brmp.family import Cauchy, HalfCauchy, LKJ, Family, Type, fully_applied
 
 # `is_param` indicates whether a node corresponds to a parameter in
 # the model. (Nodes without this flag set exist only to add structure
@@ -14,8 +10,10 @@ from brmp.family import Cauchy, HalfCauchy, LKJ, Family, Type, fully_applied
 # information from the tree.
 Node = namedtuple('Node', 'name prior_edit is_param checks children')
 
+
 def leaf(name, prior_edit=None, checks=[]):
     return Node(name, prior_edit, True, checks, [])
+
 
 RESPONSE_PRIORS = {
     'Normal': {
@@ -23,9 +21,11 @@ RESPONSE_PRIORS = {
     },
 }
 
+
 def get_response_prior(family, parameter):
     if family in RESPONSE_PRIORS:
         return RESPONSE_PRIORS[family][parameter]
+
 
 # This is similar to brms `set_prior`. (e.g. `set_prior('<prior>',
 # coef='x1')` is similar to `Prior(['x1'], '<prior>)`.) By specifying
@@ -33,6 +33,55 @@ def get_response_prior(family, parameter):
 # the hope is that a brms-like interface can be put in front of this.
 
 Prior = namedtuple('Prior', 'path prior')
+"""
+
+A :class:`~brmp.prior.Prior` instance associates a prior distribution with one
+or more parameters of a model. One or more such instances may be passed to
+:func:`~brmp.defm` to override its default choice of priors.
+
+The parameters of the model to which a prior should be applied are specified
+using a path. The following examples illustrate how this works:
+
+.. list-table::
+   :widths: auto
+   :header-rows: 1
+
+   * - Path
+     - Selected Parameters
+   * - ``('b',)``
+     - All population level coefficients
+   * - ``('b', 'intercept')``
+     - The population level intercept
+   * - ``('b', 'x')``
+     - The population level coefficient ``x``
+   * - ``('sd',)``
+     - All standard deviations in all groups
+   * - ``('sd', 'a')``
+     - All standard deviations in the group which groups by column ``a``
+   * - ``('sd', 'a:b')``
+     - All standard deviations in the group which groups by columns ``a`` and ``b``
+   * - ``('sd', 'a', 'intercept')``
+     - The standard deviation of the intercept in the group which groups by column ``a``
+   * - ``('cor',)``
+     - All correlation matrices
+   * - ``('cor', 'a')``
+     - The correlation matrix of the group which groups by column ``a``
+   * - ``('cor', 'a:b')``
+     - The correlation matrix of the group which groups by columns ``a`` and ``b``
+   * - ``('resp', `sigma`)``
+     - The ``sigma`` parameter of the response distribution
+
+Example::
+
+  Prior(('b', 'intercept'), Normal(0., 1.))
+
+:param path: A path describing one or more parameters of the model.
+:type path: tuple
+:param prior: A prior distribution, given as a :class:`~brmp.family.Family`
+              with all of its parameters specified.
+:type prior: brmp.family.Family
+"""
+
 
 def walk(node, path):
     assert type(node) == Node
@@ -46,8 +95,10 @@ def walk(node, path):
             raise ValueError('Invalid path')
         return [node] + walk(selected_node, path[1:])
 
+
 def select(node, path):
     return walk(node, path)[-1]
+
 
 def edit(node, path, f):
     assert type(node) == Node
@@ -66,6 +117,7 @@ def edit(node, path, f):
         children = [edit(n, path[1:], f) if n.name == name else n
                     for n in node.children]
         return Node(node.name, node.prior_edit, node.is_param, node.checks, children)
+
 
 # TODO: Match default priors used by brms. (An improper uniform is
 # used for `b`. A Half Student-t here is used for priors on standard
@@ -88,7 +140,8 @@ def default_prior(model_desc_pre):
     assert all(type(gm) == GroupPre for gm in model_desc_pre.groups)
     b_children = [leaf(name) for name in model_desc_pre.population.coefs]
     cor_children = [leaf(cols2str(group.columns)) for group in model_desc_pre.groups if group.corr]
-    sd_children = [Node(cols2str(gm.columns), None, False, [], [leaf(name) for name in gm.coefs]) for gm in model_desc_pre.groups]
+    sd_children = [Node(cols2str(gm.columns), None, False, [], [leaf(name) for name in gm.coefs]) for gm in
+                   model_desc_pre.groups]
 
     def mk_resp_prior_edit(param_name):
         prior = get_response_prior(family.name, param_name)
@@ -98,10 +151,11 @@ def default_prior(model_desc_pre):
     resp_children = [leaf(p.name, mk_resp_prior_edit(p.name), [chk_support(p.type)])
                      for p in model_desc_pre.response.nonlocparams]
     return Node('root', None, False, [], [
-        Node('b',    Prior(('b',),   Cauchy(0., 1.)), False, [chk_support(Type['Real']())],    b_children),
-        Node('sd',   Prior(('sd',),  HalfCauchy(3.)), False, [chk_support(Type['PosReal']())], sd_children),
-        Node('cor',  Prior(('cor',), LKJ(1.)),        False, [chk_lkj],                        cor_children),
-        Node('resp', None,                            False, [],                               resp_children)])
+        Node('b', Prior(('b',), Cauchy(0., 1.)), False, [chk_support(Type['Real']())], b_children),
+        Node('sd', Prior(('sd',), HalfCauchy(3.)), False, [chk_support(Type['PosReal']())], sd_children),
+        Node('cor', Prior(('cor',), LKJ(1.)), False, [chk_lkj], cor_children),
+        Node('resp', None, False, [], resp_children)])
+
 
 def cols2str(cols):
     return ':'.join(cols)
@@ -119,6 +173,7 @@ def customize_prior(tree, priors):
         tree = edit(tree, prior_edit.path,
                     lambda n: Node(n.name, prior_edit, n.is_param, n.checks, n.children))
     return tree
+
 
 # It's important that trees maintain the order of their children, so
 # that coefficients in the prior tree continue to line up with columns
@@ -144,6 +199,7 @@ def build_prior_tree(model_desc_pre, priors, chk=True):
             raise Exception(format_errors(errors))
     return tree
 
+
 # `fill` populates the `prior_edit` and `checks` properties of all
 # nodes in a tree. Each node uses its own `prior_edit` value if set,
 # otherwise the first `prior_edit` value encountered when walking up
@@ -152,14 +208,16 @@ def build_prior_tree(model_desc_pre, priors, chk=True):
 # walking from the node to the root. (This is the behaviour, not the
 # implementation.)
 def fill(node, default=None, upstream_checks=[]):
-    prior = node.prior_edit if not node.prior_edit is None else default
+    prior = node.prior_edit if node.prior_edit is not None else default
     checks = upstream_checks + node.checks
     return Node(node.name, prior, node.is_param, checks, [fill(n, prior, checks) for n in node.children])
+
 
 def leaves(node, path=[]):
     this = [(node, path)] if node.is_param else []
     rest = join(leaves(n, path + [n.name]) for n in node.children)
     return this + rest
+
 
 # Sanity checks
 
@@ -179,10 +237,13 @@ class Chk():
     def __repr__(self):
         return 'Chk("{}")'.format(self.name)
 
+
 def chk(name):
     def decorate(predicate):
         return Chk(predicate, name)
+
     return decorate
+
 
 def chk_support(typ):
     # TODO: This could probably be relaxed to only require that the
@@ -190,11 +251,14 @@ def chk_support(typ):
     # (However this is easier and good enough for now.)
     def pred(prior):
         return prior.support() == typ
+
     return Chk(pred, 'has support of {}'.format(typ))
+
 
 @chk('is LKJ')
 def chk_lkj(prior):
     return prior.name == 'LKJ'
+
 
 def check(tree):
     errors = defaultdict(lambda: defaultdict(list))
@@ -207,11 +271,13 @@ def check(tree):
                 errors[node.prior_edit.path][chk].append(path)
     return errors
 
+
 # TODO: There's info in `errors` which we're not making use of here.
 def format_errors(errors):
     paths = ', '.join('"{}"'.format('/'.join(path))
                       for path in errors.keys())
     return 'Invalid prior specified at {}.'.format(paths)
+
 
 def leaves_without_prior(tree):
     return [path for (node, path) in leaves(tree) if node.prior_edit is None]
