@@ -259,7 +259,7 @@ def extend_df_with_result(formula, meta, data_so_far, design, result):
     # This assumes that `design` is ordered following
     # `design_space_cols`.
     row = dict(zip(cols, design))
-    row['y'] = result
+    row[formula.response] = result
     return df_append_row(data_so_far, row)
 
 
