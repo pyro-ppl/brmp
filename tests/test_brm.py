@@ -1056,8 +1056,6 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
      Normal,
      {}),
 ])
-# TODO: Remove on next Pyro release.
-@pytest.mark.xfail('CI' in os.environ, reason='Failure when num_chains > num_cpu; fixed in Pyro master.')
 def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, contrasts):
     N = 10
     S = 4
