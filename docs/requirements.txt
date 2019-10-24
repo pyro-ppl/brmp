@@ -1,5 +1,5 @@
 sphinx
 sphinx_rtd_theme
 pandas
-pyro-ppl>=0.4.1
+pyro-ppl>=0.5.1
 numpyro>=0.2.0'
