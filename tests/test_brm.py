@@ -1043,7 +1043,8 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
 @pytest.mark.parametrize('fitargs', [
     lambda S: dict(backend=pyro_backend, algo='prior', num_samples=S),
     lambda S: dict(backend=pyro_backend, iter=S, warmup=0),
-    lambda S: dict(backend=pyro_backend, iter=S // 2, num_chains=2, warmup=0),
+    pytest.param(lambda S: dict(backend=pyro_backend, iter=S // 2, num_chains=2, warmup=0),
+                 marks=pytest.mark.xfail('CI' in os.environ, reason='https://github.com/pyro-ppl/pyro/issues/2095')),
     lambda S: dict(backend=pyro_backend, algo='svi', iter=1, num_samples=S),
     lambda S: dict(backend=pyro_backend, algo='svi', iter=1, num_samples=S, subsample_size=1),
     lambda S: dict(backend=numpyro_backend, algo='prior', num_samples=S),
@@ -1056,8 +1057,6 @@ def test_coef_names(formula_str, non_real_cols, expected_names):
      Normal,
      {}),
 ])
-# TODO: Remove on next Pyro release.
-@pytest.mark.xfail('CI' in os.environ, reason='Failure when num_chains > num_cpu; fixed in Pyro master.')
 def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, contrasts):
     N = 10
     S = 4
