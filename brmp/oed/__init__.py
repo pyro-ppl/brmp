@@ -219,7 +219,7 @@ def design_space_cols(formula, meta):
         cols = cols.union(OrderedSet(*group.columns))
         for t in group.terms:
             cols = cols.union(t.factors)
-    assert all(type(meta.column(c) == Categorical) for c in cols)
+    assert all(type(meta.column(c)) == Categorical for c in cols)
     return list(cols)
 
 
