@@ -135,10 +135,6 @@ def nuts(data, model, iter, warmup, num_chains):
     mcmc.run(**data)
 
     samples = mcmc.get_samples(group_by_chain=True)
-    # Pyro doesn't insert a chain dim when num_chains==1.
-    if num_chains == 1:
-        samples = {k: arr.unsqueeze(0) for k, arr in samples.items()}
-
     transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
 
     def loc(d):

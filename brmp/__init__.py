@@ -226,7 +226,3 @@ class GenerateResult():
 
         """
         return self._run_algo('svi', iter, num_samples, *args, **kwargs)
-
-
-def brm(formula_str, df, family=None, priors=None, **kwargs):
-    return defm(formula_str, df, family, priors).fit(_default_backend, **kwargs)
