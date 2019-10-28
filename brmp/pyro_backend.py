@@ -268,4 +268,21 @@ def prior(data, model, num_samples):
     return Samples(samples, partial(get_param, samples), loc)
 
 
-backend = Backend('Pyro', gen, prior, nuts, svi, from_numpy, to_numpy)
+# This particular back end implements this by generating additional
+# code but other approaches are possible.
+def sample_response(model, *args):
+    assert type(model) == Model
+    return model.sample_response_fn(*args)
+
+
+def expected_response(model, *args):
+    assert type(model) == Model
+    return model.expected_response_fn(*args)
+
+
+def inv_link(model, mu):
+    assert type(model) == Model
+    return model.inv_link_fn(mu)
+
+
+backend = Backend('Pyro', gen, prior, nuts, svi, sample_response, expected_response, inv_link, from_numpy, to_numpy)
