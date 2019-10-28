@@ -9,7 +9,7 @@ import torch.optim as optim
 
 from brmp import makedesc
 from brmp.formula import parse, OrderedSet, unique
-from brmp.design import Metadata, makedata, metadata_from_cols, RealValued, Categorical, code_lengths
+from brmp.design import Metadata, makedata, metadata_from_cols, RealValued, Categorical, Integral, code_lengths
 from brmp.family import Normal
 from brmp.backend import data_from_numpy
 from brmp.pyro_backend import backend as pyro_backend
@@ -81,7 +81,7 @@ class SequentialOED:
             callback = null
 
         design_space = self.design_space(**kwargs)
-        design_space_df = design_space_to_df(self.dscols, design_space)
+        design_space_df = design_space_to_df(self.dscols, design_space, self.metadata)
 
         # Code the data-so-far data frame into design matrices.
         dsf = data_from_numpy(self.backend,
@@ -201,6 +201,8 @@ def empty_df_from_cols(cols):
             return pd.Categorical([])
         elif type(col) == RealValued:
             return []
+        elif type(col) == Integral:
+            return pd.Series([], dtype=int)
         else:
             raise Exception('encountered unsupported column type')
     return pd.DataFrame({col.name: emptydfcol(col) for col in cols})
@@ -219,34 +221,53 @@ def design_space_cols(formula, meta):
         cols = cols.union(OrderedSet(*group.columns))
         for t in group.terms:
             cols = cols.union(t.factors)
-    assert all(type(meta.column(c)) == Categorical for c in cols)
+    assert all(finite(meta.column(c)) for c in cols)
     return list(cols)
+
+
+def finite(col):
+    return (type(col) == Categorical or
+            type(col) == Integral and col.min is not None and col.max is not None)
 
 
 # This defaults to using the full Cartesian product of the columns,
 # but allows individual columns to be restricted to a subset of their
 # values.
-def design_space(names, metadata, **levels_lookup):
+def design_space(names, metadata, **values_lookup):
     assert type(names) == list
     assert all(type(name) == str for name in names)
     assert type(metadata) == Metadata
 
-    def levels(name):
+    def col_values(name):
         col = metadata.column(name)
-        assert type(col) == Categorical
-        if name in levels_lookup:
-            vals = levels_lookup[name]
-            assert set(vals).issubset(set(col.levels)), 'one of more invalid levels given for "{}"'.format(name)
-            return vals
+        assert type(col) in [Categorical, Integral]
+        values = col.levels if type(col) == Categorical else list(range(col.min, col.max+1))
+        if name in values_lookup:
+            subset = values_lookup[name]
+            assert set(subset).issubset(set(values)), 'one or more invalid values given for "{}"'.format(name)
+            return subset
         else:
-            return col.levels
+            return values
 
-    all_possible_vals = list(itertools.product(*[levels(name) for name in names]))
+    all_possible_vals = list(itertools.product(*[col_values(name) for name in names]))
     return all_possible_vals
 
 
-def design_space_to_df(dscols, design_space):
-    return pd.DataFrame(dict((name, pd.Categorical(col))
+def design_space_to_df(dscols, design_space, metadata):
+
+    def identity(x):
+        return x
+
+    def dispatch(name):
+        col = metadata.column(name)
+        if type(col) == Categorical:
+            return pd.Categorical
+        elif type(col) == Integral:
+            return identity
+        else:
+            raise Exception('unhandled column type')
+
+    return pd.DataFrame(dict((name, dispatch(name)(col))
                              for name, col in zip(dscols, list(zip(*design_space)))))
 
 
