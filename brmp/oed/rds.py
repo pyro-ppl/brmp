@@ -85,10 +85,9 @@ for participant in participants:
         not_yet_asked = set(questions) - asked_so_far
 
         next_trial, dstar, eigs, fit, cbresult = oed.next_trial(
-            # The next two lines restrict the design space to the
-            # product: {participant} x not_yet_asked
-            participant=[participant],
-            question=list(not_yet_asked),
+            # Here we restrict the design space to the product:
+            # {participant} x not_yet_asked
+            design_space=[(q, participant) for q in not_yet_asked],
             verbose=False)
 
         # Look up this trial in the real data, and extract the response given.

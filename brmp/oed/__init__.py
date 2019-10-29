@@ -75,12 +75,19 @@ class SequentialOED:
         self.backend = backend
         self.num_samples = 1000
 
-    def next_trial(self, callback=None, verbose=False, **kwargs):
+    def next_trial(self, callback=None, verbose=False, design_space=None):
+        assert (design_space is None or
+                type(design_space) == list and all(type(t) == tuple for t in design_space))
 
         if callback is None:
             callback = null
 
-        design_space = self.design_space(**kwargs)
+        if design_space is None:
+            design_space = full_design_space(self.dscols, self.metadata)
+        else:
+            sanity_check_design_space(design_space, self.dscols, self.metadata)
+        assert len(design_space) > 0, 'design space cannot be empty'
+
         design_space_df = design_space_to_df(self.dscols, design_space, self.metadata)
 
         # Code the data-so-far data frame into design matrices.
@@ -129,9 +136,6 @@ class SequentialOED:
 
     def add_result(self, design, result):
         self.data_so_far = extend_df_with_result(self.formula, self.metadata, self.data_so_far, design, result)
-
-    def design_space(self, **kwargs):
-        return design_space(self.dscols, self.metadata, **kwargs)
 
 
 def argmax(lst):
@@ -230,27 +234,31 @@ def finite(col):
             type(col) == Integral and col.min is not None and col.max is not None)
 
 
-# This defaults to using the full Cartesian product of the columns,
-# but allows individual columns to be restricted to a subset of their
-# values.
-def design_space(names, metadata, **values_lookup):
+# Compute the product of the sets of possible values taken on by each
+# column named in `names`.
+def full_design_space(names, metadata):
     assert type(names) == list
     assert all(type(name) == str for name in names)
     assert type(metadata) == Metadata
+    return list(itertools.product(*[possible_values(metadata.column(name)) for name in names]))
 
-    def col_values(name):
-        col = metadata.column(name)
-        assert type(col) in [Categorical, Integral]
-        values = col.levels if type(col) == Categorical else list(range(col.min, col.max+1))
-        if name in values_lookup:
-            subset = values_lookup[name]
-            assert set(subset).issubset(set(values)), 'one or more invalid values given for "{}"'.format(name)
-            return subset
-        else:
-            return values
 
-    all_possible_vals = list(itertools.product(*[col_values(name) for name in names]))
-    return all_possible_vals
+def possible_values(col):
+    assert type(col) in (Categorical, Integral)
+    if type(col) == Categorical:
+        return col.levels
+    elif type(col) == Integral:
+        return range(col.min, col.max + 1)
+    else:
+        raise Exception('unexpected column type')
+
+
+def sanity_check_design_space(design_space, dscols, metadata):
+    lookup = {name: set(possible_values(metadata.column(name)))
+              for name in dscols}
+    for design in design_space:
+        for (col, value) in zip(dscols, design):
+            assert value in lookup[col], 'invalid design {} given in design space'.format(design)
 
 
 def design_space_to_df(dscols, design_space, metadata):
