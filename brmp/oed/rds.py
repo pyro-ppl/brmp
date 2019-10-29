@@ -31,8 +31,8 @@ from brmp.oed import SequentialOED
 
 df = pd.DataFrame({
     'response': [float(i) for i in range(9)],
-    'question': pd.Categorical(['a','b','c','a','b','c','a','b','c']),
-    'participant': pd.Categorical(['x','x','x','y','y','y','z','z', 'z']),
+    'question': pd.Categorical(['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c']),
+    'participant': pd.Categorical(['x', 'x', 'x', 'y', 'y', 'y', 'z', 'z', 'z']),
 })
 
 participants = list(df.participant.cat.categories)
@@ -53,8 +53,8 @@ print('==============================')
 print('Real data:')
 print(df)
 print('------------------------------')
-print('Participants: {}'.format(participants)) # e.g. ['x', 'y', 'z']
-print('Questions:    {}'.format(questions))    # e.g. ['a', 'b', 'c']
+print('Participants: {}'.format(participants))  # e.g. ['x', 'y', 'z']
+print('Questions:    {}'.format(questions))     # e.g. ['a', 'b', 'c']
 print('Will simulate asking each participant {} of {} questions.'.format(M, N))
 
 
@@ -68,7 +68,7 @@ oed = SequentialOED(
     [RealValued('response'),
      Categorical('question', questions),
      Categorical('participant', participants),
-    ],
+     ],
     backend=numpyro)
 
 
@@ -93,7 +93,7 @@ for participant in participants:
 
         # Look up this trial in the real data, and extract the response given.
         next_question, next_participant = next_trial
-        rows = df[(df['question']==next_question) & (df['participant']==next_participant)]
+        rows = df[(df['question'] == next_question) & (df['participant'] == next_participant)]
         assert len(rows) == 1
         response = rows['response'].tolist()[0]
 
