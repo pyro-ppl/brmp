@@ -1,7 +1,7 @@
 import time
 from functools import partial
 from sys import stderr
-from contextlib import nullcontext
+from contextlib import contextmanager
 
 import numpy as np
 import torch
@@ -17,6 +17,12 @@ from pyro.infer.autoguide import AutoMultivariateNormal
 from pyro.infer.mcmc import NUTS
 from pyro.infer.mcmc.api import MCMC
 from pyro.optim import Adam
+
+
+# Available as `contextmanager.nullcontext` in Python 3.7
+@contextmanager
+def nullcontext(enter_result=None):
+    yield enter_result
 
 
 # A wrapper around the Pyro seed handler, providing handling for the
