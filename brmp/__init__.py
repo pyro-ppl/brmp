@@ -169,12 +169,14 @@ class GenerateResult():
         return Fit(self.defm_result.formula, self.defm_result.metadata, self.defm_result.contrasts, self.data,
                    self.defm_result.desc, self.model, samples, self.backend)
 
-    def prior(self, num_samples=10, *args, **kwargs):
+    def prior(self, num_samples=10, seed=None, *args, **kwargs):
         """
         Sample from the prior.
 
         :param num_samples: The number of samples to take.
         :type num_samples: int
+        :param seed: Random seed.
+        :type seed: int
         :return: A model fit.
         :rtype: brmp.fit.Fit
 
@@ -183,9 +185,9 @@ class GenerateResult():
           fit = defm('y ~ x', df).generate().prior()
 
         """
-        return self._run_algo('prior', num_samples, *args, **kwargs)
+        return self._run_algo('prior', num_samples, seed, *args, **kwargs)
 
-    def nuts(self, iter=10, warmup=None, num_chains=1, *args, **kwargs):
+    def nuts(self, iter=10, warmup=None, num_chains=1, seed=None, *args, **kwargs):
         """
         Fit the model using NUTS.
 
@@ -197,6 +199,8 @@ class GenerateResult():
         :type warmup: int
         :param num_chains: The number of chains to run.
         :type num_chains: int
+        :param seed: Random seed.
+        :type seed: int
         :return: A model fit.
         :rtype: brmp.fit.Fit
 
@@ -206,9 +210,9 @@ class GenerateResult():
 
         """
         warmup = iter // 2 if warmup is None else warmup
-        return self._run_algo('nuts', iter, warmup, num_chains, *args, **kwargs)
+        return self._run_algo('nuts', iter, warmup, num_chains, seed, *args, **kwargs)
 
-    def svi(self, iter=10, num_samples=10, *args, **kwargs):
+    def svi(self, iter=10, num_samples=10, seed=None, *args, **kwargs):
         """
         Fit the model using stochastic variational inference.
 
@@ -217,6 +221,8 @@ class GenerateResult():
         :param num_samples: The number of samples to take from the variational
                             posterior.
         :type num_samples: int
+        :param seed: Random seed.
+        :type seed: int
         :return: A model fit.
         :rtype: brmp.fit.Fit
 
@@ -225,4 +231,4 @@ class GenerateResult():
           fit = defm('y ~ x', df).generate().svi()
 
         """
-        return self._run_algo('svi', iter, num_samples, *args, **kwargs)
+        return self._run_algo('svi', iter, num_samples, seed, *args, **kwargs)

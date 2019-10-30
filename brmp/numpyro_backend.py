@@ -14,6 +14,10 @@ from brmp.utils import flatten, unflatten
 config.update("jax_platform_name", "cpu")
 
 
+def sample_rng_seed():
+    return np.random.randint(0, 2 ** 32, dtype=np.uint32).astype(np.int32)
+
+
 # The types described in the comments in pyro_backend.py as follows
 # in this back end:
 #
@@ -64,7 +68,7 @@ def location(original_data, samples, transformed_samples, model_fn, new_data):
         return flatten(run_model_on_samples_and_data(model_fn, samples, new_data)['mu'])
 
 
-def nuts(data, model, iter, warmup, num_chains, seed=None):
+def nuts(data, model, iter, warmup, num_chains, seed):
     assert type(data) == dict
     assert type(model) == Model
     assert type(iter) == int
@@ -73,7 +77,7 @@ def nuts(data, model, iter, warmup, num_chains, seed=None):
     assert seed is None or type(seed) == int
 
     if seed is None:
-        seed = np.random.randint(0, 2 ** 32, dtype=np.uint32).astype(np.int32)
+        seed = sample_rng_seed()
     rng = random.PRNGKey(seed)
 
     kernel = NUTS(model.fn)
@@ -99,14 +103,14 @@ def svi(*args, **kwargs):
     raise NotImplementedError
 
 
-def prior(data, model, num_samples, seed=None):
+def prior(data, model, num_samples, seed):
     assert type(data) == dict
     assert type(model) == Model
     assert type(num_samples) == int and num_samples > 0
     assert seed is None or type(seed) == int
 
     if seed is None:
-        seed = np.random.randint(0, 2 ** 32, dtype=np.uint32).astype(np.int32)
+        seed = sample_rng_seed()
     rngs = random.split(random.PRNGKey(seed), num_samples)
 
     def get_model_trace(rng):
