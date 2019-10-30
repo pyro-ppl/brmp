@@ -77,7 +77,7 @@ class SequentialOED:
 
     def next_trial(self, callback=None, verbose=False, design_space=None):
         assert (design_space is None or
-                type(design_space) == list and all(type(t) == tuple for t in design_space))
+                type(design_space) == list and all(type(t) == dict for t in design_space))
 
         if callback is None:
             callback = null
@@ -135,7 +135,11 @@ class SequentialOED:
         return design_space[dstar], dstar, list(zip(design_space, eigs)), fit, cbvals
 
     def add_result(self, design, result):
-        self.data_so_far = extend_df_with_result(self.formula, self.metadata, self.data_so_far, design, result)
+        assert type(design) == dict
+        assert set(design.keys()) == set(self.dscols)
+        assert type(result) == float
+        row = dict({self.formula.response: result}, **design)
+        self.data_so_far = df_append_row(self.data_so_far, row)
 
 
 def argmax(lst):
@@ -240,7 +244,12 @@ def full_design_space(names, metadata):
     assert type(names) == list
     assert all(type(name) == str for name in names)
     assert type(metadata) == Metadata
-    return list(itertools.product(*[possible_values(metadata.column(name)) for name in names]))
+    # A list of tuples, where each tuple holds a value for each of the
+    # design columns.
+    designs = list(itertools.product(*[possible_values(metadata.column(name)) for name in names]))
+    # Include explicit column names in the design representation,
+    # rather than relying implicitly on order.
+    return [dict(zip(names, design)) for design in designs]
 
 
 def possible_values(col):
@@ -257,10 +266,11 @@ def sanity_check_design_space(design_space, dscols, metadata):
     lookup = {name: set(possible_values(metadata.column(name)))
               for name in dscols}
     for design in design_space:
-        for (col, value) in zip(dscols, design):
+        for (col, value) in design.items():
             assert value in lookup[col], 'invalid design {} given in design space'.format(design)
 
 
+# TODO: This has some overlap with `empty_df_from_cols` -- consolidate?
 def design_space_to_df(dscols, design_space, metadata):
 
     def identity(x):
@@ -275,21 +285,10 @@ def design_space_to_df(dscols, design_space, metadata):
         else:
             raise Exception('unhandled column type')
 
-    return pd.DataFrame(dict((name, dispatch(name)(col))
-                             for name, col in zip(dscols, list(zip(*design_space)))))
-
-
-# TODO: Does it *really* take this much work to add a row to a df?
-def extend_df_with_result(formula, meta, data_so_far, design, result):
-    assert type(design) == tuple
-    assert type(result) == float
-    cols = design_space_cols(formula, meta)
-    assert len(design) == len(cols)
-    # This assumes that `design` is ordered following
-    # `design_space_cols`.
-    row = dict(zip(cols, design))
-    row[formula.response] = result
-    return df_append_row(data_so_far, row)
+    df = pd.DataFrame(design_space)
+    for name in dscols:
+        df[name] = dispatch(name)(df[name])
+    return df
 
 
 def df_append_row(df, row):
