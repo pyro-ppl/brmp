@@ -1,4 +1,5 @@
 from collections import namedtuple
+from functools import partial
 
 import numpy as np
 import numpyro.diagnostics as diags
@@ -44,7 +45,7 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
 
     # https://rdrr.io/cran/brms/man/fitted.brmsfit.html
 
-    def fitted(self, what='expectation', data=None):
+    def fitted(self, what='expectation', data=None, seed=None):
         """
         Produces predictions from the fitted model.
 
@@ -74,6 +75,8 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
 
 
         :type data: pandas.DataFrame
+        :param seed: Random seed. Used only when ``'sample'`` is given as the ``'what'`` argument.
+        :type seed: int
         :return: An array with shape ``(S, N)``. Where ``S`` is the number of samples taken
                  during inference and ``N`` is the number of rows in the data set used for prediction.
         :rtype: numpy.ndarray
@@ -81,13 +84,14 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
         """
         assert what in ['sample', 'expectation', 'linear', 'response']
         assert data is None or type(data) is pd.DataFrame
+        assert seed is None or type(seed) == int
 
         get_param = self.samples.get_param
         location = self.samples.location
         to_numpy = self.backend.to_numpy
-        expected_response = self.backend.expected_response
-        sample_response = self.backend.sample_response
-        inv_link = self.backend.inv_link
+        expected_response = partial(self.backend.expected_response, self.model)
+        sample_response = partial(self.backend.sample_response, self.model, seed)
+        inv_link = partial(self.backend.inv_link, self.model)
 
         mu = location(self.data if data is None
                       else data_from_numpy(self.backend, predictors(self.formula, data, self.metadata, self.contrasts)))
@@ -96,11 +100,11 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
             args = [mu if name == 'mu' else get_param(name, False)
                     for name in free_param_names(self.model_desc.response.family)]
             response_fn = sample_response if what == 'sample' else expected_response
-            return to_numpy(response_fn(self.model, *args))
+            return to_numpy(response_fn(*args))
         elif what == 'linear':
             return to_numpy(mu)
         elif what == 'response':
-            return to_numpy(inv_link(self.model, mu))
+            return to_numpy(inv_link(mu))
         else:
             raise ValueError('Unhandled value of the `what` parameter encountered.')
 
