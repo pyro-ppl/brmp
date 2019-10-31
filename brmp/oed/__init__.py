@@ -118,6 +118,12 @@ class SequentialOED:
         assert y_samples.shape == (self.num_samples, len(design_space))
 
         # Compute the targets. (These are used by all designs.)
+
+        # TODO: How might we set this automatically, and possibly
+        # adapt it over time? Is setting it so that ~50% of sample are
+        # within the interval sensible? Or perhaps at least ensure
+        # that the class are reasonably balanced. 70/30 might be OK,
+        # 99/1 probably not?
         eps = 0.5
         targets = ((-eps < latent_samples) & (latent_samples < eps)).long()
         assert targets.shape == (self.num_samples, self.num_coefs)
