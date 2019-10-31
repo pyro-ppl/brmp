@@ -53,12 +53,13 @@ class SequentialOED:
         dscols = design_space_cols(formula, metadata)
 
         assert type(target_coefs) == list
+        all_population_level_coefs = ['b_{}'.format(coef) for coef in model_desc.population.coefs]
         if len(target_coefs) == 0:
-            target_coefs = model_desc.population.coefs
+            target_coefs = all_population_level_coefs
         else:
             # TODO: Move `unique` to utils or similar.
             target_coefs = unique(target_coefs)
-            assert set(target_coefs).issubset(set(model_desc.population.coefs)), 'unknown target coefficient given'
+            assert set(target_coefs).issubset(set(all_population_level_coefs)), 'unknown target coefficient given'
 
         num_coefs = len(target_coefs)
 
@@ -104,7 +105,7 @@ class SequentialOED:
         fit = Fit(self.formula, self.metadata, self.contrasts, dsf, self.model_desc, self.model, samples, self.backend)
 
         # Values sampled for (population-level) target coefs. (numpy array.)
-        latent_samples = [fit.get_scalar_param('b_{}'.format(tc)) for tc in self.target_coefs]
+        latent_samples = [fit.get_scalar_param(tc) for tc in self.target_coefs]
 
         # Draw samples from p(y|theta;d)
         y_samples = fit.fitted('sample', design_space_df)  # numpy array.
