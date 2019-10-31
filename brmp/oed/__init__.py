@@ -1,5 +1,6 @@
 import itertools
 import time
+import random
 
 import pandas as pd
 from pandas.api.types import is_categorical_dtype
@@ -186,18 +187,37 @@ def est_eig_vec(Q, targets, inputs, design_space, target_coefs, callback, verbos
 
 def optimise(net, inputs, targets, verbose):
 
-    # TODO: Mini-batches. (On shuffled inputs/outputs.)
+    assert inputs.shape[1] == targets.shape[1]
+    N = inputs.shape[1]
+    batch_size = 50
+    assert N % batch_size == 0
+
     # TODO: Note: using some weight decay probably makes sense here.
+
+    # Shuffle data.
+    ix = list(range(N))
+    random.shuffle(ix)
+    inputs = inputs[:, ix, :]
+    targets = targets[:, ix, :]
+
+    # Form mini-batches.
+    num_batches = N // batch_size
+    input_batches = inputs.chunk(num_batches, 1)
+    target_batches = targets.chunk(num_batches, 1)
 
     optimizer = optim.Adam(net.parameters(), lr=0.01)
 
-    for i in range(1000):
-        optimizer.zero_grad()
-        loss = -torch.sum(torch.mean(net.logprobs(inputs, targets), -1))
-        loss.backward()
-        optimizer.step()
-        if (i+1) % 100 == 0 and verbose:
-            print('{:5d} | {:.6f}'.format(i+1, loss.item()))
+    num_epochs = 50
+    for i in range(num_epochs):
+        epoch_loss = 0.
+        for j in range(num_batches):
+            optimizer.zero_grad()
+            loss = -torch.sum(torch.sum(net.logprobs(input_batches[j], target_batches[j]), -1))
+            epoch_loss += loss.item()
+            loss.backward()
+            optimizer.step()
+        if (i+1) % 10 == 0 and verbose:
+            print('{:5d} | {:.6f}'.format(i+1, epoch_loss / N))
 
     if verbose:
         print('--------------------')
