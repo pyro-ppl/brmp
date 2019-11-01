@@ -15,6 +15,9 @@ class QIndep(nn.Module):
         assert num_designs > 0
         self.num_coef = num_coef
         self.num_designs = num_designs
+        # TODO: The functions we're asking the networks to learn are
+        # not very complicated, so we can likely get away with
+        # networks with fewer parameters.
         self.net = nn.Sequential(BatchLinear(num_designs, 1, 100),
                                  nn.ReLU(),
                                  BatchLinear(num_designs, 100, 50),

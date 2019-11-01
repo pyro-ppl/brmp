@@ -111,6 +111,11 @@ class SequentialOED:
         # Draw samples from p(y|theta;d)
         y_samples = fit.fitted('sample', design_space_df)  # numpy array.
 
+        # TODO: Given the correlation between consecutive samples, we
+        # can presumably train on thinned samples and not loose
+        # anything/much? If so, can we use number of effective samples
+        # or similar to decide how much thinning to apply?
+
         # All ANN work is done using PyTorch, so convert samples from
         # numpy to torch ready for what follows.
         latent_samples = torch.stack([torch.tensor(col) for col in latent_samples], 1)
