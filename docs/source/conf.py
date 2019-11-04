@@ -71,3 +71,7 @@ intersphinx_mapping = {'python': ('https://docs.python.org/3/', None),
                        'numpy': ('http://docs.scipy.org/doc/numpy/', None),
                        'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
                        }
+
+# XXX: Use small sized CPU wheels for rtd builder
+if 'READTHEDOCS' in os.environ:
+    os.system('pip install torch==1.3.0+cpu -f https://download.pytorch.org/whl/torch_stable.html')
