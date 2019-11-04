@@ -51,6 +51,11 @@ exclude_patterns = []
 def setup(app):
     app.add_stylesheet('theme_overrides.css')
 
+# source_suffix = ['.rst', '.md']
+source_suffix = '.rst'
+
+# The master toctree document.
+master_doc = 'index'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
