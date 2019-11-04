@@ -39,7 +39,9 @@ from brmp.oed.example import collect_plot_data  # , make_training_data_plot
 # * Would it be useful to relax (in some as yet unspecified way) the
 #   assumption that there is a single "participant" column?
 #
-
+# * Allow the design space to be something other than the full product
+#   of the levels/possible values of the design columns. (See
+#  `all_designs` below.)
 
 def run_simulation(df, M, formula_str, priors,
                    target_coef, response_col, participant_col, design_cols):
@@ -125,11 +127,9 @@ def kde(fit, coef):
 
 
 def main():
-    # In this data `y` is the response, `p` the participant, and `x`
-    # and `z` the design/condition. The data were generated from a
-    # model something like `y ~ 1 + x + (1 + x || p)`. Note that `z`
-    # does not appear.
 
+    # These data were generated from a model something like `y ~ 1 + x
+    # + (1 + x || p)`. Note that `z` does not appear.
     df = pd.read_csv('rds.csv', index_col=0)
     df['p'] = pd.Categorical(df['p'])
     df['z'] = pd.Categorical(df['z'])
@@ -139,7 +139,9 @@ def main():
     target_coef = 'b_z[b]'
 
     # Compute the Bayes factor on the full data using Savage-Dickey.
-    # (> 1 supports nested model, < 1 supports full model)
+    # (> 1 supports nested model, < 1 supports full model.) We use KDE
+    # to estimate densities, but log splines seem to be preferred in
+    # the literature.
     print('------------------------------')
     print('Computing Bayes factor on full data...')
 
@@ -153,7 +155,7 @@ def main():
 
     selected_trials = run_simulation(
         df,
-        2,  # Number of trials per participant
+        2,  # Number of trials per participant.
         formula_str,
         priors,
         target_coef='b_z[b]',
