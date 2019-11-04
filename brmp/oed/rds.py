@@ -1,6 +1,7 @@
 import operator
 from itertools import product
 from functools import reduce
+from collections import defaultdict
 
 from scipy.stats import gaussian_kde
 import pandas as pd
@@ -169,6 +170,46 @@ def main():
     oed_density = kde(oed_fit, target_coef)(0)
     oed_bayes_factor, = oed_density / prior_density
     print('Bayes factor on OED selected trials: {}'.format(oed_bayes_factor))
+
+
+def run_many():
+    # Here we run multiple simulations for varying M and collect the
+    # final Bayes factors.
+
+    df = pd.read_csv('rds.csv', index_col=0)
+    df['p'] = pd.Categorical(df['p'])
+    df['z'] = pd.Categorical(df['z'])
+
+    formula_str = 'y ~ 1 + x + z + (1 + x || p)'
+    priors = [Prior(('b',), Normal(0., 5.))]
+    target_coef = 'b_z[b]'
+
+    # Compute prior density.
+    model = defm(formula_str, df, priors=priors).generate(numpyro)
+    prior_fit = model.prior(num_samples=2000)
+    prior_density = kde(prior_fit, target_coef)(0)
+
+    results = defaultdict(list)
+
+    for _ in range(1):  # Repeat simulation multiple times for each M.
+        for M in range(1, 12+1):
+            selected_trials = run_simulation(
+                df,
+                M,
+                formula_str,
+                priors,
+                target_coef='b_z[b]',
+                response_col='y',
+                participant_col='p',
+                design_cols=['x', 'z'])
+
+            # Compute the Bayes factor.
+            model = defm(formula_str, selected_trials, priors=priors).generate(numpyro)
+            oed_fit = model.nuts(iter=2000)
+            oed_density = kde(oed_fit, target_coef)(0)
+            oed_bayes_factor, = oed_density / prior_density
+            results[M].append(oed_bayes_factor)
+            print(results)
 
 
 if __name__ == '__main__':
