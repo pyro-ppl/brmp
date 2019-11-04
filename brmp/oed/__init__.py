@@ -78,7 +78,7 @@ class SequentialOED:
         self.backend = backend
         self.num_samples = 1000
 
-    def next_trial(self, callback=None, verbose=False, design_space=None, fixed_target_interval=True):
+    def next_trial(self, callback=None, verbose=False, design_space=None, fixed_target_interval=True, seed=None):
         assert (design_space is None or
                 type(design_space) == list and all(type(t) == dict for t in design_space))
 
@@ -99,10 +99,10 @@ class SequentialOED:
 
         # Draw samples from current distribution over parameters.
         if len(self.data_so_far) == 0:
-            samples = self.backend.prior(dsf, self.model, num_samples=self.num_samples)
+            samples = self.backend.prior(dsf, self.model, num_samples=self.num_samples, seed=seed)
         else:
             samples = self.backend.nuts(dsf, self.model, iter=self.num_samples,
-                                        warmup=self.num_samples // 2, num_chains=1)
+                                        warmup=self.num_samples // 2, num_chains=1, seed=seed)
         fit = Fit(self.formula, self.metadata, self.contrasts, dsf, self.model_desc, self.model, samples, self.backend)
 
         # Values sampled for (population-level) target coefs. (numpy array.)
