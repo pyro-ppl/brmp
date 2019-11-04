@@ -51,6 +51,7 @@ exclude_patterns = []
 def setup(app):
     app.add_stylesheet('theme_overrides.css')
 
+
 # source_suffix = ['.rst', '.md']
 source_suffix = '.rst'
 
