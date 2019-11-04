@@ -5,7 +5,7 @@ setup(name='brmp',
       install_requires=[
         'pandas',
         'pyro-ppl>=0.5.1',
-        'numpyro>=0.2.0',
+        'numpyro>=0.2.1',
       ],
       extras_require={
           'test': ['flake8', 'pytest'],

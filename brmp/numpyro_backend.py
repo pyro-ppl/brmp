@@ -4,7 +4,7 @@ import numpy as np
 import numpyro.handlers as handler
 from jax import random, vmap
 from jax.config import config
-from numpyro.mcmc import MCMC, NUTS
+from numpyro.infer import MCMC, NUTS
 
 from brmp.backend import Backend, Model
 from brmp.fit import Samples
@@ -12,6 +12,10 @@ from brmp.numpyro_codegen import gen
 from brmp.utils import flatten, unflatten
 
 config.update("jax_platform_name", "cpu")
+
+
+def sample_rng_seed():
+    return np.random.randint(0, 2 ** 32, dtype=np.uint32).astype(np.int32)
 
 
 # The types described in the comments in pyro_backend.py as follows
@@ -64,7 +68,7 @@ def location(original_data, samples, transformed_samples, model_fn, new_data):
         return flatten(run_model_on_samples_and_data(model_fn, samples, new_data)['mu'])
 
 
-def nuts(data, model, iter, warmup, num_chains, seed=None):
+def nuts(data, model, iter, warmup, num_chains, seed):
     assert type(data) == dict
     assert type(model) == Model
     assert type(iter) == int
@@ -73,7 +77,7 @@ def nuts(data, model, iter, warmup, num_chains, seed=None):
     assert seed is None or type(seed) == int
 
     if seed is None:
-        seed = np.random.randint(0, 2 ** 32, dtype=np.uint32).astype(np.int32)
+        seed = sample_rng_seed()
     rng = random.PRNGKey(seed)
 
     kernel = NUTS(model.fn)
@@ -99,14 +103,14 @@ def svi(*args, **kwargs):
     raise NotImplementedError
 
 
-def prior(data, model, num_samples, seed=None):
+def prior(data, model, num_samples, seed):
     assert type(data) == dict
     assert type(model) == Model
     assert type(num_samples) == int and num_samples > 0
     assert seed is None or type(seed) == int
 
     if seed is None:
-        seed = np.random.randint(0, 2 ** 32, dtype=np.uint32).astype(np.int32)
+        seed = sample_rng_seed()
     rngs = random.split(random.PRNGKey(seed), num_samples)
 
     def get_model_trace(rng):
@@ -128,6 +132,27 @@ def prior(data, model, num_samples, seed=None):
     return Samples(all_samples, partial(get_param, all_samples), loc)
 
 
+# This particular back end implements this by generating additional
+# code but other approaches are possible.
+def sample_response(model, seed, *args):
+    assert type(model) == Model
+    assert seed is None or type(seed) is int
+    if seed is None:
+        seed = sample_rng_seed()
+    rng = random.PRNGKey(seed)
+    return handler.seed(model.sample_response_fn, rng)(*args)
+
+
+def expected_response(model, *args):
+    assert type(model) == Model
+    return model.expected_response_fn(*args)
+
+
+def inv_link(model, mu):
+    assert type(model) == Model
+    return model.inv_link_fn(mu)
+
+
 # TODO: Make it possible to run inference on a gpu.
 
-backend = Backend('NumPyro', gen, prior, nuts, svi, from_numpy, to_numpy)
+backend = Backend('NumPyro', gen, prior, nuts, svi, sample_response, expected_response, inv_link, from_numpy, to_numpy)
