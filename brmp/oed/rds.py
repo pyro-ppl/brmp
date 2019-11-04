@@ -68,25 +68,6 @@ def run_simulation(df, M, formula_str, priors,
     print('All designs:  {}'.format(all_designs))
     print('Will simulate running {} of {} designs per participant.'.format(M, N))
 
-    # Compute the Bayes factor on all data using Savage-Dickey.
-
-    def target_coef_zero_density(fit):
-        kde = gaussian_kde(fit.get_scalar_param(target_coef))
-        return kde(0)[0]
-
-    print('------------------------------')
-    print('Computing Bayes factor...')
-
-    model = defm(formula_str, df, priors=priors).generate(numpyro)
-    prior_fit = model.prior(num_samples=2000)
-    post_fit = model.nuts(iter=2000)
-
-    # Bayes factor:
-    # (> 1 supports nested model, < 1 supports full model)
-    prior_density = target_coef_zero_density(prior_fit)
-    fullbf = target_coef_zero_density(post_fit) / prior_density
-    print('Bayes factor on full data: {}'.format(fullbf))
-
     # Begin simulation.
     # ----------------------------------------
 
@@ -99,7 +80,6 @@ def run_simulation(df, M, formula_str, priors,
         target_coefs=[target_coef],
         backend=numpyro)
 
-    bfs = []
     for participant in participants:
 
         # Track the designs/trials run with `participant` so far.
@@ -120,17 +100,6 @@ def run_simulation(df, M, formula_str, priors,
                 verbose=True)
             print(eigs)
 
-            # We might want separate out evaluation from OED, since we
-            # might want to carefully evaluate (i.e. use lots of samples)
-            # the use of fewer samples for OED. Perhaps I ought to
-            # eventually perform evaluation as a post-processing step.
-            # (This could remain as a guide though.)
-
-            # Expected to be ~1 initially.
-            bf = target_coef_zero_density(fit) / prior_density
-            print('Bayes factor on data-so-far: {}'.format(bf))
-            bfs.append(bf)
-
             # make_training_data_plot(plot_data)
 
             # Look up this trial in the real data, and extract the response given.
@@ -148,13 +117,11 @@ def run_simulation(df, M, formula_str, priors,
             print('Data so far:')
             print(oed.data_so_far)
 
-    # Compute final Bayes factor.
-    fit = defm(formula_str, oed.data_so_far, priors=priors).generate(numpyro).nuts(iter=2000)
-    bf = target_coef_zero_density(fit) / prior_density
-    print('Bayes factor on data-so-far: {}'.format(bf))
-    bfs.append(bf)
+    return oed.data_so_far
 
-    return bf
+
+def kde(fit, coef):
+    return gaussian_kde(fit.get_scalar_param(coef))
 
 
 def main():
@@ -167,17 +134,39 @@ def main():
     df['p'] = pd.Categorical(df['p'])
     df['z'] = pd.Categorical(df['z'])
 
-    bayes_factors = run_simulation(
+    formula_str = 'y ~ 1 + x + z + (1 + x || p)'
+    priors = [Prior(('b',), Normal(0., 5.))]
+    target_coef = 'b_z[b]'
+
+    # Compute the Bayes factor on the full data using Savage-Dickey.
+    # (> 1 supports nested model, < 1 supports full model)
+    print('------------------------------')
+    print('Computing Bayes factor on full data...')
+
+    model = defm(formula_str, df, priors=priors).generate(numpyro)
+    prior_fit = model.prior(num_samples=2000)
+    posterior_fit = model.nuts(iter=2000)
+    prior_density = kde(prior_fit, target_coef)(0)
+    posterior_density = kde(posterior_fit, target_coef)(0)
+    full_bayes_factor, = posterior_density / prior_density
+    print('Bayes factor on full data: {}'.format(full_bayes_factor))
+
+    selected_trials = run_simulation(
         df,
         2,  # Number of trials per participant
-        'y ~ 1 + x + z + (1 + x || p)',
-        priors=[Prior(('b',), Normal(0., 5.))],
+        formula_str,
+        priors,
         target_coef='b_z[b]',
         response_col='y',
         participant_col='p',
         design_cols=['x', 'z'])
 
-    print(bayes_factors)
+    # Compute the Bayes factor on the trials selected by OED.
+    model = defm(formula_str, selected_trials, priors=priors).generate(numpyro)
+    oed_fit = model.nuts(iter=2000)
+    oed_density = kde(oed_fit, target_coef)(0)
+    oed_bayes_factor, = oed_density / prior_density
+    print('Bayes factor on OED selected trials: {}'.format(oed_bayes_factor))
 
 
 if __name__ == '__main__':
