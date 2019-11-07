@@ -99,11 +99,14 @@ def run_simulation(df, M, formula_str, priors,
             next_design_space = [dict(zip(design_cols, d), **{participant_col: participant})
                                  for d in not_yet_run]
 
-            next_trial, dstar, eigs, fit, plot_data = oed.next_trial(
-                design_space=next_design_space,
-                callback=collect_plot_data,
-                verbose=True)
-            print(eigs)
+            if (True):
+                next_trial, dstar, eigs, fit, plot_data = oed.next_trial(
+                    design_space=next_design_space,
+                    callback=collect_plot_data,
+                    verbose=True)
+                print(eigs)
+            else:
+                next_trial = oed.random_trial(design_space=next_design_space)
 
             # make_training_data_plot(plot_data)
 

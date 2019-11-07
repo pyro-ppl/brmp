@@ -78,18 +78,28 @@ class SequentialOED:
         self.num_samples = num_samples
         self.backend = backend
 
+    def _full_design_space(self):
+        return full_design_space(self.dscols, self.metadata)
+
+    def _check_design_space(self, design_space):
+        assert (type(design_space) == list and all(type(t) == dict for t in design_space))
+        sanity_check_design_space(design_space, self.dscols, self.metadata)
+        return design_space
+
+    def random_trial(self, design_space=None):
+        design_space = (self._full_design_space()
+                        if design_space is None
+                        else self._check_design_space(design_space))
+        return random.choice(design_space)
+
     def next_trial(self, callback=None, verbose=False, design_space=None, fixed_target_interval=True, seed=None):
-        assert (design_space is None or
-                type(design_space) == list and all(type(t) == dict for t in design_space))
 
         if callback is None:
             callback = null
 
-        if design_space is None:
-            design_space = full_design_space(self.dscols, self.metadata)
-        else:
-            sanity_check_design_space(design_space, self.dscols, self.metadata)
-        assert len(design_space) > 0, 'design space cannot be empty'
+        design_space = (self._full_design_space()
+                        if design_space is None
+                        else self._check_design_space(design_space))
 
         design_space_df = design_space_to_df(self.dscols, design_space, self.metadata)
 
