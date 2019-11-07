@@ -8,10 +8,12 @@ import pandas as pd
 
 from brmp import defm
 from brmp.numpyro_backend import backend as numpyro
-from brmp.design import metadata_from_df
+from brmp.design import metadata_from_df, makedata
 from brmp.oed import SequentialOED
 from brmp.priors import Prior
 from brmp.family import Normal
+from brmp.fit import Fit
+from brmp.backend import data_from_numpy
 
 from brmp.oed import possible_values  # TODO: Perhaps this ought to be moved to design.py?
 from brmp.oed.example import collect_plot_data  # , make_training_data_plot
@@ -120,7 +122,7 @@ def run_simulation(df, M, formula_str, priors,
             print('Data so far:')
             print(oed.data_so_far)
 
-    return oed.data_so_far
+    return oed
 
 
 def kde(fit, coef):
@@ -162,7 +164,7 @@ def main():
         target_coef='b_z[b]',
         response_col='y',
         participant_col='p',
-        design_cols=['x', 'z'])
+        design_cols=['x', 'z']).data_so_far
 
     # Compute the Bayes factor on the trials selected by OED.
     model = defm(formula_str, selected_trials, priors=priors).generate(numpyro)
@@ -193,7 +195,7 @@ def run_many():
 
     for _ in range(1):  # Repeat simulation multiple times for each M.
         for M in range(1, 12+1):
-            selected_trials = run_simulation(
+            oed = run_simulation(
                 df,
                 M,
                 formula_str,
@@ -203,9 +205,20 @@ def run_many():
                 participant_col='p',
                 design_cols=['x', 'z'])
 
-            # Compute the Bayes factor.
-            model = defm(formula_str, selected_trials, priors=priors).generate(numpyro)
-            oed_fit = model.nuts(iter=2000)
+            # Compute the Bayes factor. (We avoid defining the model
+            # using `selected_trials` since initially that data frame
+            # will not include e.g. all categorical levels present in
+            # the full data frame, therefore a different model will be
+            # fit.)
+
+            # TODO: Make it easier to build models from metadata.
+            num_samples = 2000
+            dsf = data_from_numpy(oed.backend,
+                                  makedata(oed.formula, oed.data_so_far, oed.metadata, oed.contrasts))
+            samples = oed.backend.nuts(dsf, oed.model, iter=num_samples,
+                                       warmup=num_samples // 2, num_chains=1, seed=None)
+            oed_fit = Fit(oed.formula, oed.metadata, oed.contrasts, dsf,
+                          oed.model_desc, oed.model, samples, oed.backend)
             oed_density = kde(oed_fit, target_coef)(0)
             oed_bayes_factor, = oed_density / prior_density
             results[M].append(oed_bayes_factor)
