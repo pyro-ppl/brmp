@@ -45,7 +45,8 @@ def null(*args):
 
 class SequentialOED:
     def __init__(self, formula_str, cols, family=Normal, priors=[],
-                 contrasts={}, target_coefs=[], num_samples=1000, backend=pyro_backend):
+                 contrasts={}, target_coefs=[], num_samples=1000, backend=pyro_backend,
+                 use_cuda=False):
         formula = parse(formula_str)
         metadata = metadata_from_cols(cols)
         model_desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
@@ -77,6 +78,7 @@ class SequentialOED:
 
         self.num_samples = num_samples
         self.backend = backend
+        self.use_cuda = use_cuda
 
     def _full_design_space(self):
         return full_design_space(self.dscols, self.metadata)
@@ -94,7 +96,9 @@ class SequentialOED:
 
     def next_trial(self, callback=None, verbose=False, design_space=None, fixed_target_interval=True, seed=None):
 
-        if callback is None:
+        # FIXME: Don't invoke the call back when using CUDA. (Since at
+        # present the only callback we have doesn't work with CUDA.)
+        if callback is None or self.use_cuda:
             callback = null
 
         design_space = (self._full_design_space()
@@ -170,7 +174,8 @@ class SequentialOED:
         Q = QFull  # QIndep
         vectorize = True
         est_eig_fn = est_eig_vec if vectorize else est_eig
-        eigs, cbvals, elapsed = est_eig_fn(Q, targets, inputs, design_space, self.target_coefs, callback, verbose)
+        eigs, cbvals, elapsed = est_eig_fn(Q, targets, inputs, design_space, self.target_coefs,
+                                           callback, self.use_cuda, verbose)
         if verbose:
             print('Elapsed: {}'.format(elapsed))
 
@@ -190,17 +195,22 @@ def argmax(lst):
 
 
 # Estimate the EIG for each design.
-def est_eig(Q, targets, inputs, design_space, target_coefs, callback, verbose):
+def est_eig(Q, targets, inputs, design_space, target_coefs, callback, use_cuda, verbose):
     num_coefs = targets.shape[1]
     eigs = []
     cbvals = []
     elapsed = 0.0
     targets_enc = Q.encode(targets).unsqueeze(0)
+    if use_cuda:
+        inputs = inputs.cuda()
+        targets_enc = targets_enc.cuda()
     for i, design in enumerate(design_space):
         inputs_i = inputs[i].unsqueeze(0)
 
         # Construct and optimised the network.
         q_net = Q(num_coefs, num_designs=1)
+        if use_cuda:
+            q_net.cuda()
         t0 = time.time()
         optimise(q_net, inputs_i, targets_enc, verbose)
 
@@ -214,11 +224,15 @@ def est_eig(Q, targets, inputs, design_space, target_coefs, callback, verbose):
 
 
 # Estimate the EIG for each design. (Vectorized over designs.)
-def est_eig_vec(Q, targets, inputs, design_space, target_coefs, callback, verbose):
+def est_eig_vec(Q, targets, inputs, design_space, target_coefs, callback, use_cuda, verbose):
     num_coefs = targets.shape[1]
     # Encode targets, and replicate for each design.
     targets_enc = Q.encode(targets).unsqueeze(0).expand(len(design_space), -1, -1)
     q_net = Q(num_coefs, len(design_space))
+    if use_cuda:
+        q_net.cuda()
+        inputs = inputs.cuda()
+        targets_enc = targets_enc.cuda()
     t0 = time.time()
     optimise(q_net, inputs, targets_enc, verbose)
     eigs = torch.mean(q_net.logprobs(inputs, targets_enc), -1)

@@ -3,6 +3,7 @@ from itertools import product
 from functools import reduce
 import json
 import sys
+import os
 
 from scipy.stats import gaussian_kde
 import pandas as pd
@@ -86,7 +87,8 @@ def run_simulation(df, M, formula_str, priors,
         priors=priors,
         target_coefs=[target_coef],
         num_samples=2000,
-        backend=numpyro)
+        backend=numpyro,
+        use_cuda=bool(os.environ.get('OED_USE_CUDA', 0)))
 
     for participant in participants:
 
