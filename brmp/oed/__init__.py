@@ -45,7 +45,7 @@ def null(*args):
 
 class SequentialOED:
     def __init__(self, formula_str, cols, family=Normal, priors=[],
-                 contrasts={}, target_coefs=[], backend=pyro_backend):
+                 contrasts={}, target_coefs=[], num_samples=1000, backend=pyro_backend):
         formula = parse(formula_str)
         metadata = metadata_from_cols(cols)
         model_desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
@@ -75,8 +75,8 @@ class SequentialOED:
         self.target_coefs = target_coefs
         self.dscols = dscols
 
+        self.num_samples = num_samples
         self.backend = backend
-        self.num_samples = 1000
 
     def next_trial(self, callback=None, verbose=False, design_space=None, fixed_target_interval=True, seed=None):
         assert (design_space is None or
