@@ -132,7 +132,7 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
 
         Example::
 
-          fit = defm('y ~ x', df).fit()
+          fit = brm('y ~ x', df).fit()
           print(fit.marginals())
 
           #        mean    sd  2.5%   25%   50%   75% 97.5% n_eff r_hat
