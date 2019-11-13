@@ -1,7 +1,8 @@
 import operator
 from itertools import product
 from functools import reduce
-from collections import defaultdict
+import json
+import sys
 
 from scipy.stats import gaussian_kde
 import pandas as pd
@@ -11,7 +12,7 @@ from brmp.numpyro_backend import backend as numpyro
 from brmp.design import metadata_from_df, makedata
 from brmp.oed import SequentialOED
 from brmp.priors import Prior
-from brmp.family import Normal
+from brmp.family import Normal, HalfNormal
 from brmp.fit import Fit
 from brmp.backend import data_from_numpy
 
@@ -47,7 +48,8 @@ from brmp.oed.example import collect_plot_data  # , make_training_data_plot
 #  `all_designs` below.)
 
 def run_simulation(df, M, formula_str, priors,
-                   target_coef, response_col, participant_col, design_cols):
+                   target_coef, response_col, participant_col, design_cols,
+                   use_oed=True, fixed_target_interval=True):
 
     df_metadata = metadata_from_df(df)
     participants = possible_values(df_metadata.column(participant_col))
@@ -100,10 +102,11 @@ def run_simulation(df, M, formula_str, priors,
             next_design_space = [dict(zip(design_cols, d), **{participant_col: participant})
                                  for d in not_yet_run]
 
-            if (True):
+            if use_oed:
                 next_trial, dstar, eigs, fit, plot_data = oed.next_trial(
                     design_space=next_design_space,
                     callback=collect_plot_data,
+                    fixed_target_interval=fixed_target_interval,
                     verbose=True)
                 print(eigs)
             else:
@@ -133,101 +136,76 @@ def kde(fit, coef):
     return gaussian_kde(fit.get_scalar_param(coef))
 
 
-def main():
+def main(name, M):
 
-    # These data were generated from a model something like `y ~ 1 + x
-    # + (1 + x || p)`. Note that `z` does not appear.
     df = pd.read_csv('rds.csv', index_col=0)
     df['p'] = pd.Categorical(df['p'])
     df['z'] = pd.Categorical(df['z'])
 
     formula_str = 'y ~ 1 + x + z + (1 + x || p)'
-    priors = [Prior(('b',), Normal(0., 5.))]
+    priors = [Prior(('b',), Normal(0., 5.)),
+              Prior(('sd',), HalfNormal(2.)),
+              Prior(('resp', 'sigma'), HalfNormal(.5))]
     target_coef = 'b_z[b]'
 
-    # Compute the Bayes factor on the full data using Savage-Dickey.
-    # (> 1 supports nested model, < 1 supports full model.) We use KDE
-    # to estimate densities, but log splines seem to be preferred in
-    # the literature.
-    print('------------------------------')
-    print('Computing Bayes factor on full data...')
+    conditions = dict(
+        oed=dict(use_oed=True, fixed_target_interval=True),
+        oed_alt=dict(use_oed=True, fixed_target_interval=False),
+        rand=dict(use_oed=False))
+    kwargs = conditions[name]
 
-    model = defm(formula_str, df, priors=priors).generate(numpyro)
-    prior_fit = model.prior(num_samples=2000)
-    posterior_fit = model.nuts(iter=2000)
-    prior_density = kde(prior_fit, target_coef)(0)
-    posterior_density = kde(posterior_fit, target_coef)(0)
-    full_bayes_factor, = posterior_density / prior_density
-    print('Bayes factor on full data: {}'.format(full_bayes_factor))
-
-    selected_trials = run_simulation(
+    oed = run_simulation(
         df,
-        2,  # Number of trials per participant.
+        M,
         formula_str,
         priors,
         target_coef='b_z[b]',
         response_col='y',
         participant_col='p',
-        design_cols=['x', 'z']).data_so_far
+        design_cols=['x', 'z'],
+        **kwargs)
 
-    # Compute the Bayes factor on the trials selected by OED.
-    model = defm(formula_str, selected_trials, priors=priors).generate(numpyro)
-    oed_fit = model.nuts(iter=2000)
-    oed_density = kde(oed_fit, target_coef)(0)
-    oed_bayes_factor, = oed_density / prior_density
-    print('Bayes factor on OED selected trials: {}'.format(oed_bayes_factor))
-
-
-def run_many():
-    # Here we run multiple simulations for varying M and collect the
-    # final Bayes factors.
-
-    df = pd.read_csv('rds.csv', index_col=0)
-    df['p'] = pd.Categorical(df['p'])
-    df['z'] = pd.Categorical(df['z'])
-
-    formula_str = 'y ~ 1 + x + z + (1 + x || p)'
-    priors = [Prior(('b',), Normal(0., 5.))]
-    target_coef = 'b_z[b]'
+    # Compute the Bayes factor. (We avoid defining the model
+    # using `selected_trials` since initially that data frame
+    # will not include e.g. all categorical levels present in
+    # the full data frame, therefore a different model will be
+    # fit.)
 
     # Compute prior density.
+    num_bf_samples = 2000
     model = defm(formula_str, df, priors=priors).generate(numpyro)
-    prior_fit = model.prior(num_samples=2000)
+    prior_fit = model.prior(num_samples=num_bf_samples)
     prior_density = kde(prior_fit, target_coef)(0)
 
-    results = defaultdict(list)
+    # TODO: Make it easier to build models from metadata.
+    dsf = data_from_numpy(oed.backend,
+                          makedata(oed.formula, oed.data_so_far, oed.metadata, oed.contrasts))
+    samples = oed.backend.nuts(dsf, oed.model, iter=num_bf_samples,
+                               warmup=num_bf_samples // 2, num_chains=1, seed=None)
+    oed_fit = Fit(oed.formula, oed.metadata, oed.contrasts, dsf,
+                  oed.model_desc, oed.model, samples, oed.backend)
+    oed_density = kde(oed_fit, target_coef)(0)
+    oed_bayes_factor, = oed_density / prior_density
 
-    for _ in range(1):  # Repeat simulation multiple times for each M.
-        for M in range(1, 12+1):
-            oed = run_simulation(
-                df,
-                M,
-                formula_str,
-                priors,
-                target_coef='b_z[b]',
-                response_col='y',
-                participant_col='p',
-                design_cols=['x', 'z'])
+    try:
+        with open('results/results.json', 'r') as f:
+            results = json.load(f)
+    except FileNotFoundError:
+        results = {}
 
-            # Compute the Bayes factor. (We avoid defining the model
-            # using `selected_trials` since initially that data frame
-            # will not include e.g. all categorical levels present in
-            # the full data frame, therefore a different model will be
-            # fit.)
+    if name not in results:
+        results[name] = []
+    i = len(results[name])
+    results[name].append((M, oed_bayes_factor))
+    with open('results/results.json', 'w') as f:
+        json.dump(results, f)
+    with open('results/selected_trials_{}_{}_{}.csv'.format(name, M, i), 'w') as f:
+        oed.data_so_far.to_csv(f)
 
-            # TODO: Make it easier to build models from metadata.
-            num_samples = 2000
-            dsf = data_from_numpy(oed.backend,
-                                  makedata(oed.formula, oed.data_so_far, oed.metadata, oed.contrasts))
-            samples = oed.backend.nuts(dsf, oed.model, iter=num_samples,
-                                       warmup=num_samples // 2, num_chains=1, seed=None)
-            oed_fit = Fit(oed.formula, oed.metadata, oed.contrasts, dsf,
-                          oed.model_desc, oed.model, samples, oed.backend)
-            oed_density = kde(oed_fit, target_coef)(0)
-            oed_bayes_factor, = oed_density / prior_density
-            results[M].append(oed_bayes_factor)
-            print(results)
+    print(results)
 
 
 if __name__ == '__main__':
-    main()
+    name = sys.argv[1]
+    M = int(sys.argv[2])
+    main(name, M)
