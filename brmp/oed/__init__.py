@@ -247,9 +247,9 @@ def optimise(net, inputs, targets, verbose):
     input_batches = inputs.chunk(num_batches, 1)
     target_batches = targets.chunk(num_batches, 1)
 
-    optimizer = optim.Adam(net.parameters(), lr=0.01)
+    optimizer = optim.Adam(net.parameters(), lr=0.001, weight_decay=0.02)
 
-    num_epochs = 50
+    num_epochs = 100
     for i in range(num_epochs):
         epoch_loss = 0.
         for j in range(num_batches):
@@ -258,7 +258,7 @@ def optimise(net, inputs, targets, verbose):
             epoch_loss += loss.item()
             loss.backward()
             optimizer.step()
-        if (i+1) % 10 == 0 and verbose:
+        if (i+1) % 5 == 0 and verbose:
             print('{:5d} | {:.6f}'.format(i+1, epoch_loss / N))
 
     if verbose:

@@ -83,6 +83,7 @@ def run_simulation(df, M, formula_str, priors,
         df_metadata.columns,
         priors=priors,
         target_coefs=[target_coef],
+        num_samples=2000,
         backend=numpyro)
 
     for participant in participants:
