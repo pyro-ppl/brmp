@@ -8,14 +8,11 @@ import os
 from scipy.stats import gaussian_kde
 import pandas as pd
 
-from brmp import defm
 from brmp.numpyro_backend import backend as numpyro
-from brmp.design import metadata_from_df, makedata
+from brmp.design import metadata_from_df
 from brmp.oed import SequentialOED
 from brmp.priors import Prior
 from brmp.family import Normal, HalfNormal
-from brmp.fit import Fit
-from brmp.backend import data_from_numpy
 
 from brmp.oed import possible_values  # TODO: Perhaps this ought to be moved to design.py?
 from brmp.oed.example import collect_plot_data  # , make_training_data_plot
@@ -175,17 +172,13 @@ def main(name, M):
 
     # Compute prior density.
     num_bf_samples = 2000
-    model = defm(formula_str, df, priors=priors).generate(numpyro)
-    prior_fit = model.prior(num_samples=num_bf_samples)
+    prior_fit = oed.model.run_algo('prior', oed.model.encode(df),
+                                   num_samples=num_bf_samples, seed=None)
     prior_density = kde(prior_fit, target_coef)(0)
 
-    # TODO: Make it easier to build models from metadata.
-    dsf = data_from_numpy(oed.backend,
-                          makedata(oed.formula, oed.data_so_far, oed.metadata, oed.contrasts))
-    samples = oed.backend.nuts(dsf, oed.model, iter=num_bf_samples,
-                               warmup=num_bf_samples // 2, num_chains=1, seed=None)
-    oed_fit = Fit(oed.formula, oed.metadata, oed.contrasts, dsf,
-                  oed.model_desc, oed.model, samples, oed.backend)
+    oed_fit = oed.model.run_algo('nuts', oed.model.encode(oed.data_so_far),
+                                 iter=num_bf_samples, warmup=num_bf_samples // 2,
+                                 num_chains=1, seed=None)
     oed_density = kde(oed_fit, target_coef)(0)
     oed_bayes_factor, = oed_density / prior_density
 
