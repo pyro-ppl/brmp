@@ -9,13 +9,11 @@ from pandas.api.types import is_categorical_dtype
 import torch
 import torch.optim as optim
 
-from brmp import makedesc
-from brmp.formula import parse, OrderedSet, unique
-from brmp.design import Metadata, makedata, metadata_from_cols, RealValued, Categorical, Integral, code_lengths
+from brmp import define_model
+from brmp.formula import OrderedSet, unique
+from brmp.design import Metadata, metadata_from_cols, RealValued, Categorical, Integral
 from brmp.family import Normal
-from brmp.backend import data_from_numpy
 from brmp.pyro_backend import backend as pyro_backend
-from brmp.fit import Fit
 
 from brmp.oed.nets import QIndep, QFull # noqa: 401
 
@@ -47,14 +45,14 @@ class SequentialOED:
     def __init__(self, formula_str, cols, family=Normal, priors=[],
                  contrasts={}, target_coefs=[], num_samples=1000, backend=pyro_backend,
                  use_cuda=False):
-        formula = parse(formula_str)
+
         metadata = metadata_from_cols(cols)
-        model_desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
-        model = backend.gen(model_desc)
+        model = define_model(formula_str, metadata, family, priors, contrasts).gen(backend)
         data_so_far = empty_df_from_cols(cols)
-        dscols = design_space_cols(formula, metadata)
+        dscols = design_space_cols(model.define_model_result.formula, metadata)
 
         assert type(target_coefs) == list
+        model_desc = model.define_model_result.desc
         all_population_level_coefs = ['b_{}'.format(coef) for coef in model_desc.population.coefs]
         if len(target_coefs) == 0:
             target_coefs = all_population_level_coefs
@@ -66,10 +64,7 @@ class SequentialOED:
         num_coefs = len(target_coefs)
 
         # TODO: Prefix non-public stuff with underscores?
-        self.formula = formula
-        self.contrasts = contrasts
         self.metadata = metadata
-        self.model_desc = model_desc
         self.model = model
         self.data_so_far = data_so_far
         self.num_coefs = num_coefs
@@ -108,16 +103,14 @@ class SequentialOED:
         design_space_df = design_space_to_df(self.dscols, design_space, self.metadata)
 
         # Code the data-so-far data frame into design matrices.
-        dsf = data_from_numpy(self.backend,
-                              makedata(self.formula, self.data_so_far, self.metadata, self.contrasts))
+        dsf = self.model.encode(self.data_so_far)
 
         # Draw samples from current distribution over parameters.
         if len(self.data_so_far) == 0:
-            samples = self.backend.prior(dsf, self.model, num_samples=self.num_samples, seed=seed)
+            fit = self.model.run_algo('prior', dsf, num_samples=self.num_samples, seed=seed)
         else:
-            samples = self.backend.nuts(dsf, self.model, iter=self.num_samples,
-                                        warmup=self.num_samples // 2, num_chains=1, seed=seed)
-        fit = Fit(self.formula, self.metadata, self.contrasts, dsf, self.model_desc, self.model, samples, self.backend)
+            fit = self.model.run_algo('nuts', dsf, iter=self.num_samples,
+                                      warmup=self.num_samples // 2, num_chains=1, seed=seed)
 
         # Values sampled for (population-level) target coefs. (numpy array.)
         latent_samples = [fit.get_scalar_param(tc) for tc in self.target_coefs]
@@ -186,7 +179,8 @@ class SequentialOED:
         assert type(design) == dict
         assert set(design.keys()) == set(self.dscols)
         assert type(result) == float
-        row = dict({self.formula.response: result}, **design)
+        response_col = self.model.define_model_result.formula.response
+        row = dict({response_col: result}, **design)
         self.data_so_far = df_append_row(self.data_so_far, row)
 
 
