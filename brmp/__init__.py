@@ -10,8 +10,7 @@ from brmp.model import build_model, model_repr
 from brmp.model_pre import build_model_pre
 from brmp.priors import build_prior_tree
 from brmp.pyro_backend import backend as pyro_backend
-
-_default_backend = pyro_backend
+from brmp.numpyro_backend import backend as numpyro_backend
 
 
 def makedesc(formula, metadata, family, priors, code_lengths):
@@ -175,7 +174,7 @@ class ModelAndData:
         assert algo in ['prior', 'nuts', 'svi']
         return getattr(self, algo)(**kwargs)
 
-    def nuts(self, iter=10, warmup=None, num_chains=1, seed=None, backend=None):
+    def nuts(self, iter=10, warmup=None, num_chains=1, seed=None, backend=numpyro_backend):
         """
         Fit the model using NUTS.
 
@@ -200,11 +199,9 @@ class ModelAndData:
 
         """
         warmup = iter // 2 if warmup is None else warmup
-        if backend is None:
-            backend = _default_backend
         return self.run_algo('nuts', backend, iter, warmup, num_chains, seed)
 
-    def svi(self, iter=10, num_samples=10, seed=None, backend=None, **kwargs):
+    def svi(self, iter=10, num_samples=10, seed=None, backend=pyro_backend, **kwargs):
         """
         Fit the model using stochastic variational inference.
 
@@ -225,11 +222,9 @@ class ModelAndData:
           fit = brm('y ~ x', df).svi()
 
         """
-        if backend is None:
-            backend = _default_backend
         return self.run_algo('svi', backend, iter, num_samples, seed, **kwargs)
 
-    def prior(self, num_samples=10, seed=None, backend=None):
+    def prior(self, num_samples=10, seed=None, backend=pyro_backend):
         """
         Sample from the prior.
 
@@ -248,8 +243,6 @@ class ModelAndData:
           fit = brm('y ~ x', df).prior()
 
         """
-        if backend is None:
-            backend = _default_backend
         return self.run_algo('prior', backend, num_samples, seed)
 
     def __repr__(self):
