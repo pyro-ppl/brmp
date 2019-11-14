@@ -88,9 +88,11 @@ from collections import namedtuple
 # rather than the expected value.
 
 
-Backend = namedtuple('Backend', 'name gen prior nuts svi ' +
-                     'sample_response expected_response inv_link ' +
-                     'from_numpy to_numpy')
+class Backend(namedtuple('Backend', 'name gen prior nuts svi ' +
+                         'sample_response expected_response inv_link ' +
+                         'from_numpy to_numpy')):
+    def __repr__(self):
+        return '<Backend name="{}">'.format(self.name)
 
 
 # Map `from_numpy` over a dict of numpy arrays, (As produced by e.g.
