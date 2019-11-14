@@ -1,5 +1,4 @@
 import operator
-from itertools import product
 from functools import reduce
 import json
 import sys
@@ -22,11 +21,17 @@ from brmp.oed.example import collect_plot_data  # , make_training_data_plot
 # We assume that the "real data" has one column which indicates the
 # "participant", another containing the participants' response, and
 # one or more columns that describe the design (or trial, condition,
-# etc.). We further assume that each participant has taken part in all
-# possible trials. (The set of all possible trials is assumed to be
-# the product of the sets of possible values taken by each of the
-# design columns.)
+# etc.).
 
+# The OED selects trails from those actually run for each participant.
+# Whether this makes sense will be situation specific. If all
+# participants faced all possible trials then this is fine. It's also
+# probably fine if each participant faced a randomly selected subset
+# of all possible trials. (OED may have done better if given the
+# freedom to select from all trials, but without the actual results of
+# doing so we can't run the simulation.) OTOH, if trials were selected
+# by some other means then it's less clear whether the simulation
+# tells us anything interesting.
 
 # Q: In what ways should this be relaxed?
 #
@@ -41,9 +46,7 @@ from brmp.oed.example import collect_plot_data  # , make_training_data_plot
 # * Would it be useful to relax (in some as yet unspecified way) the
 #   assumption that there is a single "participant" column?
 #
-# * Allow the design space to be something other than the full product
-#   of the levels/possible values of the design columns. (See
-#  `all_designs` below.)
+
 
 def run_simulation(df, M, formula_str, priors,
                    target_coef, response_col, participant_col, design_cols,
@@ -51,27 +54,18 @@ def run_simulation(df, M, formula_str, priors,
 
     df_metadata = metadata_from_df(df)
     participants = possible_values(df_metadata.column(participant_col))
-    all_designs = set(product(*[possible_values(df_metadata.column(col)) for col in design_cols]))
 
-    # We assume that the data frame contains exactly one response for each
-    # participant/trial pair:
-    actual_trials = zip(*[df[col] for col in [participant_col] + design_cols])
-    expected_trials = [(p,) + t for p, t in product(participants, all_designs)]
-    assert sorted(actual_trials) == sorted(expected_trials), \
-        "Data frame doesn't include responses for the expected trials."
-
-    # M is the number of trials to run with each participant in the
-    # simulation.
-    N = len(all_designs)
-    assert M <= N
+    # Ensure we have enough data to run the number of requested trials
+    # per participant.
+    for participant in participants:
+        participant_rows = df[df[participant_col] == participant]
+        assert M <= len(participant_rows), 'too few rows for participant "{}" with M={}'.format(participant, M)
 
     print('==============================')
     print('Real data:')
     print(df.head())
     print('------------------------------')
     print('Participants: {}'.format(participants))
-    print('All designs:  {}'.format(all_designs))
-    print('Will simulate running {} of {} designs per participant.'.format(M, N))
 
     # Begin simulation.
     # ----------------------------------------
@@ -89,7 +83,12 @@ def run_simulation(df, M, formula_str, priors,
 
     for participant in participants:
 
-        # Track the designs/trials run with `participant` so far.
+        # Determine the trials that were actually run for this
+        # participant.
+        participant_rows = df[df[participant_col] == participant]
+        actual_trials = set(zip(*[participant_rows[col] for col in design_cols]))
+
+        # Track the designs/trials run by OED for the current participant.
         run_so_far = set()
 
         print('==============================')
@@ -97,7 +96,7 @@ def run_simulation(df, M, formula_str, priors,
 
         for i in range(M):
 
-            not_yet_run = all_designs - run_so_far
+            not_yet_run = actual_trials - run_so_far
             next_design_space = [dict(zip(design_cols, d), **{participant_col: participant})
                                  for d in not_yet_run]
 
