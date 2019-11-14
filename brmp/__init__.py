@@ -56,14 +56,14 @@ class Model:
 
     def gen(self, backend):
         assets = backend.gen(self.desc)
-        return GenResult(self, assets, backend)
+        return AssetsWrapper(self, assets, backend)
 
     # Generate design matrices. (Represented as numpy arrays.)
     def encode(self, df):
         return makedata(self.formula, df, self.metadata, self.contrasts)
 
 
-class GenResult:
+class AssetsWrapper:
     def __init__(self, model, assets, backend):
         assert type(backend) == Backend
         self.model = model
@@ -153,8 +153,8 @@ class ModelAndData:
     def run_algo(self, name, backend, *args, df=None, **kwargs):
         assert type(backend) == Backend
         data = self.model.encode(df) if df is not None else self.data
-        gen_result = self.model.gen(backend)
-        return gen_result.run_algo(name, data_from_numpy(backend, data), *args, **kwargs)
+        assets_wrapper = self.model.gen(backend)
+        return assets_wrapper.run_algo(name, data_from_numpy(backend, data), *args, **kwargs)
 
     def fit(self, algo='nuts', **kwargs):
         """
