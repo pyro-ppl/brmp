@@ -10,6 +10,12 @@ the library generates model code and design matrices, targeting
 either [Pyro](https://pyro.ai/)
 or [NumPyro](https://github.com/pyro-ppl/numpyro).
 
+## Resources
+
+* [API documentation](https://brmp.readthedocs.io/en/latest/).
+* [Examples](https://nbviewer.jupyter.org/github/pyro-ppl/brmp/tree/master/brmp/examples/).
+  Notebooks showing the library been used to fit models to data.
+
 ## Current Status
 
 ### Model Specification
@@ -52,8 +58,6 @@ example, users can specify:
 Users can give multiple such specifications and they combine in a
 sensible way.
 
-See the "Priors" notebook for examples.
-
 #### Response Families
 
 The library supports models with either (uni-variate) Gaussian or
@@ -74,14 +78,6 @@ posteriors:
   the [`fitted`](https://rdrr.io/cran/brms/man/fitted.brmsfit.html)
   and [`predict`](https://rdrr.io/cran/brms/man/predict.brmsfit.html)
   methods.
-
-See the baseball and Africa notebooks (linked below) for example usage.
-
-### Examples
-
-These
-[notebooks](https://nbviewer.jupyter.org/github/pyro-ppl/brmp/tree/master/brmp/examples/) show
-examples of using the system to fit some simple models.
 
 ## Limitations
 
