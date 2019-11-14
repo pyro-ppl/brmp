@@ -28,7 +28,7 @@ default_quantiles = [0.025, 0.25, 0.5, 0.75, 0.975]
 # having to give contrasts has a similar benefit.
 
 
-class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model samples backend')):
+class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc assets samples backend')):
 
     # TODO: This doesn't match the brms interface, but the deviation
     # aren't improvements either. Figure out what to do about that.
@@ -89,9 +89,9 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc model sa
         get_param = self.samples.get_param
         location = self.samples.location
         to_numpy = self.backend.to_numpy
-        expected_response = partial(self.backend.expected_response, self.model)
-        sample_response = partial(self.backend.sample_response, self.model, seed)
-        inv_link = partial(self.backend.inv_link, self.model)
+        expected_response = partial(self.backend.expected_response, self.assets)
+        sample_response = partial(self.backend.sample_response, self.assets, seed)
+        inv_link = partial(self.backend.inv_link, self.assets)
 
         mu = location(self.data if data is None
                       else data_from_numpy(self.backend, predictors(self.formula, data, self.metadata, self.contrasts)))

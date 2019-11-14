@@ -55,8 +55,8 @@ class DefineModelResult:
         self.desc = desc
 
     def gen(self, backend):
-        model = backend.gen(self.desc)
-        return GenResult(self, model, backend)
+        assets = backend.gen(self.desc)
+        return GenResult(self, assets, backend)
 
     # Generate design matrices. (Represented as numpy arrays.)
     def encode(self, df):
@@ -64,10 +64,10 @@ class DefineModelResult:
 
 
 class GenResult:
-    def __init__(self, define_model_result, model, backend):
+    def __init__(self, define_model_result, assets, backend):
         assert type(backend) == Backend
         self.define_model_result = define_model_result
-        self.model = model
+        self.assets = assets
         self.backend = backend
 
     def encode(self, df):
@@ -75,10 +75,10 @@ class GenResult:
         return data_from_numpy(self.backend, data)
 
     def run_algo(self, name, data, *args, **kwargs):
-        samples = getattr(self.backend, name)(data, self.model, *args, **kwargs)
+        samples = getattr(self.backend, name)(data, self.assets, *args, **kwargs)
         return Fit(self.define_model_result.formula, self.define_model_result.metadata,
                    self.define_model_result.contrasts, data,
-                   self.define_model_result.desc, self.model, samples, self.backend)
+                   self.define_model_result.desc, self.assets, samples, self.backend)
 
 
 def brm(formula_str, df, family=None, priors=None, contrasts=None):

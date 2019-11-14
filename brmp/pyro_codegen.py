@@ -1,6 +1,6 @@
 import re
 
-from brmp.backend import Model
+from brmp.backend import Assets
 from brmp.family import Family, LinkFn, Normal, args, free_param_names
 from brmp.model import Group, ModelDesc
 from brmp.utils import traceback_generated
@@ -342,7 +342,7 @@ def gen(model_desc):
     expected_response_fn = eval_method(expected_response_code)
     sample_response_code = gen_response_fn(model_desc, mode='sample')
     sample_response_fn = eval_method(sample_response_code)
-    return Model(fn, code,
-                 inv_link_fn, inv_link_code,
-                 expected_response_fn, expected_response_code,
-                 sample_response_fn, sample_response_code)
+    return Assets(fn, code,
+                  inv_link_fn, inv_link_code,
+                  expected_response_fn, expected_response_code,
+                  sample_response_fn, sample_response_code)

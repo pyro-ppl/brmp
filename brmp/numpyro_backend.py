@@ -6,7 +6,7 @@ from jax import random, vmap
 from jax.config import config
 from numpyro.infer import MCMC, NUTS
 
-from brmp.backend import Backend, Model
+from brmp.backend import Backend, Assets
 from brmp.fit import Samples
 from brmp.numpyro_codegen import gen
 from brmp.utils import flatten, unflatten
@@ -68,9 +68,9 @@ def location(original_data, samples, transformed_samples, model_fn, new_data):
         return flatten(run_model_on_samples_and_data(model_fn, samples, new_data)['mu'])
 
 
-def nuts(data, model, iter, warmup, num_chains, seed):
+def nuts(data, assets, iter, warmup, num_chains, seed):
     assert type(data) == dict
-    assert type(model) == Model
+    assert type(assets) == Assets
     assert type(iter) == int
     assert type(warmup) == int
     assert type(num_chains) == int
@@ -80,7 +80,7 @@ def nuts(data, model, iter, warmup, num_chains, seed):
         seed = sample_rng_seed()
     rng = random.PRNGKey(seed)
 
-    kernel = NUTS(model.fn)
+    kernel = NUTS(assets.fn)
     # TODO: We could use a way of avoid requiring users to set
     # `--xla_force_host_platform_device_count` manually when
     # `num_chains` > 1 to achieve parallel chains.
@@ -91,10 +91,10 @@ def nuts(data, model, iter, warmup, num_chains, seed):
     # Here we re-run the model on the samples in order to collect
     # transformed parameters. (e.g. `b`, `mu`, etc.) Theses are made
     # available via the return value of the model.
-    transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
+    transformed_samples = run_model_on_samples_and_data(assets.fn, samples, data)
     all_samples = dict(samples, **transformed_samples)
 
-    loc = partial(location, data, samples, transformed_samples, model.fn)
+    loc = partial(location, data, samples, transformed_samples, assets.fn)
 
     return Samples(all_samples, partial(get_param, all_samples), loc)
 
@@ -103,9 +103,9 @@ def svi(*args, **kwargs):
     raise NotImplementedError
 
 
-def prior(data, model, num_samples, seed):
+def prior(data, assets, num_samples, seed):
     assert type(data) == dict
-    assert type(model) == Model
+    assert type(assets) == Assets
     assert type(num_samples) == int and num_samples > 0
     assert seed is None or type(seed) == int
 
@@ -114,7 +114,7 @@ def prior(data, model, num_samples, seed):
     rngs = random.split(random.PRNGKey(seed), num_samples)
 
     def get_model_trace(rng):
-        fn = handler.seed(model.fn, rng)
+        fn = handler.seed(assets.fn, rng)
         model_tr = handler.trace(fn).get_trace(mode="prior_only", **data)
         # Unpack the bits of the trace we're interested in into a dict
         # in order to support vectorization. (dicts support
@@ -124,33 +124,33 @@ def prior(data, model, num_samples, seed):
     flat_samples = vmap(get_model_trace)(rngs)
     # Insert dummy "chain" dim.
     samples = {k: np.expand_dims(arr, 0) for k, arr in flat_samples.items()}
-    transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
+    transformed_samples = run_model_on_samples_and_data(assets.fn, samples, data)
     all_samples = dict(samples, **transformed_samples)
 
-    loc = partial(location, data, samples, transformed_samples, model.fn)
+    loc = partial(location, data, samples, transformed_samples, assets.fn)
 
     return Samples(all_samples, partial(get_param, all_samples), loc)
 
 
 # This particular back end implements this by generating additional
 # code but other approaches are possible.
-def sample_response(model, seed, *args):
-    assert type(model) == Model
+def sample_response(assets, seed, *args):
+    assert type(assets) == Assets
     assert seed is None or type(seed) is int
     if seed is None:
         seed = sample_rng_seed()
     rng = random.PRNGKey(seed)
-    return handler.seed(model.sample_response_fn, rng)(*args)
+    return handler.seed(assets.sample_response_fn, rng)(*args)
 
 
-def expected_response(model, *args):
-    assert type(model) == Model
-    return model.expected_response_fn(*args)
+def expected_response(assets, *args):
+    assert type(assets) == Assets
+    return assets.expected_response_fn(*args)
 
 
-def inv_link(model, mu):
-    assert type(model) == Model
-    return model.inv_link_fn(mu)
+def inv_link(assets, mu):
+    assert type(assets) == Assets
+    return assets.inv_link_fn(mu)
 
 
 # TODO: Make it possible to run inference on a gpu.
