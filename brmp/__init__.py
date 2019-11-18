@@ -23,8 +23,65 @@ def makedesc(formula, metadata, family, priors, code_lengths):
     prior_tree = build_prior_tree(model_desc_pre, priors)
     return build_model(model_desc_pre, prior_tree)
 
+# TODO: In principle we only need to pass `code_length(contrasts)`
+# here. The actual coding isn't required until we see data.
 
-def defm(formula_str, df, family=None, priors=None, contrasts=None):
+
+def define_model(formula_str, metadata, family=None, priors=None, contrasts=None):
+    assert type(formula_str) == str
+    assert type(metadata) == Metadata
+    assert family is None or type(family) == Family
+    assert priors is None or type(priors) == list
+    assert contrasts is None or type(contrasts) == dict
+
+    family = family or Normal
+    priors = priors or []
+    contrasts = contrasts or {}
+
+    # TODO: Consider accepting nested arrays as well as numpy arrays.
+    # (If we do, convert to numpy arrays here in `define_model`?)
+    assert all(type(val) == np.ndarray and len(val.shape) == 2 for val in contrasts.values())
+
+    formula = parse(formula_str)
+    desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
+    return DefineModelResult(formula, metadata, contrasts, desc)
+
+
+class DefineModelResult:
+    def __init__(self, formula, metadata, contrasts, desc):
+        self.formula = formula
+        self.metadata = metadata
+        self.contrasts = contrasts
+        self.desc = desc
+
+    def gen(self, backend):
+        model = backend.gen(self.desc)
+        return GenResult(self, model, backend)
+
+    # Generate design matrices. (Represented as numpy arrays.)
+    def encode(self, df):
+        return makedata(self.formula, df, self.metadata, self.contrasts)
+
+
+class GenResult:
+    def __init__(self, define_model_result, model, backend):
+        assert type(backend) == Backend
+        self.define_model_result = define_model_result
+        self.model = model
+        self.backend = backend
+
+    def encode(self, df):
+        data = self.define_model_result.encode(df)
+        return data_from_numpy(self.backend, data)
+
+    def run_algo(self, name, data, *args, **kwargs):
+        samples = getattr(self.backend, name)(data, self.model, *args, **kwargs)
+        return Fit(self.define_model_result.formula, self.define_model_result.metadata,
+                   self.define_model_result.contrasts, data,
+                   self.define_model_result.desc, self.model, samples, self.backend)
+
+
+def brm(formula_str, df, family=None, priors=None, contrasts=None):
     """
     Defines a model and encodes data in design matrices.
 
@@ -48,13 +105,12 @@ def defm(formula_str, df, family=None, priors=None, contrasts=None):
                       encoding.
     :type contrasts: dict
     :return: A wrapper around the model description and the design matrices.
-    :rtype: brmp.DefmResult
+    :rtype: brmp.ModelAndData
 
     Example::
 
       df = pd.DataFrame({'y': [1., 2.], 'x': [.5, 0.]})
-      model = defm('y ~ 1 + x', df)
-
+      model = brm('y ~ 1 + x', df)
 
     """
     assert type(formula_str) == str
@@ -62,32 +118,16 @@ def defm(formula_str, df, family=None, priors=None, contrasts=None):
     assert family is None or type(family) == Family
     assert priors is None or type(priors) == list
     assert contrasts is None or type(contrasts) == dict
-
-    family = family or Normal
-    priors = priors or []
-    contrasts = contrasts or {}
-
-    # TODO: Consider accepting nested arrays as well as numpy arrays.
-    # (If we do, convert to numpy arrays here in `defm`?)
-    assert all(type(val) == np.ndarray and len(val.shape) == 2 for val in contrasts.values())
-
-    formula = parse(formula_str)
-    # Perhaps design matrices ought to always have metadata (i.e.
-    # column names) associated with them, as in Patsy.
     metadata = metadata_from_df(df)
-    desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
-    data = makedata(formula, df, metadata, contrasts)
-    return DefmResult(formula, metadata, contrasts, desc, data)
+    define_model_result = define_model(formula_str, metadata, family, priors, contrasts)
+    data = define_model_result.encode(df)
+    return ModelAndData(define_model_result, df, data)
 
 
-# A wrapper around a pair of model and data. Has a friendly `repr` and
-# makes it easy to fit the model.
-class DefmResult:
-    def __init__(self, formula, metadata, contrasts, desc, data):
-        self.formula = formula
-        self.metadata = metadata
-        self.contrasts = contrasts
-        self.desc = desc
+class ModelAndData:
+    def __init__(self, define_model_result, df, data):
+        self.define_model_result = define_model_result
+        self.df = df
         # TODO: Turn this into a `@property` to improve generate docs?
         self.data = data
         """
@@ -95,99 +135,47 @@ class DefmResult:
         Each value is a :class:`~numpy.ndarray`.
         """
 
-    def fit(self, backend=_default_backend, algo='nuts', **kwargs):
+        # We might eventually want to cache generated assets. This
+        # will likely be particularly useful once it's possible to
+        # cache compiled NumPyro models on the `Model` instance.
+
+        # Once we have this, we can extend `nuts` etc. to take an
+        # extra (optional) `df` argument, enabling the model to be fit
+        # with a data frame other than that used to define the model.
+        # This would be passed to `run_algo` (as a keyword argument)
+        # which already implements the required logic.
+
+        # One thing we might consider adding with this is checks to
+        # ensure that such a data frame is compatible (in an
+        # appropriate sense) with the data frame used to define the
+        # model.
+
+    def run_algo(self, name, backend, *args, df=None, **kwargs):
+        assert type(backend) == Backend
+        data = self.define_model_result.encode(df) if df is not None else self.data
+        gen_result = self.define_model_result.gen(backend)
+        return gen_result.run_algo(name, data_from_numpy(backend, data), *args, **kwargs)
+
+    def fit(self, algo='nuts', **kwargs):
         """
         Fits the wrapped model.
 
-        :param backend: The backend used to perform inference.
-        :type backend: brmp.backend.Backend
         :param algo: The algorithm used for inference, either ``'nuts'``, ``'svi'`` or ``'prior'``.
         :type algo: str
-        :param kwargs: Inference algorithm-specific keyword arguments. See the methods on
-                       :class:`~brmp.GenerateResult` for details.
+        :param kwargs: Inference algorithm-specific keyword arguments. See :func:`~brmp.ModelAndData.nuts`,
+                       :func:`~brmp.ModelAndData.svi` and :func:`~brmp.ModelAndData.prior` for details.
         :return: A model fit.
         :rtype: brmp.fit.Fit
 
         Example::
 
-          fit = defm('y ~ x', df).fit()
+          fit = brm('y ~ x', df).fit()
 
         """
-        assert type(backend) == Backend
         assert algo in ['prior', 'nuts', 'svi']
-        return getattr(self.generate(backend), algo)(**kwargs)
+        return getattr(self, algo)(**kwargs)
 
-    # Generate model code and data from this description, using the
-    # supplied backend.
-    def generate(self, backend=_default_backend):
-        """
-        Generates the assets required to fit the wrapped model.
-
-        :param backend: The backend used to generate code and other assets.
-        :type backend: brmp.backend.Backend
-        :return: A wrapper around the generated assets.
-        :rtype: brmp.GenerateResult
-        """
-        assert type(backend) == Backend
-        model = backend.gen(self.desc)
-        data = data_from_numpy(backend, self.data)
-        return GenerateResult(self, backend, model, data)
-
-    def prior(self, *args, **kwargs):
-        return self.generate().prior(*args, **kwargs)
-
-    def nuts(self, *args, **kwargs):
-        return self.generate().nuts(*args, **kwargs)
-
-    def svi(self, *args, **kwargs):
-        return self.generate().svi(*args, **kwargs)
-
-    def __repr__(self):
-        return model_repr(self.desc)
-
-
-# A wrapper around the result of calling DefmResult#generate. Exists
-# to support the following interface:
-#
-# model.generate(<backend>).nuts(...)
-# model.generate(<backend>).svi(...)
-#
-# This makes it possible to get at the code generated by a backend
-# without running inference. For example:
-#
-# model.generate(<backend>).model.code
-#
-class GenerateResult():
-    def __init__(self, defm_result, backend, model, data):
-        self.defm_result = defm_result
-        self.backend = backend
-        self.model = model
-        self.data = data
-
-    def _run_algo(self, algo, *args, **kwargs):
-        samples = getattr(self.backend, algo)(self.data, self.model, *args, **kwargs)
-        return Fit(self.defm_result.formula, self.defm_result.metadata, self.defm_result.contrasts, self.data,
-                   self.defm_result.desc, self.model, samples, self.backend)
-
-    def prior(self, num_samples=10, seed=None, *args, **kwargs):
-        """
-        Sample from the prior.
-
-        :param num_samples: The number of samples to take.
-        :type num_samples: int
-        :param seed: Random seed.
-        :type seed: int
-        :return: A model fit.
-        :rtype: brmp.fit.Fit
-
-        Example::
-
-          fit = defm('y ~ x', df).generate().prior()
-
-        """
-        return self._run_algo('prior', num_samples, seed, *args, **kwargs)
-
-    def nuts(self, iter=10, warmup=None, num_chains=1, seed=None, *args, **kwargs):
+    def nuts(self, iter=10, warmup=None, num_chains=1, seed=None, backend=None):
         """
         Fit the model using NUTS.
 
@@ -201,18 +189,22 @@ class GenerateResult():
         :type num_chains: int
         :param seed: Random seed.
         :type seed: int
+        :param backend: The backend used to perform inference.
+        :type backend: brmp.backend.Backend
         :return: A model fit.
         :rtype: brmp.fit.Fit
 
         Example::
 
-          fit = defm('y ~ x', df).generate().nuts()
+          fit = brm('y ~ x', df).nuts()
 
         """
         warmup = iter // 2 if warmup is None else warmup
-        return self._run_algo('nuts', iter, warmup, num_chains, seed, *args, **kwargs)
+        if backend is None:
+            backend = _default_backend
+        return self.run_algo('nuts', backend, iter, warmup, num_chains, seed)
 
-    def svi(self, iter=10, num_samples=10, seed=None, *args, **kwargs):
+    def svi(self, iter=10, num_samples=10, seed=None, backend=None, **kwargs):
         """
         Fit the model using stochastic variational inference.
 
@@ -223,12 +215,42 @@ class GenerateResult():
         :type num_samples: int
         :param seed: Random seed.
         :type seed: int
+        :param backend: The backend used to perform inference.
+        :type backend: brmp.backend.Backend
         :return: A model fit.
         :rtype: brmp.fit.Fit
 
         Example::
 
-          fit = defm('y ~ x', df).generate().svi()
+          fit = brm('y ~ x', df).svi()
 
         """
-        return self._run_algo('svi', iter, num_samples, seed, *args, **kwargs)
+        if backend is None:
+            backend = _default_backend
+        return self.run_algo('svi', backend, iter, num_samples, seed, **kwargs)
+
+    def prior(self, num_samples=10, seed=None, backend=None):
+        """
+        Sample from the prior.
+
+        :param num_samples: The number of samples to take.
+        :type num_samples: int
+        :param seed: Random seed.
+        :type seed: int
+        :param backend: The backend used to perform inference.
+        :type backend: brmp.backend.Backend
+
+        :return: A model fit.
+        :rtype: brmp.fit.Fit
+
+        Example::
+
+          fit = brm('y ~ x', df).prior()
+
+        """
+        if backend is None:
+            backend = _default_backend
+        return self.run_algo('prior', backend, num_samples, seed)
+
+    def __repr__(self):
+        return model_repr(self.define_model_result.desc)

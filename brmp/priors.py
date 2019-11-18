@@ -37,7 +37,7 @@ Prior = namedtuple('Prior', 'path prior')
 
 A :class:`~brmp.prior.Prior` instance associates a prior distribution with one
 or more parameters of a model. One or more such instances may be passed to
-:func:`~brmp.defm` to override its default choice of priors.
+:func:`~brmp.brm` to override its default choice of priors.
 
 The parameters of the model to which a prior should be applied are specified
 using a path. The following examples illustrate how this works:
