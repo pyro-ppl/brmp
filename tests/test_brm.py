@@ -1,5 +1,3 @@
-import os
-
 import numpy as np
 import numpyro.handlers as numpyro
 import pandas as pd
