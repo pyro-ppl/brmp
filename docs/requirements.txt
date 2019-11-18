@@ -2,5 +2,5 @@ sphinx
 sphinx_rtd_theme
 pandas
 pip -f https://download.pytorch.org/whl/torch_stable.html torch>=1.3.0+cpu
-pyro-ppl>=0.5.1
+pyro-ppl>=1.0.0
 numpyro>=0.2.1
