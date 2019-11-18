@@ -77,8 +77,3 @@ intersphinx_mapping = {'python': ('https://docs.python.org/3/', None),
                        'numpy': ('http://docs.scipy.org/doc/numpy/', None),
                        'pandas': ('https://pandas.pydata.org/pandas-docs/stable/', None),
                        }
-
-# XXX: This cannot be done in requirements.txt as that will trigger
-# installation of the most recent PyTorch version from pypi.
-if 'READTHEDOCS' in os.environ:
-    os.system('pip install torch==1.3.0+cpu -f https://download.pytorch.org/whl/torch_stable.html')
