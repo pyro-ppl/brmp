@@ -3,5 +3,6 @@
 sphinx
 sphinx_rtd_theme
 pandas
+torch>=1.3+cpu
 pyro-ppl>=1.0.0
 numpyro>=0.2.1
