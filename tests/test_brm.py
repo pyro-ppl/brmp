@@ -8,7 +8,7 @@ import torch
 from jax import random
 
 import pyro.poutine as poutine
-from brmp import DefmResult, defm, makedesc
+from brmp import define_model, brm, makedesc
 from brmp.backend import data_from_numpy
 from brmp.design import (Categorical, CategoricalCoding, Integral,
                          NumericCoding, RealValued, code_lengths, code_terms,
@@ -425,7 +425,7 @@ def test_numpyro_codegen(N, formula_str, non_real_cols, contrasts, family, prior
 @pytest.mark.parametrize('backend', [pyro_backend, numpyro_backend])
 def test_mu_correctness(formula_str, cols, backend, expected):
     df = dummy_df(expand_columns(parse(formula_str), cols), 10)
-    fit = defm(formula_str, df).generate(backend).prior(num_samples=1)
+    fit = brm(formula_str, df).prior(num_samples=1, backend=backend)
     # Pick out the one (and only) sample drawn.
     actual_mu = fit.fitted(what='linear')[0]
     # `expected` is assumed to return a data frame.
@@ -494,9 +494,9 @@ def test_parameter_shapes(formula_str, non_real_cols, contrasts, family, priors,
 
     # Define model, and generate a single posterior sample.
     metadata = metadata_from_cols(cols)
-    desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
-    data = makedata(formula, df, metadata, contrasts)
-    fit = DefmResult(formula, metadata, contrasts, desc, data).fit(**fitargs)
+    model = define_model(formula_str, metadata, family, priors, contrasts).gen(fitargs['backend'])
+    data = model.encode(df)
+    fit = model.run_algo('prior', data, num_samples=1, seed=None)
 
     num_chains = fitargs.get('num_chains', 1)
 
@@ -1063,11 +1063,8 @@ def test_marginals_fitted_smoke(fitargs, formula_str, non_real_cols, family, con
     formula = parse(formula_str)
     cols = expand_columns(formula, non_real_cols)
     df = dummy_df(cols, N)
-    metadata = metadata_from_cols(cols)
-    desc = makedesc(formula, metadata, family, [], code_lengths(contrasts))
-    data = makedata(formula, df, metadata, contrasts)
-    fit = DefmResult(formula, metadata, contrasts, desc, data).fit(**fitargs(S))
-
+    model = brm(formula_str, df, family, [], contrasts)
+    fit = model.fit(**fitargs(S))
     # Sanity check output for `marginals`.
     arr = fit.marginals().array
     num_coefs = len(scalar_parameter_names(fit.model_desc))
@@ -1104,7 +1101,7 @@ def test_fitted_on_new_data(N2):
     contrasts = {'a': np.array([[-1, -1], [1, 1]])}
     cols = expand_columns(parse(formula_str), [Categorical('a', ['a0', 'a1'])])
     df = dummy_df(cols, N)
-    fit = defm(formula_str, df, Normal, contrasts=contrasts).fit(iter=S)
+    fit = brm(formula_str, df, Normal, contrasts=contrasts).fit(iter=S)
     new_data = dummy_df(cols, N2, allow_non_exhaustive=True)
     arr = fit.fitted(data=new_data)
     assert np.all(np.isfinite(arr))
@@ -1120,7 +1117,7 @@ def test_fitted_on_new_data(N2):
 ])
 def test_rng_seed(fitargs):
     df = pd.DataFrame({'y': [0., 0.1, 0.2]})
-    model = defm('y ~ 1', df)
+    model = brm('y ~ 1', df)
     fit0 = model.fit(seed=0, **fitargs)
     fit1 = model.fit(seed=0, **fitargs)
     fit2 = model.fit(seed=1, **fitargs)

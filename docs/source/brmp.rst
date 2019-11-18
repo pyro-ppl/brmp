@@ -1,12 +1,8 @@
 brmp
 ====
 
-.. autofunction:: brmp.defm
+.. autofunction:: brmp.brm
 
-.. autoclass:: brmp.DefmResult
-    :members:
-    :member-order: bysource
-
-.. autoclass:: brmp.GenerateResult
+.. autoclass:: brmp.ModelAndData
     :members:
     :member-order: bysource

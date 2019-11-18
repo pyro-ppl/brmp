@@ -564,7 +564,7 @@ def execute_product_col(product_col, df, metadata, contrasts):
             levels = metadata.column(col.factor).levels
             # TODO: This can be triggered in normal use, so turn into
             # friendly error. It probably makes sense to check for
-            # this earlier. This could possibly happen in `defm` after
+            # this earlier. This could possibly happen in `brm` after
             # creating the metadata, though this would also require a
             # separate check for SequentialOED. Is there anywhere
             # sensible to put this that catches both?
