@@ -4,7 +4,7 @@ setup(name='brmp',
       packages=find_packages(),
       install_requires=[
         'pandas',
-        'pyro-ppl>=0.5.1',
+        'pyro-ppl>=1.0.0',
         'numpyro>=0.2.1',
       ],
       extras_require={
