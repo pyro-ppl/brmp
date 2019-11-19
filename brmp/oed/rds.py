@@ -3,6 +3,7 @@ from functools import reduce
 import json
 import sys
 import os
+from pprint import pprint
 
 from scipy.stats import gaussian_kde
 import pandas as pd
@@ -106,7 +107,7 @@ def run_simulation(df, M, formula_str, priors,
                     callback=collect_plot_data,
                     fixed_target_interval=fixed_target_interval,
                     verbose=True)
-                print(eigs)
+                pprint(sorted(eigs, key=lambda pair: pair[1], reverse=True))
             else:
                 next_trial = oed.random_trial(design_space=next_design_space)
 
