@@ -49,7 +49,7 @@ from brmp.oed.example import collect_plot_data  # , make_training_data_plot
 
 
 def run_simulation(df, M, formula_str, priors,
-                   target_coef, response_col, participant_col, design_cols,
+                   target_coefs, response_col, participant_col, design_cols,
                    use_oed=True, fixed_target_interval=True):
 
     df_metadata = metadata_from_df(df)
@@ -76,7 +76,7 @@ def run_simulation(df, M, formula_str, priors,
         formula_str,
         df_metadata.columns,
         priors=priors,
-        target_coefs=[target_coef],
+        target_coefs=target_coefs,
         num_samples=2000,
         backend=numpyro,
         use_cuda=bool(os.environ.get('OED_USE_CUDA', 0)))
@@ -147,9 +147,10 @@ def main(name, M):
     target_coef = 'b_z[b]'
 
     conditions = dict(
-        oed=dict(use_oed=True, fixed_target_interval=True),
-        oed_alt=dict(use_oed=True, fixed_target_interval=False),
-        rand=dict(use_oed=False))
+        oed=dict(use_oed=True, fixed_target_interval=True, target_coefs=[target_coef]),
+        oed_alt=dict(use_oed=True, fixed_target_interval=False, target_coefs=[target_coef]),
+        oed_all=dict(use_oed=True, fixed_target_interval=True, target_coefs=[]),  # empty list means all coefs
+        rand=dict(use_oed=False, target_coefs=[target_coef]))
     kwargs = conditions[name]
 
     oed = run_simulation(
@@ -157,7 +158,6 @@ def main(name, M):
         M,
         formula_str,
         priors,
-        target_coef='b_z[b]',
         response_col='y',
         participant_col='p',
         design_cols=['x', 'z'],
