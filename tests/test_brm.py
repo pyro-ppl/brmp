@@ -1101,7 +1101,7 @@ def test_fitted_on_new_data(N2):
     contrasts = {'a': np.array([[-1, -1], [1, 1]])}
     cols = expand_columns(parse(formula_str), [Categorical('a', ['a0', 'a1'])])
     df = dummy_df(cols, N)
-    fit = brm(formula_str, df, Normal, contrasts=contrasts).fit(iter=S)
+    fit = brm(formula_str, df, Normal, contrasts=contrasts).fit(iter=S, backend=pyro_backend)
     new_data = dummy_df(cols, N2, allow_non_exhaustive=True)
     arr = fit.fitted(data=new_data)
     assert np.all(np.isfinite(arr))
