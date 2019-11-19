@@ -151,6 +151,7 @@ def main(name, M):
         oed=dict(use_oed=True, fixed_target_interval=True, target_coefs=[target_coef]),
         oed_alt=dict(use_oed=True, fixed_target_interval=False, target_coefs=[target_coef]),
         oed_all=dict(use_oed=True, fixed_target_interval=True, target_coefs=[]),  # empty list means all coefs
+        oed_all_alt=dict(use_oed=True, fixed_target_interval=False, target_coefs=[]),
         rand=dict(use_oed=False, target_coefs=[target_coef]))
     kwargs = conditions[name]
 
