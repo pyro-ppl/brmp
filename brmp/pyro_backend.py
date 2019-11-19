@@ -8,7 +8,7 @@ import torch
 
 import pyro
 import pyro.poutine as poutine
-from brmp.backend import Backend, Model
+from brmp.backend import Backend, Assets
 from brmp.fit import Samples
 from brmp.pyro_codegen import gen
 from brmp.utils import flatten, unflatten
@@ -136,21 +136,21 @@ def run_model_on_samples_and_data(modelfn, samples, data):
             for name in names}
 
 
-def nuts(data, model, iter, warmup, num_chains, seed):
+def nuts(data, assets, iter, warmup, num_chains, seed):
     assert type(data) == dict
-    assert type(model) == Model
+    assert type(assets) == Assets
     assert type(iter) == int
     assert type(warmup) == int
     assert type(num_chains) == int
     assert seed is None or type(seed) == int
 
     with seed_ctx_mgr(seed):
-        nuts_kernel = NUTS(model.fn, jit_compile=False, adapt_step_size=True)
+        nuts_kernel = NUTS(assets.fn, jit_compile=False, adapt_step_size=True)
         mcmc = MCMC(nuts_kernel, num_samples=iter, warmup_steps=warmup, num_chains=num_chains)
         mcmc.run(**data)
 
     samples = mcmc.get_samples(group_by_chain=True)
-    transformed_samples = run_model_on_samples_and_data(model.fn, samples, data)
+    transformed_samples = run_model_on_samples_and_data(assets.fn, samples, data)
 
     def loc(d):
         # Optimization: For the data used for inference, values for
@@ -165,7 +165,7 @@ def nuts(data, model, iter, warmup, num_chains, seed):
             # TODO: This computes more than is necessary. (i.e. It
             # build additional tensors we immediately throw away.)
             # This is minor, but might be worth addressing eventually.
-            return flatten(run_model_on_samples_and_data(model.fn, samples, d)['mu'])
+            return flatten(run_model_on_samples_and_data(assets.fn, samples, d)['mu'])
 
     all_samples = dict(samples, **transformed_samples)
 
@@ -199,9 +199,9 @@ def get_mini_batch(arr, subsample):
         return arr[subsample]
 
 
-def svi(data, model, iter, num_samples, seed, autoguide=None, optim=None, subsample_size=None):
+def svi(data, assets, iter, num_samples, seed, autoguide=None, optim=None, subsample_size=None):
     assert type(data) == dict
-    assert type(model) == Model
+    assert type(assets) == Assets
     assert type(iter) == int
     assert type(num_samples) == int
     assert seed is None or type(seed) == int
@@ -218,8 +218,8 @@ def svi(data, model, iter, num_samples, seed, autoguide=None, optim=None, subsam
     autoguide = AutoMultivariateNormal if autoguide is None else autoguide
     optim = Adam({'lr': 1e-3}) if optim is None else optim
 
-    guide = autoguide(model.fn)
-    svi = SVI(model.fn, guide, optim, loss=Trace_ELBO())
+    guide = autoguide(assets.fn)
+    svi = SVI(assets.fn, guide, optim, loss=Trace_ELBO())
     pyro.clear_param_store()
 
     t0 = time.time()
@@ -255,7 +255,7 @@ def svi(data, model, iter, num_samples, seed, autoguide=None, optim=None, subsam
         # to compute transformed parameters, such as `b`, etc.
         def get_model_trace():
             guide_tr = poutine.trace(guide).get_trace()
-            model_tr = poutine.trace(poutine.replay(model.fn, trace=guide_tr)).get_trace(mode='prior_only', **data)
+            model_tr = poutine.trace(poutine.replay(assets.fn, trace=guide_tr)).get_trace(mode='prior_only', **data)
             return model_tr
 
         # Represent the posterior as a bunch of samples, ignoring the
@@ -269,43 +269,43 @@ def svi(data, model, iter, num_samples, seed, autoguide=None, optim=None, subsam
     # support subsampling.) Therefore `loc` always computes `mu` from
     # the data and the samples here.
     def loc(d):
-        return location(model.fn, samples, d)
+        return location(assets.fn, samples, d)
 
     return Samples(samples, partial(get_param, samples), loc)
 
 
-def prior(data, model, num_samples, seed):
+def prior(data, assets, num_samples, seed):
     assert seed is None or type(seed) == int
 
     def get_model_trace():
-        return poutine.trace(model.fn).get_trace(mode='prior_only', **data)
+        return poutine.trace(assets.fn).get_trace(mode='prior_only', **data)
 
     with seed_ctx_mgr(seed):
         samples = [get_model_trace() for _ in range(num_samples)]
 
     def loc(d):
-        return location(model.fn, samples, d)
+        return location(assets.fn, samples, d)
 
     return Samples(samples, partial(get_param, samples), loc)
 
 
 # This particular back end implements this by generating additional
 # code but other approaches are possible.
-def sample_response(model, seed, *args):
-    assert type(model) == Model
+def sample_response(assets, seed, *args):
+    assert type(assets) == Assets
     assert seed is None or type(seed) is int
     with seed_ctx_mgr(seed):
-        return model.sample_response_fn(*args)
+        return assets.sample_response_fn(*args)
 
 
-def expected_response(model, *args):
-    assert type(model) == Model
-    return model.expected_response_fn(*args)
+def expected_response(assets, *args):
+    assert type(assets) == Assets
+    return assets.expected_response_fn(*args)
 
 
-def inv_link(model, mu):
-    assert type(model) == Model
-    return model.inv_link_fn(mu)
+def inv_link(assets, mu):
+    assert type(assets) == Assets
+    return assets.inv_link_fn(mu)
 
 
 backend = Backend('Pyro', gen, prior, nuts, svi, sample_response, expected_response, inv_link, from_numpy, to_numpy)

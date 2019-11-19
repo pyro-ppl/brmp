@@ -44,10 +44,10 @@ def define_model(formula_str, metadata, family=None, priors=None, contrasts=None
 
     formula = parse(formula_str)
     desc = makedesc(formula, metadata, family, priors, code_lengths(contrasts))
-    return DefineModelResult(formula, metadata, contrasts, desc)
+    return Model(formula, metadata, contrasts, desc)
 
 
-class DefineModelResult:
+class Model:
     def __init__(self, formula, metadata, contrasts, desc):
         self.formula = formula
         self.metadata = metadata
@@ -55,30 +55,30 @@ class DefineModelResult:
         self.desc = desc
 
     def gen(self, backend):
-        model = backend.gen(self.desc)
-        return GenResult(self, model, backend)
+        assets = backend.gen(self.desc)
+        return AssetsWrapper(self, assets, backend)
 
     # Generate design matrices. (Represented as numpy arrays.)
     def encode(self, df):
         return makedata(self.formula, df, self.metadata, self.contrasts)
 
 
-class GenResult:
-    def __init__(self, define_model_result, model, backend):
+class AssetsWrapper:
+    def __init__(self, model, assets, backend):
         assert type(backend) == Backend
-        self.define_model_result = define_model_result
         self.model = model
+        self.assets = assets
         self.backend = backend
 
     def encode(self, df):
-        data = self.define_model_result.encode(df)
+        data = self.model.encode(df)
         return data_from_numpy(self.backend, data)
 
     def run_algo(self, name, data, *args, **kwargs):
-        samples = getattr(self.backend, name)(data, self.model, *args, **kwargs)
-        return Fit(self.define_model_result.formula, self.define_model_result.metadata,
-                   self.define_model_result.contrasts, data,
-                   self.define_model_result.desc, self.model, samples, self.backend)
+        samples = getattr(self.backend, name)(data, self.assets, *args, **kwargs)
+        return Fit(self.model.formula, self.model.metadata,
+                   self.model.contrasts, data,
+                   self.model.desc, self.assets, samples, self.backend)
 
 
 def brm(formula_str, df, family=None, priors=None, contrasts=None):
@@ -119,14 +119,14 @@ def brm(formula_str, df, family=None, priors=None, contrasts=None):
     assert priors is None or type(priors) == list
     assert contrasts is None or type(contrasts) == dict
     metadata = metadata_from_df(df)
-    define_model_result = define_model(formula_str, metadata, family, priors, contrasts)
-    data = define_model_result.encode(df)
-    return ModelAndData(define_model_result, df, data)
+    model = define_model(formula_str, metadata, family, priors, contrasts)
+    data = model.encode(df)
+    return ModelAndData(model, df, data)
 
 
 class ModelAndData:
-    def __init__(self, define_model_result, df, data):
-        self.define_model_result = define_model_result
+    def __init__(self, model, df, data):
+        self.model = model
         self.df = df
         # TODO: Turn this into a `@property` to improve generate docs?
         self.data = data
@@ -152,9 +152,9 @@ class ModelAndData:
 
     def run_algo(self, name, backend, *args, df=None, **kwargs):
         assert type(backend) == Backend
-        data = self.define_model_result.encode(df) if df is not None else self.data
-        gen_result = self.define_model_result.gen(backend)
-        return gen_result.run_algo(name, data_from_numpy(backend, data), *args, **kwargs)
+        data = self.model.encode(df) if df is not None else self.data
+        assets_wrapper = self.model.gen(backend)
+        return assets_wrapper.run_algo(name, data_from_numpy(backend, data), *args, **kwargs)
 
     def fit(self, algo='nuts', **kwargs):
         """
@@ -253,4 +253,4 @@ class ModelAndData:
         return self.run_algo('prior', backend, num_samples, seed)
 
     def __repr__(self):
-        return model_repr(self.define_model_result.desc)
+        return model_repr(self.model.desc)
