@@ -51,7 +51,6 @@ from brmp.oed.example import collect_plot_data  # , make_training_data_plot
 
 def run_simulation(df, M, formula_str, priors,
                    target_coefs, response_col, participant_col, design_cols,
-                   num_next_trial_runs=1,
                    use_oed=True, fixed_target_interval=True):
 
     df_metadata = metadata_from_df(df)
@@ -105,19 +104,15 @@ def run_simulation(df, M, formula_str, priors,
                                  for d in not_yet_run]
 
             if use_oed:
-                # Run multiple times to check variances.
-                all_eigs_cur_step = []
-                for _ in range(num_next_trial_runs):
-                    next_trial, dstar, eigs, fit, plot_data = oed.next_trial(
-                        design_space=next_design_space,
-                        callback=collect_plot_data,
-                        fixed_target_interval=fixed_target_interval,
-                        verbose=True)
-                    all_eigs_cur_step.append(eigs)
+                next_trial, dstar, eigs, fit, plot_data = oed.next_trial(
+                    design_space=next_design_space,
+                    callback=collect_plot_data,
+                    fixed_target_interval=fixed_target_interval,
+                    verbose=True)
+                all_eigs.append(eigs)
 
                 pprint(sorted(eigs, key=lambda pair: pair[1], reverse=True))
                 # make_training_data_plot(plot_data)
-                all_eigs.append((participant, i, all_eigs_cur_step))
 
             else:
                 next_trial = oed.random_trial(design_space=next_design_space)
@@ -206,7 +201,7 @@ def main(name, M):
         json.dump(results, f)
     with open('results/selected_trials_{}_{}_{}.csv'.format(name, M, i), 'w') as f:
         oed.data_so_far.to_csv(f)
-    with open('results/eigs.json', 'w') as f:
+    with open('results/eigs_{}.json'.format(i), 'w') as f:
         json.dump(eigs, f)
 
     print(results)
