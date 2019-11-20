@@ -51,6 +51,7 @@ from brmp.oed.example import collect_plot_data  # , make_training_data_plot
 
 def run_simulation(df, M, formula_str, priors,
                    target_coefs, response_col, participant_col, design_cols,
+                   num_next_trial_runs=1,
                    use_oed=True, fixed_target_interval=True):
 
     df_metadata = metadata_from_df(df)
@@ -82,6 +83,8 @@ def run_simulation(df, M, formula_str, priors,
         backend=numpyro,
         use_cuda=bool(os.environ.get('OED_USE_CUDA', 0)))
 
+    all_eigs = []
+
     for participant in participants:
 
         # Determine the trials that were actually run for this
@@ -102,16 +105,22 @@ def run_simulation(df, M, formula_str, priors,
                                  for d in not_yet_run]
 
             if use_oed:
-                next_trial, dstar, eigs, fit, plot_data = oed.next_trial(
-                    design_space=next_design_space,
-                    callback=collect_plot_data,
-                    fixed_target_interval=fixed_target_interval,
-                    verbose=True)
+                # Run multiple times to check variances.
+                all_eigs_cur_step = []
+                for _ in range(num_next_trial_runs):
+                    next_trial, dstar, eigs, fit, plot_data = oed.next_trial(
+                        design_space=next_design_space,
+                        callback=collect_plot_data,
+                        fixed_target_interval=fixed_target_interval,
+                        verbose=True)
+                    all_eigs_cur_step.append(eigs)
+
                 pprint(sorted(eigs, key=lambda pair: pair[1], reverse=True))
+                # make_training_data_plot(plot_data)
+                all_eigs.append((participant, i, all_eigs_cur_step))
+
             else:
                 next_trial = oed.random_trial(design_space=next_design_space)
-
-            # make_training_data_plot(plot_data)
 
             # Look up this trial in the real data, and extract the response given.
             ix = reduce(operator.and_, (df[col] == next_trial[col] for col in design_cols + [participant_col]))
@@ -128,7 +137,7 @@ def run_simulation(df, M, formula_str, priors,
             print('Data so far:')
             print(oed.data_so_far)
 
-    return oed
+    return oed, all_eigs
 
 
 def kde(fit, coef):
@@ -155,7 +164,7 @@ def main(name, M):
         rand=dict(use_oed=False, target_coefs=[target_coef]))
     kwargs = conditions[name]
 
-    oed = run_simulation(
+    oed, eigs = run_simulation(
         df,
         M,
         formula_str,
@@ -197,6 +206,8 @@ def main(name, M):
         json.dump(results, f)
     with open('results/selected_trials_{}_{}_{}.csv'.format(name, M, i), 'w') as f:
         oed.data_so_far.to_csv(f)
+    with open('results/eigs.json', 'w') as f:
+        json.dump(eigs, f)
 
     print(results)
 
