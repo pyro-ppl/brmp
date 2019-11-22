@@ -18,7 +18,7 @@ def main(fn, selected_trials_fn, eigs_fn):
         plot_one(fn, selected_trials_fn, eigs_fn, step, otherix)
 
         if step % 4 == 0:
-            plt.ylabel('eig - {}th best trial'.format(otherix))
+            plt.ylabel('eig - {}th best trial'.format(otherix + 1))
         if step >= 16:
             plt.xlabel('eig - best trial')
 
