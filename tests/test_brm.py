@@ -302,6 +302,17 @@ codegen_cases = [
 ]
 
 
+# Map generic family names to backend specific names.
+def pyro_family_name(name):
+    return dict(LKJ='LKJCorrCholesky').get(name, name)
+
+
+def numpyro_family_name(name):
+    return dict(LKJ='LKJCholesky',
+                Bernoulli='BernoulliProbs',
+                Binomial='BinomialProbs').get(name, name)
+
+
 @pytest.mark.parametrize('N', [1, 5])
 @pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
 def test_pyro_codegen(N, formula_str, non_real_cols, contrasts, family, priors, expected):
@@ -336,10 +347,9 @@ def test_pyro_codegen(N, formula_str, non_real_cols, contrasts, family, priors, 
     expected_sites = [site for (site, _, _) in expected]
     assert set(trace.stochastic_nodes) - {'obs'} == set(expected_sites)
     for (site, family_name, maybe_params) in expected:
-        pyro_family_name = dict(LKJ='LKJCorrCholesky').get(family_name, family_name)
         fn = unwrapfn(trace.nodes[site]['fn'])
         params = maybe_params or default_params[family_name]
-        assert type(fn).__name__ == pyro_family_name
+        assert type(fn).__name__ == pyro_family_name(family_name)
         for (name, expected_val) in params.items():
             val = fn.__getattribute__(name)
             assert_equal(val, torch.tensor(expected_val).expand(val.shape))
@@ -347,13 +357,6 @@ def test_pyro_codegen(N, formula_str, non_real_cols, contrasts, family, priors, 
 
 def unwrapfn(fn):
     return unwrapfn(fn.base_dist) if type(fn) == Independent else fn
-
-
-# Map generic family names to NumPyro specific names.
-def numpyro_family_name(name):
-    return dict(LKJ='LKJCholesky',
-                Bernoulli='BernoulliProbs',
-                Binomial='BinomialProbs').get(name, name)
 
 
 @pytest.mark.parametrize('N', [1, 5])
