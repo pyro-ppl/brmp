@@ -124,7 +124,7 @@ def scalar_parameter_map(model):
     for ix, group in enumerate(model.groups):
         out.extend([('sd_{}__{}'.format(cols2str(group.columns), coef), ('sd_{}'.format(ix), (i,)))
                     for i, coef in enumerate(group.coefs)])
-        out.extend([('r_{}[{},{}]'.format(cols2str(group.columns), '_'.join(level), coef), ('r_{}'.format(ix), (i, j)))
+        out.extend([('r_{}[{},{}]'.format(cols2str(group.columns), level2str(level), coef), ('r_{}'.format(ix), (i, j)))
                     for j, coef in enumerate(group.coefs)
                     for i, level in enumerate(group.levels)])
     for param in model.response.nonlocparams:
@@ -134,3 +134,8 @@ def scalar_parameter_map(model):
 
 def scalar_parameter_names(model):
     return [name for (name, _) in scalar_parameter_map(model)]
+
+
+def level2str(level):
+    assert type(level) == tuple
+    return '_'.join(str(l) for l in level)
