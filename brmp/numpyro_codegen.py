@@ -8,7 +8,7 @@ from brmp.utils import traceback_generated
 
 def gen_expanded_scalar(val, shape):
     assert type(val) in [float, int]
-    return 'chk_shape(np.array({}).broadcast([{dims}]), tuple([{dims}]))'.format(val, dims=', '.join(
+    return 'np.array({}).broadcast([{dims}])'.format(val, dims=', '.join(
         str(dim) for dim in shape))
 
 
@@ -62,9 +62,9 @@ def gen_response_dist(model, vectorize=False):
         elif param.value is not None:
             return param.value
         elif vectorize:
-            return 'chk_shape(np.tile({}, (1, N)), (S, N))'.format(param.name)
+            return 'np.tile({}, (1, N))'.format(param.name)
         else:
-            return 'chk_shape({}.broadcast([N]).reshape(-1), (N,))'.format(param.name)
+            return '{}.broadcast([N]).reshape(-1)'.format(param.name)
 
     response_args = [response_arg(p) for p in model.response.family.params]
     return gendist(model.response.family, response_args, shape=shape)
@@ -337,11 +337,6 @@ def eval_method(code):
     import numpy as onp  # noqa: F401
     import numpyro.distributions as dist  # noqa: F401
     from numpyro import sample  # noqa: F401
-
-    def chk_shape(arr, expected_shape):
-        assert arr.shape == expected_shape
-        return arr
-
     g = locals()
     exec(code, g)
     return traceback_generated(fn=g[method_name], code=code)
