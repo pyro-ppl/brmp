@@ -90,12 +90,15 @@ class SequentialOED:
                         else self._check_design_space(design_space))
         return random.choice(design_space)
 
-    def next_trial(self, callback=None, verbose=False, design_space=None, interval_method='fixed', seed=None):
+    def next_trial(self, callback=None, verbose=False, design_space=None,
+                   interval_method='fixed', q_net='full', seed=None):
 
         # FIXME: Don't invoke the call back when using CUDA. (Since at
         # present the only callback we have doesn't work with CUDA.)
         if callback is None or self.use_cuda:
             callback = null
+
+        assert q_net in ['independent', 'full']
 
         design_space = (self._full_design_space()
                         if design_space is None
@@ -162,7 +165,7 @@ class SequentialOED:
         assert inputs.shape == (len(design_space), self.num_samples, 1)
 
         # Estimate EIGs
-        Q = QFull  # QIndep
+        Q = dict(full=QFull, independent=QIndep)[q_net]
         vectorize = True
         est_eig_fn = est_eig_vec if vectorize else est_eig
         eigs, cbvals, elapsed = est_eig_fn(Q, targets, inputs, design_space, self.target_coefs,

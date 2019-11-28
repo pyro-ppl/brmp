@@ -109,6 +109,7 @@ def run_simulation(df, M, formula_str, priors,
                     design_space=next_design_space,
                     callback=collect_plot_data,
                     interval_method=interval_method,
+                    q_net='independent',
                     verbose=True)
                 all_eigs.append(eigs)
 
