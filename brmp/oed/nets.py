@@ -18,10 +18,8 @@ class QIndep(nn.Module):
         # TODO: The functions we're asking the networks to learn are
         # not very complicated, so we can likely get away with
         # networks with fewer parameters.
-        self.net = nn.Sequential(BatchLinear(num_designs, 1, 100),
-                                 nn.ReLU(),
-                                 BatchLinear(num_designs, 100, 50),
-                                 nn.ReLU(),
+        self.net = nn.Sequential(BatchLinear(num_designs, 1, 50),
+                                 nn.ELU(),
                                  BatchLinear(num_designs, 50, num_coef),
                                  nn.Sigmoid())
 
@@ -120,10 +118,8 @@ class QFull(nn.Module):
         assert num_designs > 0
         self.num_coef = num_coef
         self.num_designs = num_designs
-        self.net = nn.Sequential(BatchLinear(num_designs, 1, 100),
-                                 nn.ReLU(),
-                                 BatchLinear(num_designs, 100, 50),
-                                 nn.ReLU(),
+        self.net = nn.Sequential(BatchLinear(num_designs, 1, 50),
+                                 nn.ELU(),
                                  BatchLinear(num_designs, 50, 2**num_coef),
                                  nn.LogSoftmax(dim=-1))
 
