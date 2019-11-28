@@ -1,9 +1,4 @@
-for i in {1..5}
+for i in {1..20}
 do
-    for m in {2..4}
-    do
-        python rds.py rand $m
-        python rds.py oed $m
-        python rds.py oed_alt $m
-    done
+    python rds.py -m 2 --num-samples 6000 --num-epochs 200 -lr 0.0001 --weight-decay 0.5 --num-epochs 200 --opt-method SGD --interval-method adapt
 done
