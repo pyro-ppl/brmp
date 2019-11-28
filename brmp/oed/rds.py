@@ -1,7 +1,7 @@
+import argparse
 import operator
 from functools import reduce
 import json
-import sys
 import os
 from pprint import pprint
 
@@ -51,7 +51,7 @@ from brmp.oed.example import collect_plot_data  # , make_training_data_plot
 
 def run_simulation(df, M, formula_str, priors,
                    target_coefs, response_col, participant_col, design_cols,
-                   use_oed=True, interval_method='fixed'):
+                   interval_method, use_oed=True):
 
     df_metadata = metadata_from_df(df)
     participants = possible_values(df_metadata.column(participant_col))
@@ -139,7 +139,9 @@ def kde(fit, coef):
     return gaussian_kde(fit.get_scalar_param(coef))
 
 
-def main(name, M):
+def main(args):
+
+    M = args.m
 
     df = pd.read_csv('rds.csv', index_col=0)
     df['p'] = pd.Categorical(df['p'])
@@ -151,14 +153,6 @@ def main(name, M):
               Prior(('resp', 'sigma'), HalfNormal(.5))]
     target_coef = 'b_z[b]'
 
-    conditions = dict(
-        oed=dict(use_oed=True, interval_method='fixed', target_coefs=[target_coef]),
-        oed_alt=dict(use_oed=True, interval_method='quantile', target_coefs=[target_coef]),
-        oed_all=dict(use_oed=True, interval_method='fixed', target_coefs=[]),  # empty list means all coefs
-        oed_all_alt=dict(use_oed=True, interval_method='quantile', target_coefs=[]),
-        rand=dict(use_oed=False, target_coefs=[target_coef]))
-    kwargs = conditions[name]
-
     oed, eigs = run_simulation(
         df,
         M,
@@ -167,7 +161,8 @@ def main(name, M):
         response_col='y',
         participant_col='p',
         design_cols=['x', 'z'],
-        **kwargs)
+        target_coefs=[target_coef],
+        interval_method=args.interval_method)
 
     # Compute the Bayes factor. (We avoid defining the model
     # using `selected_trials` since initially that data frame
@@ -193,21 +188,29 @@ def main(name, M):
     except FileNotFoundError:
         results = {}
 
+    args_dict = vars(args)
+    name = '_'.join(str(args_dict[k]) for k in sorted(args_dict.keys()))
+
     if name not in results:
         results[name] = []
     i = len(results[name])
-    results[name].append((M, oed_bayes_factor))
+    results[name].append(oed_bayes_factor)
     with open('results/results.json', 'w') as f:
         json.dump(results, f)
-    with open('results/selected_trials_{}_{}_{}.csv'.format(name, M, i), 'w') as f:
+    with open('results/selected_trials__{}__{}.csv'.format(name, i), 'w') as f:
         oed.data_so_far.to_csv(f)
-    with open('results/eigs_{}.json'.format(i), 'w') as f:
+    with open('results/eigs__{}__{}.json'.format(name, i), 'w') as f:
         json.dump(eigs, f)
 
     print(results)
 
 
 if __name__ == '__main__':
-    name = sys.argv[1]
-    M = int(sys.argv[2])
-    main(name, M)
+    parser = argparse.ArgumentParser(description='Real data simulation')
+    parser.add_argument('-m', type=int, required=True,
+                        help='number of trials to perform with each participant')
+    parser.add_argument('--interval-method', type=str, choices=['fixed', 'quantile', 'adapt'], default='fixed',
+                        help='method used to select OED target interval')
+    args = parser.parse_args()
+    print(args)
+    main(args)
