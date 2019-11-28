@@ -52,7 +52,7 @@ from brmp.oed.example import collect_plot_data  # , make_training_data_plot
 
 def run_simulation(df, M, formula_str, priors,
                    target_coefs, response_col, participant_col, design_cols,
-                   interval_method, num_samples, num_epochs, use_oed=True):
+                   interval_method, num_samples, num_epochs, opt_method, lr, weight_decay, use_oed=True):
 
     df_metadata = metadata_from_df(df)
     participants = possible_values(df_metadata.column(participant_col))
@@ -84,6 +84,11 @@ def run_simulation(df, M, formula_str, priors,
         backend=numpyro,
         use_cuda=bool(os.environ.get('OED_USE_CUDA', 0)))
 
+    opt_kwargs = dict(lr=lr, weight_decay=weight_decay)
+    if opt_method == 'SGD':
+        opt_kwargs['momentum'] = 0.9
+    optimizer = partial(optim.__dict__[opt_method], **opt_kwargs)
+
     all_eigs = []
 
     for participant in participants:
@@ -111,7 +116,7 @@ def run_simulation(df, M, formula_str, priors,
                     callback=collect_plot_data,
                     interval_method=interval_method,
                     q_net='independent',
-                    optimizer=partial(optim.Adam, lr=0.001, weight_decay=0.002),
+                    optimizer=optimizer,
                     verbose=True)
                 all_eigs.append(eigs)
 
@@ -168,7 +173,10 @@ def main(args):
         target_coefs=[target_coef],
         interval_method=args.interval_method,
         num_samples=args.num_samples,
-        num_epochs=args.num_epochs)
+        num_epochs=args.num_epochs,
+        opt_method=args.opt_method,
+        lr=args.lr,
+        weight_decay=args.weight_decay)
 
     # Compute the Bayes factor. (We avoid defining the model
     # using `selected_trials` since initially that data frame
@@ -221,6 +229,12 @@ if __name__ == '__main__':
                         help='number of posterior samples to take at each OED step')
     parser.add_argument('--num-epochs', type=int, default=1,
                         help='number of epochs of optimisation to perform at each OED step')
+    parser.add_argument('--opt-method', type=str, default='Adam',
+                        help='optimisation method')
+    parser.add_argument('-lr', type=float, default=1e-3,
+                        help='learning rate')
+    parser.add_argument('--weight-decay', type=float, default=0,
+                        help='weight decay')
     args = parser.parse_args()
     print(args)
     main(args)
