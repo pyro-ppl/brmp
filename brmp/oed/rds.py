@@ -1,12 +1,13 @@
 import argparse
 import operator
-from functools import reduce
+from functools import reduce, partial
 import json
 import os
 from pprint import pprint
 
 from scipy.stats import gaussian_kde
 import pandas as pd
+import torch.optim as optim
 
 from brmp.numpyro_backend import backend as numpyro
 from brmp.design import metadata_from_df
@@ -110,6 +111,7 @@ def run_simulation(df, M, formula_str, priors,
                     callback=collect_plot_data,
                     interval_method=interval_method,
                     q_net='independent',
+                    optimizer=partial(optim.Adam, lr=0.001, weight_decay=0.002),
                     verbose=True)
                 all_eigs.append(eigs)
 

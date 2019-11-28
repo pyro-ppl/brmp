@@ -1,6 +1,7 @@
 import itertools
 import time
 import random
+from functools import partial
 
 import numpy as np
 import pandas as pd
@@ -91,7 +92,7 @@ class SequentialOED:
         return random.choice(design_space)
 
     def next_trial(self, callback=None, verbose=False, design_space=None,
-                   interval_method='fixed', q_net='full', seed=None):
+                   interval_method='fixed', q_net='full', optimizer=None, seed=None):
 
         # FIXME: Don't invoke the call back when using CUDA. (Since at
         # present the only callback we have doesn't work with CUDA.)
@@ -169,7 +170,7 @@ class SequentialOED:
         vectorize = True
         est_eig_fn = est_eig_vec if vectorize else est_eig
         eigs, cbvals, elapsed = est_eig_fn(Q, targets, inputs, design_space, self.target_coefs,
-                                           callback, self.num_epochs, self.use_cuda, verbose)
+                                           callback, self.num_epochs, self.use_cuda, optimizer, verbose)
         if verbose:
             print('Elapsed: {}'.format(elapsed))
 
@@ -190,7 +191,7 @@ def argmax(lst):
 
 
 # Estimate the EIG for each design.
-def est_eig(Q, targets, inputs, design_space, target_coefs, callback, num_epochs, use_cuda, verbose):
+def est_eig(Q, targets, inputs, design_space, target_coefs, callback, num_epochs, use_cuda, optimizer, verbose):
     num_coefs = targets.shape[1]
     eigs = []
     cbvals = []
@@ -207,7 +208,7 @@ def est_eig(Q, targets, inputs, design_space, target_coefs, callback, num_epochs
         if use_cuda:
             q_net.cuda()
         t0 = time.time()
-        optimise(q_net, inputs_i, targets_enc, num_epochs, verbose)
+        optimise(q_net, inputs_i, targets_enc, num_epochs, optimizer, verbose)
 
         eig = torch.mean(q_net.logprobs(inputs_i, targets_enc)).item()
         eigs.append(eig)
@@ -219,7 +220,7 @@ def est_eig(Q, targets, inputs, design_space, target_coefs, callback, num_epochs
 
 
 # Estimate the EIG for each design. (Vectorized over designs.)
-def est_eig_vec(Q, targets, inputs, design_space, target_coefs, callback, num_epochs, use_cuda, verbose):
+def est_eig_vec(Q, targets, inputs, design_space, target_coefs, callback, num_epochs, use_cuda, optimizer, verbose):
     num_coefs = targets.shape[1]
     # Encode targets, and replicate for each design.
     targets_enc = Q.encode(targets).unsqueeze(0).expand(len(design_space), -1, -1)
@@ -229,14 +230,14 @@ def est_eig_vec(Q, targets, inputs, design_space, target_coefs, callback, num_ep
         inputs = inputs.cuda()
         targets_enc = targets_enc.cuda()
     t0 = time.time()
-    optimise(q_net, inputs, targets_enc, num_epochs, verbose)
+    optimise(q_net, inputs, targets_enc, num_epochs, optimizer, verbose)
     eigs = torch.mean(q_net.logprobs(inputs, targets_enc), -1)
     elapsed = time.time() - t0
     cbvals = callback(q_net, inputs, targets, design_space, target_coefs)
     return eigs.tolist(), cbvals, elapsed
 
 
-def optimise(net, inputs, targets, num_epochs, verbose):
+def optimise(net, inputs, targets, num_epochs, optimizer, verbose):
 
     assert inputs.shape[1] == targets.shape[1]
     N = inputs.shape[1]
@@ -256,7 +257,9 @@ def optimise(net, inputs, targets, num_epochs, verbose):
     input_batches = inputs.chunk(num_batches, 1)
     target_batches = targets.chunk(num_batches, 1)
 
-    optimizer = optim.Adam(net.parameters(), lr=0.001, weight_decay=0.02)
+    if optimizer is None:
+        optimizer = partial(optim.Adam, lr=0.001)
+    optimizer = optimizer(net.parameters())
 
     for i in range(num_epochs):
         epoch_loss = 0.
