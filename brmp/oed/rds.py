@@ -51,7 +51,7 @@ from brmp.oed.example import collect_plot_data  # , make_training_data_plot
 
 def run_simulation(df, M, formula_str, priors,
                    target_coefs, response_col, participant_col, design_cols,
-                   interval_method, num_samples, use_oed=True):
+                   interval_method, num_samples, num_epochs, use_oed=True):
 
     df_metadata = metadata_from_df(df)
     participants = possible_values(df_metadata.column(participant_col))
@@ -79,6 +79,7 @@ def run_simulation(df, M, formula_str, priors,
         priors=priors,
         target_coefs=target_coefs,
         num_samples=num_samples,
+        num_epochs=num_epochs,
         backend=numpyro,
         use_cuda=bool(os.environ.get('OED_USE_CUDA', 0)))
 
@@ -163,7 +164,8 @@ def main(args):
         design_cols=['x', 'z'],
         target_coefs=[target_coef],
         interval_method=args.interval_method,
-        num_samples=args.num_samples)
+        num_samples=args.num_samples,
+        num_epochs=args.num_epochs)
 
     # Compute the Bayes factor. (We avoid defining the model
     # using `selected_trials` since initially that data frame
@@ -214,6 +216,8 @@ if __name__ == '__main__':
                         help='method used to select OED target interval')
     parser.add_argument('--num-samples', type=int, default=10,
                         help='number of posterior samples to take at each OED step')
+    parser.add_argument('--num-epochs', type=int, default=1,
+                        help='number of epochs of optimisation to perform at each OED step')
     args = parser.parse_args()
     print(args)
     main(args)
