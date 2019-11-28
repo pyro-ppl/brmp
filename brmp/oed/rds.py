@@ -51,7 +51,7 @@ from brmp.oed.example import collect_plot_data  # , make_training_data_plot
 
 def run_simulation(df, M, formula_str, priors,
                    target_coefs, response_col, participant_col, design_cols,
-                   use_oed=True, fixed_target_interval=True):
+                   use_oed=True, interval_method='fixed'):
 
     df_metadata = metadata_from_df(df)
     participants = possible_values(df_metadata.column(participant_col))
@@ -107,7 +107,7 @@ def run_simulation(df, M, formula_str, priors,
                 next_trial, dstar, eigs, fit, plot_data = oed.next_trial(
                     design_space=next_design_space,
                     callback=collect_plot_data,
-                    fixed_target_interval=fixed_target_interval,
+                    interval_method=interval_method,
                     verbose=True)
                 all_eigs.append(eigs)
 
@@ -152,10 +152,10 @@ def main(name, M):
     target_coef = 'b_z[b]'
 
     conditions = dict(
-        oed=dict(use_oed=True, fixed_target_interval=True, target_coefs=[target_coef]),
-        oed_alt=dict(use_oed=True, fixed_target_interval=False, target_coefs=[target_coef]),
-        oed_all=dict(use_oed=True, fixed_target_interval=True, target_coefs=[]),  # empty list means all coefs
-        oed_all_alt=dict(use_oed=True, fixed_target_interval=False, target_coefs=[]),
+        oed=dict(use_oed=True, interval_method='fixed', target_coefs=[target_coef]),
+        oed_alt=dict(use_oed=True, interval_method='quantile', target_coefs=[target_coef]),
+        oed_all=dict(use_oed=True, interval_method='fixed', target_coefs=[]),  # empty list means all coefs
+        oed_all_alt=dict(use_oed=True, interval_method='quantile', target_coefs=[]),
         rand=dict(use_oed=False, target_coefs=[target_coef]))
     kwargs = conditions[name]
 

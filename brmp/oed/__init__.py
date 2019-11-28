@@ -89,7 +89,7 @@ class SequentialOED:
                         else self._check_design_space(design_space))
         return random.choice(design_space)
 
-    def next_trial(self, callback=None, verbose=False, design_space=None, fixed_target_interval=True, seed=None):
+    def next_trial(self, callback=None, verbose=False, design_space=None, interval_method='fixed', seed=None):
 
         # FIXME: Don't invoke the call back when using CUDA. (Since at
         # present the only callback we have doesn't work with CUDA.)
@@ -130,32 +130,29 @@ class SequentialOED:
         assert latent_samples.shape == (self.num_samples, self.num_coefs)
         assert y_samples.shape == (self.num_samples, len(design_space))
 
-        # Compute the targets. (These are used by all designs.)
-
-        # TODO: How might we set this automatically, and possibly
-        # adapt it over time? Is setting it so that ~50% of sample are
-        # within the interval sensible? Or perhaps at least ensure
-        # that the class are reasonably balanced. 70/30 might be OK,
-        # 99/1 probably not?
-
-        # Here's one idea: (TODO: Test this.)
-
         # Determine the interval to use for targets.
-        if fixed_target_interval:
+        if interval_method == 'fixed':
             eps = 0.5
             interval_low = -eps
             interval_high = eps
-        else:
+        elif interval_method == 'quantile':
             # qs is a 2 x num_coefs array. The first row is
             # per-coefficient 0.25 quantiles, the second row 0.75.
             qs = np.quantile(latent_samples, [.25, .75], 0)
             interval_low = torch.tensor(qs[0])
             interval_high = torch.tensor(qs[1])
+        elif interval_method == 'adapt':
+            eps = [determine_target_eps(latent_samples[:, i]) for i in range(self.num_coefs)]
+            interval_low = -torch.tensor(eps)
+            interval_high = torch.tensor(eps)
+        else:
+            raise Exception('unrecognised interval method')
 
         print('Targets interval:')
         print('  Low:  {}'.format(interval_low))
         print('  High: {}'.format(interval_high))
 
+        # Compute the targets. (These are used by all designs.)
         targets = ((interval_low < latent_samples) & (latent_samples < interval_high)).long()
         assert targets.shape == (self.num_samples, self.num_coefs)
         print('Targets class balance: {}'.format(targets.float().mean(0)))
@@ -374,3 +371,32 @@ def df_append_row(df, row):
         if is_categorical_dtype(df[k]) and not is_categorical_dtype(out[k]):
             out[k] = pd.Categorical(out[k])
     return out
+
+
+def determine_target_eps(latent_samples):
+    assert len(latent_samples.shape) == 1  # This method expects only a single coefficient.
+
+    eps = 0.5  # Initial value for eps.
+
+    best_upper = None
+    best_lower = None
+
+    grow_factor = 1.5
+
+    while best_upper is None or best_lower is None:
+        interval_low = -eps
+        interval_high = eps
+        targets = ((interval_low < latent_samples) & (latent_samples < interval_high)).long()
+        prop = targets.float().mean(0)
+        if prop > 0.5:
+            if best_upper is None or best_upper[1] > prop:
+                best_upper = (eps, prop)
+            eps = eps / grow_factor
+        else:
+            if best_lower is None or best_lower[1] < prop:
+                best_lower = (eps, prop)
+            eps = eps * grow_factor
+
+    # Average the upper and lower bounds found, for now. Could do more
+    # work though, e.g. binary search.
+    return (best_lower[0] + best_upper[0]) / 2.
