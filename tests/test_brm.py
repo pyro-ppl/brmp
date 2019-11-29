@@ -14,7 +14,7 @@ from brmp.design import (Categorical, CategoricalCoding, Integral,
                          coef_names, dummy_df, make_column_lookup, makedata,
                          metadata_from_cols, metadata_from_df)
 from brmp.family import (LKJ, Bernoulli, Binomial, HalfCauchy, HalfNormal,
-                         Normal)
+                         Normal, StudentT)
 from brmp.fit import Samples
 from brmp.formula import Formula, OrderedSet, Term, _1, allfactors, parse
 from brmp.model import parameters, scalar_parameter_map, scalar_parameter_names
@@ -41,6 +41,7 @@ default_params = dict(
     HalfNormal=dict(scale=1.),
     LKJ=dict(eta=1.),
     Beta=dict(concentration1=1., concentration0=1.),
+    StudentT=dict(df=3., loc=0., scale=1.),
 )
 
 
@@ -165,6 +166,13 @@ codegen_cases = [
      [('b_0', 'Cauchy', {}),
       ('b_1', 'Normal', {'loc': 0., 'scale': 100.}),
       ('b_2', 'Cauchy', {}),
+      ('sigma', 'HalfCauchy', {})]),
+
+    ('y ~ 1',
+     [], {},
+     Normal,
+     [Prior(('b',), StudentT(3., 0., 1.))],
+     [('b_0', 'StudentT', {}),
       ('sigma', 'HalfCauchy', {})]),
 
     # Prior on coef of a factor.

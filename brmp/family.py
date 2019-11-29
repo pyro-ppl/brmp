@@ -118,6 +118,19 @@ HalfNormal = Family('HalfNormal',
 :param sigma: scale
 """
 
+StudentT = Family('StudentT',
+                  [param('df', Type['PosReal']()),
+                   param('loc', Type['Real']()),
+                   param('scale', Type['PosReal']())],
+                  const(Type['Real']()),
+                  None)
+
+"""
+:param df: degrees of freedom
+:param loc: location
+:param scale: scale
+"""
+
 
 def apply1(family, name, value):
     if name not in [p.name for p in family.params]:

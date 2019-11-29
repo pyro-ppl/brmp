@@ -14,3 +14,5 @@ Family
 .. autodata:: brmp.family.Binomial
 
 .. autodata:: brmp.family.HalfNormal
+
+.. autodata:: brmp.family.StudentT
