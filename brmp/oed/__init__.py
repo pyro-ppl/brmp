@@ -244,8 +244,6 @@ def optimise(net, inputs, targets, num_epochs, optimizer, verbose):
     batch_size = 50
     assert N % batch_size == 0
 
-    # TODO: Note: using some weight decay probably makes sense here.
-
     # Shuffle data.
     ix = list(range(N))
     random.shuffle(ix)
