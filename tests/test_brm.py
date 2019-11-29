@@ -87,6 +87,12 @@ codegen_cases = [
       ('z_0', 'Normal', {}),
       ('sd_0_0', 'HalfCauchy', {})]),
 
+    # Integers as categorical levels.
+    ('y ~ 1 | z', [Categorical('z', [10, 20])], {}, Normal, [],
+     [('sigma', 'HalfCauchy', {}),
+      ('z_0', 'Normal', {}),
+      ('sd_0_0', 'HalfCauchy', {})]),
+
     ('y ~ x | z', [Categorical('z', list('ab'))], {}, Normal, [],
      [('sigma', 'HalfCauchy', {}),
       ('z_0', 'Normal', {}),
@@ -537,6 +543,16 @@ def test_scalar_param_map_consistency():
         param_shape = ss[0]
         assert len(indices) == len(param_shape)
         assert all(i < s for (i, s) in zip(indices, param_shape))
+
+
+@pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
+def test_scalar_parameter_names_smoke(formula_str, non_real_cols, contrasts, family, priors, expected):
+    formula = parse(formula_str)
+    cols = expand_columns(formula, non_real_cols)
+    metadata = metadata_from_cols(cols)
+    model = define_model(formula_str, metadata, family, priors, contrasts)
+    names = scalar_parameter_names(model.desc)
+    assert type(names) == list
 
 
 @pytest.mark.parametrize('formula_str, non_real_cols, family, priors', [
