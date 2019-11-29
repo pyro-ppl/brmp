@@ -176,7 +176,8 @@ def main(args):
         num_epochs=args.num_epochs,
         opt_method=args.opt_method,
         lr=args.lr,
-        weight_decay=args.weight_decay)
+        weight_decay=args.weight_decay,
+        use_oed=not args.rand)
 
     # Compute the Bayes factor. (We avoid defining the model
     # using `selected_trials` since initially that data frame
@@ -203,7 +204,11 @@ def main(args):
         results = {}
 
     args_dict = vars(args)
-    name = '_'.join(str(args_dict[k]) for k in sorted(args_dict.keys()))
+    if args.rand:
+        # All the other args. are ignored in this case, so reflect that in `name`.
+        name = 'rand_{}'.format(M)
+    else:
+        name = '_'.join(str(args_dict[k]) for k in sorted(args_dict.keys()))
 
     if name not in results:
         results[name] = []
@@ -235,6 +240,8 @@ if __name__ == '__main__':
                         help='learning rate')
     parser.add_argument('--weight-decay', type=float, default=0,
                         help='weight decay')
+    parser.add_argument('--rand', action='store_true', default=False,
+                        help='select trials uniformly at random rather than using OED')
     args = parser.parse_args()
     print(args)
     main(args)
