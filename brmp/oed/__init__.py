@@ -160,7 +160,12 @@ class SequentialOED:
         # Compute the targets. (These are used by all designs.)
         targets = ((interval_low < latent_samples) & (latent_samples < interval_high)).long()
         assert targets.shape == (self.num_samples, self.num_coefs)
-        print('Targets class balance: {}'.format(targets.float().mean(0)))
+        balance = targets.float().mean(0)
+        print('Targets class balance: {}'.format(balance))
+
+        # Check we found a sensible interval -- retry (with a different seed) if not.
+        if interval_method == 'adapt' and not torch.all((0.25 < balance) & (balance < 0.75)):
+            return self.next_trial(callback, verbose, design_space, interval_method, q_net, optimizer, seed=None)
 
         inputs = y_samples.t().unsqueeze(-1)
         assert inputs.shape == (len(design_space), self.num_samples, 1)
