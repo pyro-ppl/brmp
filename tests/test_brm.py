@@ -317,7 +317,17 @@ codegen_cases = [
 ]
 
 
-# TODO: Extend this. Could check that the response is observed?
+# Map generic family names to backend specific names.
+def pyro_family_name(name):
+    return dict(LKJ='LKJCorrCholesky').get(name, name)
+
+
+def numpyro_family_name(name):
+    return dict(LKJ='LKJCholesky',
+                Bernoulli='BernoulliProbs',
+                Binomial='BinomialProbs').get(name, name)
+
+
 @pytest.mark.parametrize('N', [1, 5])
 @pytest.mark.parametrize('formula_str, non_real_cols, contrasts, family, priors, expected', codegen_cases)
 def test_pyro_codegen(N, formula_str, non_real_cols, contrasts, family, priors, expected):
@@ -340,15 +350,21 @@ def test_pyro_codegen(N, formula_str, non_real_cols, contrasts, family, priors, 
     df = dummy_df(cols, N, allow_non_exhaustive=True)
     data = data_from_numpy(pyro_backend, makedata(formula, df, metadata, contrasts))
 
-    # Check sample sites.
     trace = poutine.trace(modelfn).get_trace(**data)
+
+    # Check that y is correctly observed.
+    y_node = trace.nodes['y']
+    assert y_node['is_observed']
+    assert type(y_node['fn']).__name__ == family.name
+    assert_equal(y_node['value'], data['y_obs'])
+
+    # Check sample sites.
     expected_sites = [site for (site, _, _) in expected]
     assert set(trace.stochastic_nodes) - {'obs'} == set(expected_sites)
     for (site, family_name, maybe_params) in expected:
-        pyro_family_name = dict(LKJ='LKJCorrCholesky').get(family_name, family_name)
         fn = unwrapfn(trace.nodes[site]['fn'])
         params = maybe_params or default_params[family_name]
-        assert type(fn).__name__ == pyro_family_name
+        assert type(fn).__name__ == pyro_family_name(family_name)
         for (name, expected_val) in params.items():
             val = fn.__getattribute__(name)
             assert_equal(val, torch.tensor(expected_val).expand(val.shape))
@@ -373,17 +389,23 @@ def test_numpyro_codegen(N, formula_str, non_real_cols, contrasts, family, prior
     df = dummy_df(cols, N, allow_non_exhaustive=True)
     data = data_from_numpy(numpyro_backend, makedata(formula, df, metadata, contrasts))
 
-    # Check sample sites.
     rng = random.PRNGKey(0)
     trace = numpyro.trace(numpyro.seed(modelfn, rng)).get_trace(**data)
+
+    # Check that y is correctly observed.
+    y_node = trace['y']
+    assert y_node['is_observed']
+    assert type(y_node['fn']).__name__ == numpyro_family_name(family.name)
+    assert_equal(y_node['value'], data['y_obs'])
+
+    # Check sample sites.
     expected_sites = [site for (site, _, _) in expected]
     sample_sites = [name for name, node in trace.items() if not node['is_observed']]
     assert set(sample_sites) == set(expected_sites)
     for (site, family_name, maybe_params) in expected:
-        numpyro_family_name = dict(LKJ='LKJCholesky').get(family_name, family_name)
         fn = trace[site]['fn']
         params = maybe_params or default_params[family_name]
-        assert type(fn).__name__ == numpyro_family_name
+        assert type(fn).__name__ == numpyro_family_name(family_name)
         for (name, expected_val) in params.items():
             if family_name == 'LKJ':
                 assert name == 'eta'
