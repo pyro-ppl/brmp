@@ -2,8 +2,11 @@ import os
 import sys
 from collections import defaultdict
 import json
+from functools import partial
 
+import torch.optim as optim
 import pandas as pd
+
 from brmp.oed import SequentialOED
 from brmp.design import metadata_from_df
 from brmp.priors import Prior
@@ -49,7 +52,8 @@ def main(fn, selected_trials_fn, eigs_fn, step):
         df_metadata.columns,
         priors=priors,
         target_coefs=[target_coef],
-        num_samples=2000,
+        num_samples=6000,
+        num_epochs=300,
         backend=numpyro,
         use_cuda=bool(os.environ.get('OED_USE_CUDA', 0)))
     selected_trials = pd.read_csv(selected_trials_fn)
@@ -80,7 +84,11 @@ def main(fn, selected_trials_fn, eigs_fn, step):
 
     all_eigs = defaultdict(list)
     for _ in range(20):
+        optimizer = partial(optim.SGD, momentum=0.9, lr=0.0001, weight_decay=0.1)
         _, _, eigs, _, _ = oed.next_trial(design_space=next_design_space,
+                                          interval_method='adapt',
+                                          q_net='independent',
+                                          optimizer=optimizer,
                                           verbose=True)
         for trial, eig in eigs:
             all_eigs['{}_{}'.format(trial['x'], trial['z'])].append(eig)
