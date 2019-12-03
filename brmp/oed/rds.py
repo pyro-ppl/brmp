@@ -208,7 +208,7 @@ def main(args):
         # All the other args. are ignored in this case, so reflect that in `name`.
         name = 'rand_{}'.format(M)
     else:
-        name = '_'.join(str(args_dict[k]) for k in sorted(args_dict.keys()))
+        name = '_'.join(str(args_dict[k]) for k in sorted(args_dict.keys()) if not k == 'rand')
 
     if name not in results:
         results[name] = []
