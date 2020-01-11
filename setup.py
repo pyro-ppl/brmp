@@ -2,6 +2,7 @@ from setuptools import find_packages, setup
 
 setup(name='brmp',
       packages=find_packages(),
+      license='Apache License 2.0',
       install_requires=[
         'pandas',
         'pyro-ppl>=1.0.0',
