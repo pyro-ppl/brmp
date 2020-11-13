@@ -45,6 +45,9 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc assets s
 
     # https://rdrr.io/cran/brms/man/fitted.brmsfit.html
 
+    def __init__(self, *args, **kwargs):
+        self._parameter_map = scalar_parameter_map(self.model_desc)
+
     def fitted(self, what='expectation', data=None, seed=None):
         """
         Produces predictions from the fitted model.
@@ -141,8 +144,6 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc assets s
 
         """
         names = scalar_parameter_names(self.model_desc)
-        # TODO: Every call to `get_scalar_param` rebuilds the scalar
-        # parameter map.
         vecs = [self.get_scalar_param(name, True) for name in names]
         col_labels = ['mean', 'sd'] + format_quantiles(qs) + ['n_eff', 'r_hat']
         samples = np.stack(vecs, axis=2)
@@ -180,8 +181,7 @@ class Fit(namedtuple('Fit', 'formula metadata contrasts data model_desc assets s
         :rtype: numpy.ndarray
 
         """
-        m = scalar_parameter_map(self.model_desc)
-        res = [p for (n, p) in m if n == name]
+        res = [p for (n, p) in self._parameter_map if n == name]
         assert len(res) < 2
         if len(res) == 0:
             raise KeyError('unknown parameter name: {}'.format(name))
