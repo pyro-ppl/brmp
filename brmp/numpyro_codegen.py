@@ -202,6 +202,8 @@ def geninvlinkbody(linkfn, code):
         return code
     elif linkfn == LinkFn.logit:
         return 'sigmoid({})'.format(code)
+    elif linkfn == LinkFn.log:
+        return 'np.exp({})'.format(code)
     else:
         raise NotImplementedError('code generation for link function {} not implemented'.format(linkfn))
 
