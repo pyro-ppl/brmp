@@ -14,7 +14,7 @@ from brmp.design import (Categorical, CategoricalCoding, Integral,
                          coef_names, dummy_df, make_column_lookup, makedata,
                          metadata_from_cols, metadata_from_df)
 from brmp.family import (LKJ, Bernoulli, Binomial, HalfCauchy, HalfNormal,
-                         Normal, StudentT)
+                         Normal, StudentT, Poisson)
 from brmp.fit import Samples
 from brmp.formula import Formula, OrderedSet, Term, _1, allfactors, parse
 from brmp.model import parameters, scalar_parameter_map, scalar_parameter_names
@@ -78,6 +78,9 @@ codegen_cases = [
      {}, Normal, [],
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {})]),
+
+    ('y ~ 1 + x', [Integral('y', min=0, max=10), Integral('x', min=0, max=10)], {}, Poisson, [],
+     [('b_0', 'Cauchy', {})]),
 
     # (Formula('y', [], [Group([], 'z', True)]), [Categorical('z', list('ab'))], [], ['sigma', 'z_1']),
     # Groups with fewer than two terms don't sample the (Cholesky
@@ -478,6 +481,9 @@ def test_mu_correctness(formula_str, cols, backend, expected):
     ([Integral('y', min=0, max=5)],
      Binomial(num_trials=5),
      lambda mu: sigmoid(mu) * 5),
+    ([Integral('y', min=0, max=5)],
+     Poisson,
+     lambda mu: np.exp(mu)),
 ])
 @pytest.mark.parametrize('backend', [pyro_backend, numpyro_backend])
 def test_expectation_correctness(cols, family, expected, backend):
@@ -598,6 +604,7 @@ def test_scalar_parameter_names_smoke(formula_str, non_real_cols, contrasts, fam
      Binomial(num_trials=2),
      []),
     ('y ~ x', [Categorical('y', list('abc'))], Binomial(num_trials=1), []),
+    ('y ~ x', [], Poisson, []),
 ])
 def test_family_and_response_type_checks(formula_str, non_real_cols, family, priors):
     formula = parse(formula_str)
