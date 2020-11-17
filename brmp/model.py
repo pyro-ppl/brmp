@@ -138,4 +138,4 @@ def scalar_parameter_names(model):
 
 def level2str(level):
     assert type(level) == tuple
-    return '_'.join(str(l) for l in level)
+    return '_'.join(str(lv) for lv in level)
