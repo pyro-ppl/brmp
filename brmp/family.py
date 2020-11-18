@@ -132,9 +132,9 @@ StudentT = Family('StudentT',
 """
 
 Poisson = Family('Poisson',
-                  [param('rate', Type['PosReal']())],
-                  const(Type['IntegerRange'](0, None)),
-                  Link('rate', LinkFn.log))
+                 [param('rate', Type['PosReal']())],
+                 const(Type['IntegerRange'](0, None)),
+                 Link('rate', LinkFn.log))
 
 """
 :param rate: rate
