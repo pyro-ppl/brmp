@@ -192,6 +192,8 @@ def geninvlinkbody(linkfn, code):
         return code
     elif linkfn == LinkFn.logit:
         return 'torch.sigmoid({})'.format(code)
+    elif linkfn == LinkFn.log:
+        return 'torch.exp({})'.format(code)
     else:
         raise NotImplementedError('code generation for link function {} not implemented'.format(linkfn))
 

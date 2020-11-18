@@ -45,7 +45,7 @@ def istype(ty):
 
 
 # Inverse might also be called recip(rocal).
-LinkFn = Enum('LinkFn', 'identity logit inverse')
+LinkFn = Enum('LinkFn', 'identity logit inverse log')
 
 Link = namedtuple('Link', 'param fn')
 
@@ -129,6 +129,15 @@ StudentT = Family('StudentT',
 :param df: degrees of freedom
 :param loc: location
 :param scale: scale
+"""
+
+Poisson = Family('Poisson',
+                 [param('rate', Type['PosReal']())],
+                 const(Type['IntegerRange'](0, None)),
+                 Link('rate', LinkFn.log))
+
+"""
+:param rate: rate
 """
 
 
