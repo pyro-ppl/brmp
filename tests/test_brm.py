@@ -79,9 +79,6 @@ codegen_cases = [
      [('b_0', 'Cauchy', {}),
       ('sigma', 'HalfCauchy', {})]),
 
-    ('y ~ 1 + x', [Integral('y', min=0, max=10), Integral('x', min=0, max=10)], {}, Poisson, [],
-     [('b_0', 'Cauchy', {})]),
-
     # (Formula('y', [], [Group([], 'z', True)]), [Categorical('z', list('ab'))], [], ['sigma', 'z_1']),
     # Groups with fewer than two terms don't sample the (Cholesky
     # decomp. of the) correlation matrix.
@@ -287,6 +284,13 @@ codegen_cases = [
      [Integral('y', min=0, max=10)],
      {},
      Binomial(num_trials=10),
+     [],
+     [('b_0', 'Cauchy', {})]),
+
+    ('y ~ 1 + x',
+     [Integral('y', min=0, max=10), Integral('x', min=0, max=10)],
+     {},
+     Poisson,
      [],
      [('b_0', 'Cauchy', {})]),
 
